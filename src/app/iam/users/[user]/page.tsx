@@ -49,14 +49,15 @@ export default async function UserDetailPage({ params }: PageProps) {
       };
 
       const policiesRes = await iam.send(
-        new ListPoliciesCommand({ Scope: "All", MaxItems: 100 })
+        new ListPoliciesCommand({ Scope: "All", MaxItems: 200 })
       );
       allPolicies = (policiesRes.Policies ?? [])
         .map((p) => ({
           name: p.PolicyName ?? "",
-          arn: p.PolicyArn ?? "",
+          arn: p.Arn ?? p.PolicyArn ?? "",
         }))
-        .filter((p) => p.name && p.arn);
+        .filter((p) => p.name && p.arn)
+        .sort((a, b) => a.name.localeCompare(b.name));
     }
   } catch (err: unknown) {
     error = err instanceof Error ? err.message : String(err);

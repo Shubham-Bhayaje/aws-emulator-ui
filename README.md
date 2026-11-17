@@ -50,14 +50,41 @@ This web UI connects directly to your local emulator over HTTPS and provides ded
   - Manage IAM Roles: create roles with trust policies (Lambda, EC2, ECS, or custom JSON) and inspect `AssumeRolePolicyDocument`.
   - Policy Inspector: browse customer and AWS-managed policies, review structured Statement breakdowns (`Effect`, `Action`, `Resource`), and inspect syntax-highlighted JSON policy documents.
 
-- **All Services Catalog**:
+- **AWS CloudShell Terminal (`>_`)**:
+  - Interactive terminal drawer embedded directly in the top navigation bar.
+  - Executes real AWS CLI commands directly against the local emulator container (`aws s3 ls`, `aws dynamodb list-tables`, `aws sqs list-queues`, `aws iam list-users`, etc.).
+  - Command history navigation (`↑` / `↓`), execution duration timer, and maximize/restore drawer controls.
+  - Works with native AWS CLI installed on the host system, with an AWS SDK v3 fallback runner.
+
+- **Active Identity & Role Switcher (Local IAM Policy Enforcement)**:
+  - Switch active identity between Administrator (`000000000000`), custom IAM Users, and Assumed Roles from the account menu.
+  - Built-in local IAM policy evaluation engine (`src/lib/permissions.ts`) that enforces least-privilege policies locally, evaluating `Effect`, `Action` (e.g. `s3:*`, `dynamodb:PutItem`), and `Resource` (`arn:aws:s3:::*`).
+  - Simulates authentic `AccessDeniedException` error banners when unauthorized actions are attempted under restricted user or role identities.
+
+- **Interactive Top Navigation & Global Search**:
+  - Global Search Command Palette (`Alt + S`) indexing all 211 services with instant keyboard filtering.
+  - Active Region selector (`us-east-1`, `us-east-2`, `us-west-1`, `us-west-2`).
+  - Notifications drawer displaying real-time emulator connection and credential health.
+  - Settings drawer with endpoint status indicators and cache management.
+
+- **All Services Catalog (200+ AWS Services)**:
   - Comprehensive catalog of 200+ AWS services categorized across Compute, Storage, Database, Networking, Security, Management, Analytics, Machine Learning, Developer Tools, IoT, Business Applications, and more.
   - Instant live filter and search with category counts and quick jump links.
-  - Services currently under development show a consistent, Cloudscape-styled overview screen with documentation links.
+  - Universal dynamic service routing (`/[service]`): any service in the catalog opens in an authentic Cloudscape console layout with documentation links.
 
 - **Cross-Platform Dev Runner (`scripts/dev.js`)**:
   - Automatically locates the emulator TLS certificate (`ca.pem`) on Windows (`%USERPROFILE%`), macOS, or Linux/WSL.
   - Injects `NODE_EXTRA_CA_CERTS` and credentials so the UI communicates with the emulator securely without disabling TLS checks.
+
+---
+
+### Keyboard Shortcuts
+
+| Shortcut | Description |
+| :--- | :--- |
+| `Alt + S` | Open global service search palette |
+| `Esc` | Close open modals, search palette, or CloudShell drawer |
+| `↑` / `↓` | Navigate command history in CloudShell terminal |
 
 ---
 
