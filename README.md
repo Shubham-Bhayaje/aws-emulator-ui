@@ -4,6 +4,8 @@ A lightweight, local, pixel-perfect **AWS Management Console UI** clone designed
 
 Built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, and **AWS SDK v3**.
 
+![AWS Console Home Screenshot](docs/images/console-home.png)
+
 ---
 
 ## Architecture Overview
