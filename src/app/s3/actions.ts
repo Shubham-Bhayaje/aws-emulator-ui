@@ -16,6 +16,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getActiveIdentity } from "@/lib/identity";
+import { assertPermission } from "@/lib/permissions";
 
 // Create a new S3 bucket
 export async function createBucket(formData: FormData) {
@@ -26,6 +28,9 @@ export async function createBucket(formData: FormData) {
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "s3:CreateBucket", `arn:aws:s3:::${name.trim()}`);
+
     await s3.send(new CreateBucketCommand({ Bucket: name.trim() }));
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -39,6 +44,9 @@ export async function createBucket(formData: FormData) {
 // Delete a bucket (must be empty first)
 export async function deleteBucket(bucketName: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "s3:DeleteBucket", `arn:aws:s3:::${bucketName}`);
+
     await s3.send(new DeleteBucketCommand({ Bucket: bucketName }));
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -50,6 +58,9 @@ export async function deleteBucket(bucketName: string) {
 // Empty a bucket (delete all objects inside it)
 export async function emptyBucket(bucketName: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "s3:DeleteObject", `arn:aws:s3:::${bucketName}/*`);
+
     let continuationToken: string | undefined;
     do {
       const list = await s3.send(
@@ -83,6 +94,9 @@ export async function emptyBucket(bucketName: string) {
 // Delete a single object
 export async function deleteObject(bucket: string, key: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "s3:DeleteObject", `arn:aws:s3:::${bucket}/${key}`);
+
     await s3.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -105,6 +119,9 @@ export async function uploadObject(formData: FormData) {
   const bytes = await file.arrayBuffer();
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "s3:PutObject", `arn:aws:s3:::${bucket}/${key}`);
+
     await s3.send(
       new PutObjectCommand({
         Bucket: bucket,
@@ -135,6 +152,9 @@ export async function createFolder(formData: FormData) {
   const key = prefix + folderName.trim() + "/";
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "s3:PutObject", `arn:aws:s3:::${bucket}/${key}`);
+
     await s3.send(
       new PutObjectCommand({
         Bucket: bucket,

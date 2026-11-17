@@ -16,6 +16,8 @@ import {
 } from "@aws-sdk/client-sqs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getActiveIdentity } from "@/lib/identity";
+import { assertPermission } from "@/lib/permissions";
 
 // Create a new SQS queue
 export async function createQueue(formData: FormData) {
@@ -29,6 +31,13 @@ export async function createQueue(formData: FormData) {
   const queueName = fifo ? name.trim() + ".fifo" : name.trim();
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "sqs:CreateQueue",
+      `arn:aws:sqs:us-east-1:000000000000:${queueName}`
+    );
+
     const attrs: Record<string, string> = {};
     if (fifo) attrs["FifoQueue"] = "true";
 
@@ -48,6 +57,9 @@ export async function createQueue(formData: FormData) {
 // Delete a queue
 export async function deleteQueue(queueUrl: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "sqs:DeleteQueue", queueUrl);
+
     await sqs.send(new DeleteQueueCommand({ QueueUrl: queueUrl }));
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -59,6 +71,9 @@ export async function deleteQueue(queueUrl: string) {
 // Purge a queue (delete all messages)
 export async function purgeQueue(queueUrl: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "sqs:PurgeQueue", queueUrl);
+
     await sqs.send(new PurgeQueueCommand({ QueueUrl: queueUrl }));
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -77,6 +92,9 @@ export async function sendMessage(formData: FormData) {
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "sqs:SendMessage", queueUrl);
+
     const result = await sqs.send(new SendMessageCommand({
       QueueUrl: queueUrl,
       MessageBody: body,
@@ -116,6 +134,9 @@ export async function receiveMessages(queueUrl: string) {
 // Delete a single message
 export async function deleteMessage(queueUrl: string, receiptHandle: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "sqs:DeleteMessage", queueUrl);
+
     await sqs.send(new DeleteMessageCommand({
       QueueUrl: queueUrl,
       ReceiptHandle: receiptHandle,

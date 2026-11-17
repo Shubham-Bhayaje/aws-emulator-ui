@@ -18,6 +18,8 @@ import {
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { marshalAttribute, unmarshalAttribute } from "./dynamo-utils";
+import { getActiveIdentity } from "@/lib/identity";
+import { assertPermission } from "@/lib/permissions";
 
 // Create a new DynamoDB table
 export async function createTable(formData: FormData) {
@@ -40,6 +42,13 @@ export async function createTable(formData: FormData) {
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "dynamodb:CreateTable",
+      `arn:aws:dynamodb:us-east-1:000000000000:table/${tableName}`
+    );
+
     const attributeDefinitions = [
       {
         AttributeName: partitionKeyName,
@@ -93,6 +102,13 @@ export async function createTable(formData: FormData) {
 // Delete a DynamoDB table
 export async function deleteTable(tableName: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "dynamodb:DeleteTable",
+      `arn:aws:dynamodb:us-east-1:000000000000:table/${tableName}`
+    );
+
     await dynamodb.send(new DeleteTableCommand({ TableName: tableName }));
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -119,6 +135,13 @@ export async function putItem(
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "dynamodb:PutItem",
+      `arn:aws:dynamodb:us-east-1:000000000000:table/${tableName}`
+    );
+
     await dynamodb.send(
       new PutItemCommand({
         TableName: tableName,
@@ -145,6 +168,13 @@ export async function deleteItem(
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "dynamodb:DeleteItem",
+      `arn:aws:dynamodb:us-east-1:000000000000:table/${tableName}`
+    );
+
     await dynamodb.send(
       new DeleteItemCommand({
         TableName: tableName,

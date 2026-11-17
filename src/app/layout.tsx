@@ -9,8 +9,8 @@ import "./globals.css";
 import TopBar from "@/components/TopBar";
 import { sts } from "@/lib/aws";
 import { GetCallerIdentityCommand } from "@aws-sdk/client-sts";
+import { getActiveIdentity } from "@/lib/identity";
 
-// Inter is the closest publicly available match to Amazon Ember
 const inter = Inter({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
@@ -40,10 +40,21 @@ export default async function RootLayout({
     // Use defaults if STS fails
   }
 
+  // Load the active identity from session cookies
+  const activeIdentity = await getActiveIdentity();
+  if (activeIdentity && activeIdentity.name && activeIdentity.type !== "admin") {
+    userName = activeIdentity.name;
+  }
+
   return (
     <html lang="en" className={inter.className}>
       <body>
-        <TopBar accountId={accountId} userName={userName} region={region} />
+        <TopBar
+          accountId={accountId}
+          userName={userName}
+          region={region}
+          initialIdentity={activeIdentity}
+        />
         <div className="mt-[40px]">{children}</div>
       </body>
     </html>
