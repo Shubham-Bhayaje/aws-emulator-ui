@@ -1,0 +1,41 @@
+/**
+ * Create IAM Role page – Server component.
+ * Loads policies and renders CreateRoleForm.
+ */
+
+import ServiceLayout from "@/components/ServiceLayout";
+import { iam } from "@/lib/aws";
+import { ListPoliciesCommand } from "@aws-sdk/client-iam";
+import { CreateRoleForm } from "./CreateRoleForm";
+import { iamNav } from "../../page";
+
+export default async function CreateRolePage() {
+  let policies: { name: string; arn: string }[] = [];
+
+  try {
+    const res = await iam.send(
+      new ListPoliciesCommand({ Scope: "All", MaxItems: 100 })
+    );
+    policies = (res.Policies ?? [])
+      .map((p) => ({
+        name: p.PolicyName ?? "",
+        arn: p.Arn ?? "",
+      }))
+      .filter((p) => p.name && p.arn);
+  } catch (err) {
+    console.error("Error fetching policies for role creation:", err);
+  }
+
+  return (
+    <ServiceLayout serviceName="IAM" serviceColor="#BD0816" navItems={iamNav}>
+      <div>
+        <h1 className="text-[22px] font-bold text-[#16191f] mb-1">Create role</h1>
+        <p className="text-[13px] text-[#545b64] mb-6">
+          Create an IAM role to delegate permissions to AWS services or identities.
+        </p>
+
+        <CreateRoleForm policies={policies} />
+      </div>
+    </ServiceLayout>
+  );
+}
