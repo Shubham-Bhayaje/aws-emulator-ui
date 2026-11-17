@@ -53,10 +53,11 @@ if (fs.existsSync(caCert)) {
 
 const isWindows = process.platform === "win32";
 const nextCmd = isWindows ? "npx.cmd" : "npx";
+const hostname = process.env.HOST || "0.0.0.0";
 
-console.log(`[AWS Emulator UI] Starting Next.js dev server on http://127.0.0.1:3000 ...`);
+console.log(`[AWS Emulator UI] Starting Next.js dev server on http://localhost:3000 (binding to ${hostname}) ...`);
 
-const child = spawn(nextCmd, ["next", "dev", "--hostname", "127.0.0.1"], {
+const child = spawn(nextCmd, ["next", "dev", "--hostname", hostname, "--port", "3000"], {
   stdio: "inherit",
   env,
   shell: true,
