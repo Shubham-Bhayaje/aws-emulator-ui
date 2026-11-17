@@ -5,11 +5,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Shubham-Bhayaje/-aws-emulator-ui.git"
+    "url": "https://github.com/Shubham-Bhayaje/aws-emulator-ui.git"
   },
-  "homepage": "https://github.com/Shubham-Bhayaje/-aws-emulator-ui#readme",
+  "homepage": "https://github.com/Shubham-Bhayaje/aws-emulator-ui#readme",
   "bugs": {
-    "url": "https://github.com/Shubham-Bhayaje/-aws-emulator-ui/issues"
+    "url": "https://github.com/Shubham-Bhayaje/aws-emulator-ui/issues"
   },
   "keywords": [
     "aws",

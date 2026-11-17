@@ -18,7 +18,7 @@ Hi everyone,
 Like many of you, I really enjoy using the AWS Emulator for local development, but missed having a visual dashboard to quickly inspect buckets, browse DynamoDB items, and check queue messages.
 
 I've put together an open-source, community web UI built with Next.js and AWS SDK v3:
-👉 https://github.com/Shubham-Bhayaje/-aws-emulator-ui
+👉 https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 Current support includes:
 - S3 (bucket creation, folder prefix navigation, file uploads/downloads)
@@ -44,7 +44,7 @@ With AWS recently releasing the official AWS Emulator (`aws/aws-emulator`), loca
 
 To make local debugging and prototyping easier, I built an open-source web dashboard that replicates the AWS Management Console interface:
 
-GitHub: https://github.com/Shubham-Bhayaje/-aws-emulator-ui
+GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 Key features so far:
 - **Amazon S3**: Browse buckets, traverse prefix folders, upload and download objects.
@@ -71,7 +71,7 @@ If you do any cloud or serverless development locally, you might know about the 
 
 Because the emulator doesn't ship with any graphical interface, I built an unofficial local web console you can self-host alongside it:
 
-🔗 Project: https://github.com/Shubham-Bhayaje/-aws-emulator-ui
+🔗 Project: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 Highlights:
 - Replicates the official AWS Management Console layout and themes.
@@ -94,7 +94,7 @@ AWS recently launched the official AWS Emulator (aws/aws-emulator) to let develo
 While the emulator engine is great, it’s strictly headless — meaning all interactions have to happen via the CLI or code.
 
 To make local cloud development more intuitive, I built an open-source web management console:
-👉 GitHub: https://github.com/Shubham-Bhayaje/-aws-emulator-ui
+👉 GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 What’s included:
 📦 Amazon S3: Bucket manager, folder prefix navigator, file upload & download
@@ -119,7 +119,7 @@ Built an open-source web console for the new official AWS Emulator ☁️🖥️
 
 The emulator is awesome for local testing, but has no UI. AWS Emulator UI gives you a local dashboard for S3, SQS, DynamoDB, and IAM with zero cloud costs.
 
-🔗 GitHub: https://github.com/Shubham-Bhayaje/-aws-emulator-ui
+🔗 GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 #AWS #DevTools #OpenSource #Nextjs
 ```
@@ -158,5 +158,5 @@ The emulator is awesome for local testing, but has no UI. AWS Emulator UI gives 
 Add this one-liner to your GitHub profile README or personal bio:
 
 ```markdown
-Creator of [AWS Emulator UI](https://github.com/Shubham-Bhayaje/-aws-emulator-ui) — An open-source web dashboard for the official AWS Emulator.
+Creator of [AWS Emulator UI](https://github.com/Shubham-Bhayaje/aws-emulator-ui) — An open-source web dashboard for the official AWS Emulator.
 ```

@@ -114,8 +114,8 @@ Clone this repository and launch the Next.js development server:
 
 ```bash
 # Clone the repository
-git clone https://github.com/Shubham-Bhayaje/-aws-emulator-ui.git
-cd -aws-emulator-ui
+git clone https://github.com/Shubham-Bhayaje/aws-emulator-ui.git
+cd aws-emulator-ui
 
 # Install dependencies
 npm install

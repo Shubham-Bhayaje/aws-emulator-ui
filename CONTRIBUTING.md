@@ -21,8 +21,8 @@ Please be respectful, constructive, and helpful when participating in discussion
 
 2. **Fork and Clone**:
    ```bash
-   git clone https://github.com/YOUR_USERNAME/-aws-emulator-ui.git
-   cd -aws-emulator-ui
+   git clone https://github.com/YOUR_USERNAME/aws-emulator-ui.git
+   cd aws-emulator-ui
    npm install
    ```
 
