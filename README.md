@@ -1,105 +1,96 @@
-# AWS Emulator Console UI (`-aws-emulator-ui`)
+# AWS Emulator UI
 
-A lightweight, local, pixel-perfect **AWS Management Console Web UI** designed specifically for the official [**AWS Emulator (`aws/aws-emulator`)**](https://github.com/aws/aws-emulator).
+An unofficial, open-source **web UI** and interactive **dashboard** for the official **AWS Emulator**, bringing an intuitive management console to your **local AWS** development environment.
 
-Built with **Next.js 16 (App Router)**, **TypeScript**, **Tailwind CSS**, and **AWS SDK v3**.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org)
+[![React](https://img.shields.io/badge/React-19-blue?logo=react)](https://react.dev)
+[![AWS SDK v3](https://img.shields.io/badge/AWS%20SDK-v3-orange?logo=amazon-aws)](https://aws.amazon.com/sdk-for-javascript/)
 
-![AWS Console Home Screenshot](docs/images/console-home.png)
-
----
-
-## Why This Project?
-
-The official [AWS Emulator](https://github.com/aws/aws-emulator) is a local AWS API engine released by AWS for building and testing cloud workflows locally without incurring cloud costs. However, **the official AWS Emulator has no graphical user interface (GUI)** — it only provides an HTTPS API endpoint (`https://127.0.0.1:9297`) accessed through the AWS CLI or SDKs.
-
-**`-aws-emulator-ui` provides the missing full-featured Management Console GUI**:
-- **Pixel-perfect match** to the real AWS Console (dark `#000716` header, Cloudscape cards, official architecture icons, breadcrumbs, and collapsible sidebars).
-- **Interactive service managers** for **S3**, **SQS**, **DynamoDB**, and **IAM**.
-- **Services Catalog (`/services`)** index covering 26+ AWS cloud services.
-- **Zero cloud credentials or costs required** — connects directly to your local emulator over HTTPS.
+> **Disclaimer:** **AWS Emulator UI is an independent, unofficial community project.** It is not affiliated with, maintained by, or endorsed by Amazon Web Services (AWS) or Amazon.com, Inc. The official headless emulator is hosted at [aws/aws-emulator](https://github.com/aws/aws-emulator).
 
 ---
 
-## Architecture
+## Why This Exists
 
-```
-+-------------------------------------------------------------+
-|                  Browser (Developer)                        |
-|               http://127.0.0.1:3000                         |
-+------------------------------+------------------------------+
-                               |
-                               | (React Server Actions / Pages)
-                               v
-+-------------------------------------------------------------+
-|           Next.js 16 Console Web App (Node.js)              |
-|   - Runs on 127.0.0.1:3000                                  |
-|   - Uses AWS SDK v3 (S3, SQS, DynamoDB, IAM, STS)           |
-|   - Auto-trusts Emulator CA cert via NODE_EXTRA_CA_CERTS    |
-|   - Loads credentials from ~/.aws/emulator/9297/            |
-+------------------------------+------------------------------+
-                               |
-                               | HTTPS (Port 9297)
-                               v
-+-------------------------------------------------------------+
-|         Official AWS Emulator (Docker Container)            |
-|   - Repository: https://github.com/aws/aws-emulator         |
-|   - Listening on: 127.0.0.1:9297                            |
-|   - Emulates S3, SQS, DynamoDB, IAM, and STS in memory      |
-|   - Auto-generates CA certs and credentials to:             |
-|     ~/.aws/emulator/9297/ca.pem                             |
-|     ~/.aws/emulator/9297/emulator_credentials               |
-|     ~/.aws/emulator/9297/config                             |
-+-------------------------------------------------------------+
-```
+The official [AWS Emulator](https://github.com/aws/aws-emulator) provides a fast, lightweight local AWS API engine for developing and testing cloud services locally without incurrence of cloud bills or network latency.
+
+However, the AWS Emulator is strictly headless — it only exposes an HTTPS endpoint (`https://127.0.0.1:9297`) accessible through the AWS CLI or SDKs. **AWS Emulator UI fills this gap by delivering a local AWS UI and AWS emulator dashboard** that replicates the look and feel of the official AWS Management Console. With this web interface, developers can visually explore buckets, poll queues, browse DynamoDB records, and configure IAM policies entirely on their local machine.
 
 ---
 
-## Complete From-Scratch Setup Guide
+## Features
 
-Follow these steps to set up the **AWS Emulator** and the **Console UI** on your PC.
+This web UI connects directly to your local emulator over HTTPS and provides dedicated management screens for supported services:
+
+- **Amazon S3**:
+  - Create and delete buckets.
+  - Navigate object key hierarchies (folder prefixes).
+  - Multi-file drag-and-drop uploads directly into buckets or prefixes.
+  - One-click object downloads and file deletions.
+  - Path-style addressing configured automatically for local emulator compatibility.
+
+- **Amazon SQS**:
+  - Create Standard and FIFO (`.fifo`) queues with configurable delivery delays.
+  - Inspect queue depths (messages available, delayed, and in-flight).
+  - Send messages with custom message bodies and delay parameters.
+  - Live message poller with automatic receipt handle retrieval and one-click message deletion.
+  - Full queue purge capabilities.
+
+- **Amazon DynamoDB**:
+  - Create tables with typed partition keys (`S`, `N`, `B`), optional sort keys, and flexible billing modes.
+  - Dynamic item explorer: automatically discovers and renders columns based on item attributes.
+  - Dual-mode item editor: build items visually via structured form fields or edit raw DynamoDB JSON documents directly.
+  - Attribute scan filters and individual item deletion.
+  - Table deletion and metadata inspection.
+
+- **AWS Identity & Access Management (IAM)**:
+  - Central IAM dashboard displaying key metrics and the fixed emulator account ID (`000000000000`).
+  - Manage IAM Users: create users, attach/detach policies, view attached permissions, and safe deletion.
+  - Manage IAM Roles: create roles with trust policies (Lambda, EC2, ECS, or custom JSON) and inspect `AssumeRolePolicyDocument`.
+  - Policy Inspector: browse customer and AWS-managed policies, review structured Statement breakdowns (`Effect`, `Action`, `Resource`), and inspect syntax-highlighted JSON policy documents.
+
+- **All Services Catalog**:
+  - Comprehensive index of 26+ AWS services categorized into Compute, Storage, Database, Networking, Security, Application Integration, Management, Analytics, ML, and Developer Tools.
+  - Instant live filter and search.
+  - Services currently under development show a consistent, cloudscape-styled status screen.
+
+- **Cross-Platform Dev Runner (`scripts/dev.js`)**:
+  - Automatically locates the emulator TLS certificate (`ca.pem`) on Windows (`%USERPROFILE%`), macOS, or Linux/WSL.
+  - Injects `NODE_EXTRA_CA_CERTS` and credentials so the UI communicates with the emulator securely without disabling TLS checks.
 
 ---
 
-### Step 1: Install Docker
-Make sure **Docker Desktop** (or Docker inside WSL 2 on Windows, or Docker Engine on Linux/macOS) is installed and running.
+## Screenshots
+
+### AWS Management Console Dashboard
+![AWS Emulator UI Console Home Dashboard showing service shortcuts, recent services, and welcome banner](docs/images/console-home.png)
 
 ---
 
-### Step 2: Clone This Repository
-```bash
-git clone https://github.com/Shubham-Bhayaje/-aws-emulator-ui.git
-cd -aws-emulator-ui
-```
+## Prerequisites
 
-This repository includes:
-- `Dockerfile.emulator` — Ready-to-build Dockerfile for the official AWS Emulator RPM package.
-- `scripts/emulator.sh` — Helper script to start, stop, and inspect the emulator with one command.
-- The complete Next.js AWS Console UI web app.
+Before running the UI, ensure you have the following installed:
+1. **Docker Desktop** (Windows / macOS) or **Docker Engine** (Linux / WSL).
+2. **Node.js** (v20.x or higher) and **npm**.
 
 ---
 
-### Step 3: Start the AWS Emulator
+## Quickstart Guide
 
-You can start the emulator using either the **helper script**, **Windows PowerShell**, or **WSL / Linux bash**.
+### 1. Start the AWS Emulator
 
-#### Option A: Using the Helper Script (WSL / Linux / macOS)
-```bash
-# Make script executable (first time only)
-chmod +x ./scripts/emulator.sh
+The official emulator runs inside Docker and listens on port `9297`.
 
-# Build (first time only) and start the emulator in the background
-./scripts/emulator.sh start
-```
-
-#### Option B: Using Windows PowerShell (Native Windows)
+#### On Windows (PowerShell):
 ```powershell
 # 1. Create directory for certificates & credentials
 New-Item -ItemType Directory -Force "$env:USERPROFILE\.aws\emulator"
 
-# 2. Build the Docker image
+# 2. Build the emulator container
 docker build -t aws-emulator -f Dockerfile.emulator .
 
-# 3. Run the container
+# 3. Start the container
 $port = 9297
 docker run -d --rm --memory=2g --memory-swap=2g `
   -p "127.0.0.1:${port}:${port}" `
@@ -107,125 +98,63 @@ docker run -d --rm --memory=2g --memory-swap=2g `
   aws-emulator -p $port --telemetry off
 ```
 
-#### Option C: Using Bash (WSL / Linux)
+#### On Linux / macOS / WSL:
 ```bash
-# 1. Create directory
-mkdir -p ~/.aws/emulator
-
-# 2. Build the Docker image
-docker build -t aws-emulator -f Dockerfile.emulator .
-
-# 3. Run the container in the background
-docker run -d --rm --memory=2g --memory-swap=2g \
-  -p 127.0.0.1:9297:9297 \
-  --user "$(id -u):$(id -g)" \
-  -e HOME="$HOME" \
-  -v "$HOME/.aws/emulator:$HOME/.aws/emulator" \
-  aws-emulator -p 9297 --telemetry off
+# 1. Start using the bundled helper script
+chmod +x ./scripts/emulator.sh
+./scripts/emulator.sh start
 ```
+*(Alternatively, run manually via standard `docker run` as detailed in `scripts/emulator.sh`)*.
 
 ---
 
-### Step 4: Verify the Emulator is Running
+### 2. Start the AWS Emulator UI
 
-Check that the container is active:
+Clone this repository and launch the Next.js development server:
+
 ```bash
-docker ps --filter "name=aws-emulator"
+# Clone the repository
+git clone https://github.com/Shubham-Bhayaje/-aws-emulator-ui.git
+cd -aws-emulator-ui
+
+# Install dependencies
+npm install
+
+# Start the dashboard
+npm run dev
 ```
 
-Verify that the emulator automatically created its TLS certificate and credentials:
-```bash
-# In WSL / Linux:
-ls -la ~/.aws/emulator/9297/
+Open your browser and navigate to:
+👉 **[http://127.0.0.1:3000](http://127.0.0.1:3000)**
 
-# In PowerShell:
-Get-ChildItem "$env:USERPROFILE\.aws\emulator\9297\"
-```
-You should see:
-- `ca.pem` — TLS self-signed root certificate.
-- `emulator_credentials` — AWS Access Key ID and Secret Access Key.
-- `config` — Region (`us-east-1`) and endpoint (`https://127.0.0.1:9297`).
-
-#### (Optional) Test with AWS CLI:
-**In WSL / Bash:**
-```bash
-export AWS_SHARED_CREDENTIALS_FILE=~/.aws/emulator/9297/emulator_credentials
-export AWS_CONFIG_FILE=~/.aws/emulator/9297/config
-export AWS_CA_BUNDLE=~/.aws/emulator/9297/ca.pem
-export AWS_EC2_METADATA_DISABLED=true
-
-aws sts get-caller-identity
-```
-
-**In PowerShell:**
-```powershell
-$env:AWS_SHARED_CREDENTIALS_FILE = "$env:USERPROFILE\.aws\emulator\9297\emulator_credentials"
-$env:AWS_CONFIG_FILE = "$env:USERPROFILE\.aws\emulator\9297\config"
-$env:AWS_CA_BUNDLE = "$env:USERPROFILE\.aws\emulator\9297\ca.pem"
-$env:AWS_EC2_METADATA_DISABLED = "true"
-
-aws sts get-caller-identity
-```
-You will receive the emulator's fixed account ID `000000000000`:
-```json
-{
-    "UserId": "AIDAH5I7GEMO7ADXNFAZU",
-    "Account": "000000000000",
-    "Arn": "arn:aws:iam::000000000000:user/emulator"
-}
-```
+The launcher script will automatically detect the emulator's generated `ca.pem` certificate and configure Node.js environment variables.
 
 ---
 
-### Step 5: Start the Console UI
+## Configuration & Architecture
 
-1. Install project dependencies (requires Node.js v20+):
-   ```bash
-   npm install
-   ```
+The application communicates with the local emulator exclusively on `127.0.0.1:9297`.
 
-2. Start the development server:
-   ```bash
-   npm run dev
-   ```
+### Environment Variables
 
-   > **Note:** The `npm run dev` script automatically binds to `127.0.0.1` and passes `NODE_EXTRA_CA_CERTS`, `AWS_SHARED_CREDENTIALS_FILE`, and `AWS_CONFIG_FILE` from your emulator directory.
+When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically sets:
 
-3. Open your browser:
-   👉 [**http://127.0.0.1:3000**](http://127.0.0.1:3000)
-
----
-
-## Supported Services & Capabilities
-
-| Service | Route | Key Features |
+| Variable | Default Value | Description |
 | :--- | :--- | :--- |
-| **Console Home** | `/` | Recently visited services widget (localStorage), official service icons, Welcome widget. |
-| **All Services** | `/services` | Categorized directory of 26+ AWS services with search filters and category pills. |
-| **Amazon S3** | `/s3` | Create buckets (Block Public Access, Versioning), prefix folder navigation, file drag-and-drop upload, file download, and delete. |
-| **Amazon SQS** | `/sqs` | Create Standard & FIFO queues, send messages, live poll messages with receipt handles, and purge queues. |
-| **Amazon DynamoDB** | `/dynamodb` | Create tables (partition key & optional sort key, on-demand/provisioned capacity), dynamic attribute item explorer, and dual-mode **Form & JSON Item Editor**. |
-| **AWS IAM** | `/iam` | IAM Dashboard (metric tiles, sign-in URL), Users (attach/detach policies), Roles (service trust policies), Policies catalog, and **Permission Inspector** (visual statement breakdown + JSON viewer). |
+| `NODE_EXTRA_CA_CERTS` | `~/.aws/emulator/9297/ca.pem` | Injects the emulator's self-signed root CA certificate into Node.js. |
+| `AWS_SHARED_CREDENTIALS_FILE` | `~/.aws/emulator/9297/emulator_credentials` | Path to emulator access keys (`000000000000` account). |
+| `AWS_CONFIG_FILE` | `~/.aws/emulator/9297/config` | Path to emulator configuration (`us-east-1` region). |
+| `AWS_EC2_METADATA_DISABLED` | `true` | Prevents SDK calls from querying instance metadata. |
+| `EMULATOR_PORT` | `9297` | Optional override if running the emulator on a custom port. |
 
 ---
 
-## Helpful Helper Script Commands
+## Contributing
 
-If you use `./scripts/emulator.sh`:
-```bash
-./scripts/emulator.sh start   # Builds Docker image (if missing) & runs in background
-./scripts/emulator.sh status  # Checks if emulator container is running
-./scripts/emulator.sh env     # Prints the export commands for AWS CLI
-./scripts/emulator.sh stop    # Stops the emulator container
-```
+Contributions from the community are warmly welcomed! Whether you want to add screens for additional services, optimize performance, or report an issue, please read our [Contributing Guide](CONTRIBUTING.md) to get started.
 
 ---
 
-## Important Things to Know
+## License
 
-1. **In-Memory Storage**:  
-   The official AWS Emulator keeps emulated resources in memory. When you stop the container (`docker stop aws-emulator` or `./scripts/emulator.sh stop`), all emulated buckets, queues, tables, and users are reset.
-2. **Local Security (`127.0.0.1`)**:  
-   The emulator and UI bind exclusively to `127.0.0.1` (localhost) to prevent exposure on your local network.
-3. **Self-Signed Certificates**:  
-   Because the emulator communicates over HTTPS with a self-signed root cert, Node.js needs `NODE_EXTRA_CA_CERTS` to establish TLS trust. The `npm run dev` command handles this out of the box.
+This project is licensed under the [MIT License](LICENSE).
