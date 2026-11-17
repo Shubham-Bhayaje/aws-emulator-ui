@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "NODE_EXTRA_CA_CERTS=$HOME/.aws/emulator/9297/ca.pem AWS_SHARED_CREDENTIALS_FILE=$HOME/.aws/emulator/9297/emulator_credentials AWS_CONFIG_FILE=$HOME/.aws/emulator/9297/config AWS_EC2_METADATA_DISABLED=true next dev --hostname 127.0.0.1",
+    "dev": "node scripts/dev.js",
+    "dev:bash": "NODE_EXTRA_CA_CERTS=$HOME/.aws/emulator/9297/ca.pem AWS_SHARED_CREDENTIALS_FILE=$HOME/.aws/emulator/9297/emulator_credentials AWS_CONFIG_FILE=$HOME/.aws/emulator/9297/config AWS_EC2_METADATA_DISABLED=true next dev --hostname 127.0.0.1",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
