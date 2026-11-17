@@ -51,9 +51,9 @@ This web UI connects directly to your local emulator over HTTPS and provides ded
   - Policy Inspector: browse customer and AWS-managed policies, review structured Statement breakdowns (`Effect`, `Action`, `Resource`), and inspect syntax-highlighted JSON policy documents.
 
 - **All Services Catalog**:
-  - Comprehensive index of 26+ AWS services categorized into Compute, Storage, Database, Networking, Security, Application Integration, Management, Analytics, ML, and Developer Tools.
-  - Instant live filter and search.
-  - Services currently under development show a consistent, cloudscape-styled status screen.
+  - Comprehensive catalog of 200+ AWS services categorized across Compute, Storage, Database, Networking, Security, Management, Analytics, Machine Learning, Developer Tools, IoT, Business Applications, and more.
+  - Instant live filter and search with category counts and quick jump links.
+  - Services currently under development show a consistent, Cloudscape-styled overview screen with documentation links.
 
 - **Cross-Platform Dev Runner (`scripts/dev.js`)**:
   - Automatically locates the emulator TLS certificate (`ca.pem`) on Windows (`%USERPROFILE%`), macOS, or Linux/WSL.
@@ -125,7 +125,7 @@ npm run dev
 ```
 
 Open your browser and navigate to:
-👉 **[http://127.0.0.1:3000](http://127.0.0.1:3000)**
+**[http://127.0.0.1:3000](http://127.0.0.1:3000)**
 
 The launcher script will automatically detect the emulator's generated `ca.pem` certificate and configure Node.js environment variables.
 

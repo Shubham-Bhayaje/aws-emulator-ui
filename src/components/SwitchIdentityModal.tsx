@@ -87,9 +87,12 @@ export default function SwitchIdentityModal({ isOpen, onClose, onIdentityChanged
           </div>
           <button
             onClick={onClose}
-            className="text-white/60 hover:text-white p-1 rounded hover:bg-white/10 text-[18px]"
+            className="text-white/60 hover:text-white p-1 rounded hover:bg-white/10"
           >
-            ✕
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
 
@@ -99,15 +102,15 @@ export default function SwitchIdentityModal({ isOpen, onClose, onIdentityChanged
             <span className="text-[12px] text-[#545b64]">Current Active Identity:</span>
             {isDefaultAdmin ? (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-amber-100 text-amber-900 border border-amber-300">
-                👑 Administrator (emulator)
+                Administrator (emulator)
               </span>
             ) : current?.type === "role" ? (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-purple-100 text-purple-900 border border-purple-300">
-                🎭 Role: {current?.name}
+                Role: {current?.name}
               </span>
             ) : (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-blue-100 text-blue-900 border border-blue-300">
-                👤 User: {current?.name}
+                User: {current?.name}
               </span>
             )}
           </div>
@@ -118,7 +121,7 @@ export default function SwitchIdentityModal({ isOpen, onClose, onIdentityChanged
               disabled={!!switching}
               className="text-[11px] text-[#0073bb] hover:underline font-semibold"
             >
-              Revert to Admin ↺
+              Revert to Admin
             </button>
           )}
         </div>
@@ -238,7 +241,7 @@ export default function SwitchIdentityModal({ isOpen, onClose, onIdentityChanged
                 <div className="p-8 text-center bg-[#fafafa] rounded border border-dashed border-[#d5dbdb]">
                   <p className="text-[13px] text-[#545b64] font-medium">No custom IAM users created yet.</p>
                   <p className="text-[11px] text-[#8d9ba8] mt-1">
-                    Go to IAM → Users → Create User to create a user and attach custom policies.
+                    Go to IAM &gt; Users &gt; Create User to create a user and attach custom policies.
                   </p>
                 </div>
               )}
@@ -284,7 +287,7 @@ export default function SwitchIdentityModal({ isOpen, onClose, onIdentityChanged
                 <div className="p-8 text-center bg-[#fafafa] rounded border border-dashed border-[#d5dbdb]">
                   <p className="text-[13px] text-[#545b64] font-medium">No IAM roles available.</p>
                   <p className="text-[11px] text-[#8d9ba8] mt-1">
-                    Create roles under IAM → Roles with trust relationships.
+                    Create roles under IAM &gt; Roles with trust relationships.
                   </p>
                 </div>
               )}

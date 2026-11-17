@@ -455,13 +455,136 @@ export function BedrockIcon({ size = 20, className }: IconProps) {
 
 // ─── Generic AWS Service Icon (fallback) ────────────────────────────
 
-export function AwsServiceIcon({ size = 20, className, label }: IconProps & { label?: string }) {
+export function AwsServiceIcon({
+  size = 20,
+  className,
+  label,
+  color = "#232f3e",
+}: IconProps & { label?: string; color?: string }) {
+  const displayLabel = label ? (label.length > 3 ? label.slice(0, 3) : label) : "A";
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" className={className}>
-      <rect width="40" height="40" rx="4" fill="#232f3e"/>
-      <text x="20" y="25" textAnchor="middle" fill="white" fontSize="14" fontWeight="bold">
-        {label ? label.charAt(0) : "⚡"}
+      <rect width="40" height="40" rx="6" fill={color}/>
+      <text
+        x="20"
+        y="25"
+        textAnchor="middle"
+        fill="white"
+        fontSize={displayLabel.length >= 3 ? "11" : "13"}
+        fontWeight="bold"
+        fontFamily="sans-serif"
+      >
+        {displayLabel.toUpperCase()}
       </text>
     </svg>
   );
+}
+
+export function ServiceIcon({
+  id,
+  shortName,
+  color,
+  size = 20,
+  className,
+}: {
+  id: string;
+  shortName?: string;
+  color?: string;
+  size?: number;
+  className?: string;
+}) {
+  const normId = id.toLowerCase();
+  switch (normId) {
+    case "ec2":
+      return <EC2Icon size={size} className={className} />;
+    case "lambda":
+      return <LambdaIcon size={size} className={className} />;
+    case "elasticbeanstalk":
+      return <BeanstalkIcon size={size} className={className} />;
+    case "lightsail":
+      return <LightsailIcon size={size} className={className} />;
+    case "ecs":
+    case "ecs-anywhere":
+      return <ECSIcon size={size} className={className} />;
+    case "eks":
+    case "eks-anywhere":
+      return <EKSIcon size={size} className={className} />;
+    case "s3":
+      return <S3Icon size={size} className={className} />;
+    case "efs":
+      return <EFSIcon size={size} className={className} />;
+    case "glacier":
+      return <GlacierIcon size={size} className={className} />;
+    case "dynamodb":
+      return <DynamoDBIcon size={size} className={className} />;
+    case "rds":
+    case "aurora":
+    case "rds-custom":
+      return <RDSIcon size={size} className={className} />;
+    case "elasticache":
+    case "memorydb":
+      return <ElastiCacheIcon size={size} className={className} />;
+    case "redshift":
+      return <RedshiftIcon size={size} className={className} />;
+    case "vpc":
+      return <VPCIcon size={size} className={className} />;
+    case "cloudfront":
+      return <CloudFrontIcon size={size} className={className} />;
+    case "route53":
+    case "route53-arc":
+      return <Route53Icon size={size} className={className} />;
+    case "apigateway":
+      return <APIGatewayIcon size={size} className={className} />;
+    case "sqs":
+      return <SQSIcon size={size} className={className} />;
+    case "sns":
+      return <SNSIcon size={size} className={className} />;
+    case "stepfunctions":
+      return <StepFunctionsIcon size={size} className={className} />;
+    case "eventbridge":
+    case "pipes":
+      return <EventBridgeIcon size={size} className={className} />;
+    case "iam":
+    case "identity-center":
+      return <IAMIcon size={size} className={className} />;
+    case "kms":
+      return <KMSIcon size={size} className={className} />;
+    case "secretsmanager":
+      return <SecretsManagerIcon size={size} className={className} />;
+    case "cognito":
+      return <CognitoIcon size={size} className={className} />;
+    case "cloudwatch":
+      return <CloudWatchIcon size={size} className={className} />;
+    case "cloudtrail":
+      return <CloudTrailIcon size={size} className={className} />;
+    case "cloudformation":
+      return <CloudFormationIcon size={size} className={className} />;
+    case "systems-manager":
+      return <SystemsManagerIcon size={size} className={className} />;
+    case "kinesis":
+    case "kinesis-firehose":
+    case "kinesis-video":
+      return <KinesisIcon size={size} className={className} />;
+    case "athena":
+      return <AthenaIcon size={size} className={className} />;
+    case "codecommit":
+    case "codebuild":
+    case "codepipeline":
+    case "codeartifact":
+    case "codecatalyst":
+      return <CodeIcon size={size} className={className} />;
+    case "sagemaker":
+      return <SageMakerIcon size={size} className={className} />;
+    case "bedrock":
+      return <BedrockIcon size={size} className={className} />;
+    default:
+      return (
+        <AwsServiceIcon
+          size={size}
+          className={className}
+          label={shortName || id}
+          color={color}
+        />
+      );
+  }
 }

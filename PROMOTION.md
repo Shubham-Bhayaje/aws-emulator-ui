@@ -18,7 +18,7 @@ Hi everyone,
 Like many of you, I really enjoy using the AWS Emulator for local development, but missed having a visual dashboard to quickly inspect buckets, browse DynamoDB items, and check queue messages.
 
 I've put together an open-source, community web UI built with Next.js and AWS SDK v3:
-👉 https://github.com/Shubham-Bhayaje/aws-emulator-ui
+GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 Current support includes:
 - S3 (bucket creation, folder prefix navigation, file uploads/downloads)
@@ -71,7 +71,7 @@ If you do any cloud or serverless development locally, you might know about the 
 
 Because the emulator doesn't ship with any graphical interface, I built an unofficial local web console you can self-host alongside it:
 
-🔗 Project: https://github.com/Shubham-Bhayaje/aws-emulator-ui
+Project: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 Highlights:
 - Replicates the official AWS Management Console layout and themes.
@@ -87,21 +87,21 @@ Feedback, bug reports, and contributions are greatly appreciated!
 ## 3. LinkedIn Post
 
 ```text
-🚀 Excited to share an open-source project I’ve been working on: AWS Emulator UI!
+Excited to share an open-source project I’ve been working on: AWS Emulator UI!
 
 AWS recently launched the official AWS Emulator (aws/aws-emulator) to let developers test cloud services locally without spinning up real cloud infrastructure or incurring cloud costs.
 
 While the emulator engine is great, it’s strictly headless — meaning all interactions have to happen via the CLI or code.
 
 To make local cloud development more intuitive, I built an open-source web management console:
-👉 GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
+GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 What’s included:
-📦 Amazon S3: Bucket manager, folder prefix navigator, file upload & download
-📬 Amazon SQS: Standard & FIFO queue management, message poller & purge
-⚡ Amazon DynamoDB: Dynamic table item browser, visual form & JSON document editor
-🔐 AWS IAM: Account dashboard, user & role inspector, live policy statement visualizer
-💻 Cross-platform support for Windows, macOS, and Linux
+- Amazon S3: Bucket manager, folder prefix navigator, file upload & download
+- Amazon SQS: Standard & FIFO queue management, message poller & purge
+- Amazon DynamoDB: Dynamic table item browser, visual form & JSON document editor
+- AWS IAM: Account dashboard, user & role inspector, live policy statement visualizer
+- Cross-platform support for Windows, macOS, and Linux
 
 Built with Next.js 16, React 19, Tailwind CSS, and AWS SDK v3.
 
@@ -115,11 +115,11 @@ If you test AWS workflows locally, give it a star on GitHub and try it out! Any 
 ## 4. X (Twitter) Post
 
 ```text
-Built an open-source web console for the new official AWS Emulator ☁️🖥️
+Built an open-source web console for the new official AWS Emulator.
 
 The emulator is awesome for local testing, but has no UI. AWS Emulator UI gives you a local dashboard for S3, SQS, DynamoDB, and IAM with zero cloud costs.
 
-🔗 GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
+GitHub: https://github.com/Shubham-Bhayaje/aws-emulator-ui
 
 #AWS #DevTools #OpenSource #Nextjs
 ```

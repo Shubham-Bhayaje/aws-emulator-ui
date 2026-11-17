@@ -173,7 +173,7 @@ export function PolicyDetail({ policy }: PolicyDetailProps) {
               onClick={handleCopyJson}
               className="text-[12px] text-[#0073bb] hover:underline flex items-center gap-1 font-medium"
             >
-              {copied ? "✓ Copied" : "Copy JSON"}
+              {copied ? "Copied" : "Copy JSON"}
             </button>
           )}
         </div>

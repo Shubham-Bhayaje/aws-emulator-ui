@@ -7,20 +7,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  S3Icon, SQSIcon, DynamoDBIcon, IAMIcon,
-  EC2Icon, LambdaIcon, BeanstalkIcon, LightsailIcon, ECSIcon, EKSIcon,
-  EFSIcon, GlacierIcon,
-  RDSIcon, ElastiCacheIcon, RedshiftIcon,
-  VPCIcon, CloudFrontIcon, Route53Icon, APIGatewayIcon,
-  SNSIcon, StepFunctionsIcon, EventBridgeIcon,
-  KMSIcon, SecretsManagerIcon, CognitoIcon,
-  CloudWatchIcon, CloudTrailIcon, CloudFormationIcon, SystemsManagerIcon,
-  KinesisIcon, AthenaIcon,
-  SageMakerIcon, BedrockIcon,
-  CodeIcon,
-  AwsServiceIcon,
-} from "./AwsIcons";
+import { ServiceIcon } from "./AwsIcons";
+import { findServiceByHref } from "@/lib/services-catalog";
 
 type RecentService = {
   name: string;
@@ -28,47 +16,16 @@ type RecentService = {
   visitedAt: number;
 };
 
-// Map service names to their real AWS icons
-function getServiceIcon(name: string) {
-  const icons: Record<string, React.ReactNode> = {
-    "S3": <S3Icon size={16} />,
-    "SQS": <SQSIcon size={16} />,
-    "DynamoDB": <DynamoDBIcon size={16} />,
-    "IAM": <IAMIcon size={16} />,
-    "EC2": <EC2Icon size={16} />,
-    "Lambda": <LambdaIcon size={16} />,
-    "Elastic Beanstalk": <BeanstalkIcon size={16} />,
-    "Lightsail": <LightsailIcon size={16} />,
-    "ECS": <ECSIcon size={16} />,
-    "EKS": <EKSIcon size={16} />,
-    "EFS": <EFSIcon size={16} />,
-    "S3 Glacier": <GlacierIcon size={16} />,
-    "RDS": <RDSIcon size={16} />,
-    "ElastiCache": <ElastiCacheIcon size={16} />,
-    "Redshift": <RedshiftIcon size={16} />,
-    "VPC": <VPCIcon size={16} />,
-    "CloudFront": <CloudFrontIcon size={16} />,
-    "Route 53": <Route53Icon size={16} />,
-    "API Gateway": <APIGatewayIcon size={16} />,
-    "SNS": <SNSIcon size={16} />,
-    "Step Functions": <StepFunctionsIcon size={16} />,
-    "EventBridge": <EventBridgeIcon size={16} />,
-    "KMS": <KMSIcon size={16} />,
-    "Secrets Manager": <SecretsManagerIcon size={16} />,
-    "Cognito": <CognitoIcon size={16} />,
-    "CloudWatch": <CloudWatchIcon size={16} />,
-    "CloudTrail": <CloudTrailIcon size={16} />,
-    "CloudFormation": <CloudFormationIcon size={16} />,
-    "Systems Manager": <SystemsManagerIcon size={16} />,
-    "Kinesis": <KinesisIcon size={16} />,
-    "Athena": <AthenaIcon size={16} />,
-    "SageMaker": <SageMakerIcon size={16} />,
-    "Bedrock": <BedrockIcon size={16} />,
-    "CodeCommit": <CodeIcon size={16} />,
-    "CodeBuild": <CodeIcon size={16} />,
-    "CodePipeline": <CodeIcon size={16} />,
-  };
-  return icons[name] || <AwsServiceIcon size={16} label={name} />;
+function getServiceIcon(name: string, href: string) {
+  const service = findServiceByHref(href);
+  return (
+    <ServiceIcon
+      id={service?.id || name.toLowerCase().replace(/\s+/g, "")}
+      shortName={service?.shortName || name}
+      color={service?.color}
+      size={16}
+    />
+  );
 }
 
 export default function RecentlyVisited() {
@@ -114,7 +71,7 @@ export default function RecentlyVisited() {
                 href={s.href}
                 className="flex items-center gap-2 py-1 text-[13px] text-[#0073bb] hover:text-[#ec7211] hover:underline"
               >
-                {getServiceIcon(s.name)}
+                {getServiceIcon(s.name, s.href)}
                 {s.name}
               </Link>
             ))}

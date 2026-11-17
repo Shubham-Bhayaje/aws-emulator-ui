@@ -11,18 +11,9 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  S3Icon, SQSIcon, DynamoDBIcon, IAMIcon,
-  EC2Icon, LambdaIcon, BeanstalkIcon, LightsailIcon, ECSIcon, EKSIcon,
-  EFSIcon, GlacierIcon,
-  RDSIcon, ElastiCacheIcon, RedshiftIcon,
-  VPCIcon, CloudFrontIcon, Route53Icon, APIGatewayIcon,
-  SNSIcon, StepFunctionsIcon, EventBridgeIcon,
-  KMSIcon, SecretsManagerIcon, CognitoIcon,
-  CloudWatchIcon, CloudTrailIcon, CloudFormationIcon, SystemsManagerIcon,
-  KinesisIcon, AthenaIcon,
-  SageMakerIcon, BedrockIcon,
-  CodeIcon,
+  S3Icon, SQSIcon, DynamoDBIcon, IAMIcon, ServiceIcon
 } from "./AwsIcons";
+import { SERVICE_CATEGORIES, ALL_SERVICES } from "@/lib/services-catalog";
 import SwitchIdentityModal from "./SwitchIdentityModal";
 import CloudShellTerminal from "./CloudShellTerminal";
 import { ActiveIdentity } from "@/lib/permissions";
@@ -34,104 +25,7 @@ type TopBarProps = {
   initialIdentity?: ActiveIdentity;
 };
 
-// Full service catalog organized by category
-const serviceCategories = [
-  {
-    category: "Compute",
-    services: [
-      { name: "EC2", href: "/ec2", icon: <EC2Icon size={16} />, desc: "Virtual Servers in the Cloud" },
-      { name: "Lambda", href: "/lambda", icon: <LambdaIcon size={16} />, desc: "Run Code without Thinking about Servers" },
-      { name: "Elastic Beanstalk", href: "/elasticbeanstalk", icon: <BeanstalkIcon size={16} />, desc: "Run and Manage Web Apps" },
-      { name: "Lightsail", href: "/lightsail", icon: <LightsailIcon size={16} />, desc: "Launch and Manage Virtual Private Servers" },
-      { name: "ECS", href: "/ecs", icon: <ECSIcon size={16} />, desc: "Run and Manage Docker Containers" },
-      { name: "EKS", href: "/eks", icon: <EKSIcon size={16} />, desc: "Run Managed Kubernetes" },
-    ],
-  },
-  {
-    category: "Storage",
-    services: [
-      { name: "S3", href: "/s3", icon: <S3Icon size={16} />, desc: "Scalable Storage in the Cloud" },
-      { name: "EFS", href: "/efs", icon: <EFSIcon size={16} />, desc: "Managed File Storage for EC2" },
-      { name: "S3 Glacier", href: "/glacier", icon: <GlacierIcon size={16} />, desc: "Archive Storage in the Cloud" },
-    ],
-  },
-  {
-    category: "Database",
-    services: [
-      { name: "RDS", href: "/rds", icon: <RDSIcon size={16} />, desc: "Managed Relational Database Service" },
-      { name: "DynamoDB", href: "/dynamodb", icon: <DynamoDBIcon size={16} />, desc: "Managed NoSQL Database" },
-      { name: "ElastiCache", href: "/elasticache", icon: <ElastiCacheIcon size={16} />, desc: "In-Memory Caching Service" },
-      { name: "Redshift", href: "/redshift", icon: <RedshiftIcon size={16} />, desc: "Fast, Simple, Cost-Effective Data Warehousing" },
-    ],
-  },
-  {
-    category: "Networking & Content Delivery",
-    services: [
-      { name: "VPC", href: "/vpc", icon: <VPCIcon size={16} />, desc: "Isolated Cloud Resources" },
-      { name: "CloudFront", href: "/cloudfront", icon: <CloudFrontIcon size={16} />, desc: "Global Content Delivery Network" },
-      { name: "Route 53", href: "/route53", icon: <Route53Icon size={16} />, desc: "Scalable Domain Name System" },
-      { name: "API Gateway", href: "/apigateway", icon: <APIGatewayIcon size={16} />, desc: "Build, Deploy, and Manage APIs" },
-    ],
-  },
-  {
-    category: "Security, Identity, & Compliance",
-    services: [
-      { name: "IAM", href: "/iam", icon: <IAMIcon size={16} />, desc: "Manage User Access and Encryption Keys" },
-      { name: "KMS", href: "/kms", icon: <KMSIcon size={16} />, desc: "Managed Creation and Control of Encryption Keys" },
-      { name: "Cognito", href: "/cognito", icon: <CognitoIcon size={16} />, desc: "Identity for your Web and Mobile Apps" },
-      { name: "Secrets Manager", href: "/secretsmanager", icon: <SecretsManagerIcon size={16} />, desc: "Rotate, Manage, and Retrieve Secrets" },
-    ],
-  },
-  {
-    category: "Application Integration",
-    services: [
-      { name: "SQS", href: "/sqs", icon: <SQSIcon size={16} />, desc: "Managed Message Queues" },
-      { name: "SNS", href: "/sns", icon: <SNSIcon size={16} />, desc: "Managed Message Topics for Pub/Sub" },
-      { name: "Step Functions", href: "/stepfunctions", icon: <StepFunctionsIcon size={16} />, desc: "Coordinate Distributed Applications" },
-      { name: "EventBridge", href: "/eventbridge", icon: <EventBridgeIcon size={16} />, desc: "Serverless Event Bus" },
-    ],
-  },
-  {
-    category: "Management & Governance",
-    services: [
-      { name: "CloudWatch", href: "/cloudwatch", icon: <CloudWatchIcon size={16} />, desc: "Monitor Resources and Applications" },
-      { name: "CloudTrail", href: "/cloudtrail", icon: <CloudTrailIcon size={16} />, desc: "Track User Activity and API Usage" },
-      { name: "CloudFormation", href: "/cloudformation", icon: <CloudFormationIcon size={16} />, desc: "Create and Manage Resources with Templates" },
-      { name: "Systems Manager", href: "/systems-manager", icon: <SystemsManagerIcon size={16} />, desc: "Operational Insights and Take Action" },
-    ],
-  },
-  {
-    category: "Analytics",
-    services: [
-      { name: "Kinesis", href: "/kinesis", icon: <KinesisIcon size={16} />, desc: "Work with Real-Time Streaming Data" },
-      { name: "Athena", href: "/athena", icon: <AthenaIcon size={16} />, desc: "Query Data in S3 using SQL" },
-      { name: "Redshift", href: "/redshift", icon: <RedshiftIcon size={16} />, desc: "Fast Data Warehousing" },
-    ],
-  },
-  {
-    category: "Machine Learning",
-    services: [
-      { name: "SageMaker", href: "/sagemaker", icon: <SageMakerIcon size={16} />, desc: "Build, Train, and Deploy ML Models" },
-      { name: "Bedrock", href: "/bedrock", icon: <BedrockIcon size={16} />, desc: "Build with Foundation Models" },
-    ],
-  },
-  {
-    category: "Developer Tools",
-    services: [
-      { name: "CodeCommit", href: "/codecommit", icon: <CodeIcon size={16} />, desc: "Store Code in Private Git Repositories" },
-      { name: "CodeBuild", href: "/codebuild", icon: <CodeIcon size={16} />, desc: "Build and Test Code" },
-      { name: "CodePipeline", href: "/codepipeline", icon: <CodeIcon size={16} />, desc: "Release Software using Continuous Delivery" },
-    ],
-  },
-];
-
-// Flat list of all unique services for global search
-const allServicesFlat = serviceCategories.flatMap((c) =>
-  c.services.map((s) => ({ ...s, category: c.category }))
-);
-const uniqueServices = allServicesFlat.filter(
-  (s, i, arr) => arr.findIndex((x) => x.href === s.href) === i
-);
+const uniqueServices = ALL_SERVICES;
 
 const availableRegions = [
   { id: "us-east-1", name: "US East (N. Virginia)", active: true, tag: "Default Emulator" },
@@ -264,14 +158,15 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
 
   // Filtered services in Services dropdown menu
   const filteredCategories = useMemo(() => {
-    if (!servicesSearchQuery.trim()) return serviceCategories;
-    const q = servicesSearchQuery.toLowerCase();
-    return serviceCategories
+    if (!servicesSearchQuery.trim()) return SERVICE_CATEGORIES;
+    const q = servicesSearchQuery.toLowerCase().trim();
+    return SERVICE_CATEGORIES
       .map((cat) => ({
         ...cat,
         services: cat.services.filter(
           (s) =>
             s.name.toLowerCase().includes(q) ||
+            s.shortName.toLowerCase().includes(q) ||
             s.desc.toLowerCase().includes(q) ||
             cat.category.toLowerCase().includes(q)
         ),
@@ -279,16 +174,17 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
       .filter((cat) => cat.services.length > 0);
   }, [servicesSearchQuery]);
 
-  // Global search matching results
+  // Global search matching results (across all 200+ services)
   const globalSearchResults = useMemo(() => {
     if (!globalSearch.trim()) return [];
-    const q = globalSearch.toLowerCase();
-    return uniqueServices.filter(
+    const q = globalSearch.toLowerCase().trim();
+    return ALL_SERVICES.filter(
       (s) =>
         s.name.toLowerCase().includes(q) ||
+        s.shortName.toLowerCase().includes(q) ||
         s.desc.toLowerCase().includes(q) ||
         s.category.toLowerCase().includes(q)
-    ).slice(0, 8);
+    ).slice(0, 10);
   }, [globalSearch]);
 
   const currentRegionObj = availableRegions.find((r) => r.id === selectedRegion) || availableRegions[0];
@@ -354,7 +250,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                         onClick={() => handleServiceClick(s.name, s.href)}
                         className="w-full text-left px-4 py-[6px] text-[13px] text-[#0073bb] hover:bg-[#f2f3f3] flex items-center gap-2.5 group transition-colors"
                       >
-                        {s.icon}
+                        <ServiceIcon id={s.id} shortName={s.shortName} color={s.color} size={16} />
                         <div className="min-w-0">
                           <div className="group-hover:text-[#ec7211] font-medium text-[#16191f]">{s.name}</div>
                           <div className="text-[11px] text-[#545b64] truncate">{s.desc}</div>
@@ -368,6 +264,16 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                     No services match &quot;{servicesSearchQuery}&quot;
                   </div>
                 )}
+              </div>
+
+              <div className="p-3 border-t border-[#eaeded] bg-[#fafafa]">
+                <Link
+                  href="/services"
+                  onClick={() => setServicesOpen(false)}
+                  className="block text-center py-1.5 px-3 bg-[#0073bb] hover:bg-[#005a92] text-white text-[12px] font-semibold rounded transition-colors"
+                >
+                  View All {ALL_SERVICES.length} Services in Catalog
+                </Link>
               </div>
             </div>
           )}
@@ -396,10 +302,13 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
             {globalSearch && (
               <button
                 onClick={() => setGlobalSearch("")}
-                className="absolute right-2.5 text-[#8d9ba8] hover:text-white text-[12px]"
+                className="absolute right-2.5 text-[#8d9ba8] hover:text-white p-0.5"
                 title="Clear"
               >
-                ✕
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             )}
           </div>
@@ -418,7 +327,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                       onClick={() => handleServiceClick(s.name, s.href)}
                       className="w-full text-left px-3 py-2 hover:bg-[#f2f3f3] flex items-center gap-3 border-b border-[#eaeded]/60 group transition-colors"
                     >
-                      {s.icon}
+                      <ServiceIcon id={s.id} shortName={s.shortName} color={s.color} size={16} />
                       <div className="min-w-0 flex-1">
                         <div className="text-[13px] font-medium text-[#16191f] group-hover:text-[#ec7211] flex items-center gap-2">
                           {s.name}
@@ -426,7 +335,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                         </div>
                         <div className="text-[11px] text-[#545b64] truncate">{s.desc}</div>
                       </div>
-                      <span className="text-[11px] text-[#0073bb] group-hover:underline">Open ↗</span>
+                      <span className="text-[11px] text-[#0073bb] group-hover:underline">Open</span>
                     </button>
                   ))}
                   {globalSearchResults.length === 0 && (
@@ -446,7 +355,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                       { name: "SQS", href: "/sqs", icon: <SQSIcon size={14} /> },
                       { name: "DynamoDB", href: "/dynamodb", icon: <DynamoDBIcon size={14} /> },
                       { name: "IAM", href: "/iam", icon: <IAMIcon size={14} /> },
-                      { name: "Services Catalog", href: "/services", icon: <CodeIcon size={14} /> },
+                      { name: "All 200+ Services", href: "/services", icon: <ServiceIcon id="services" shortName="ALL" color="#0073bb" size={14} /> },
                     ].map((item) => (
                       <button
                         key={item.href}
@@ -572,33 +481,53 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                     href="https://docs.aws.amazon.com/emulator/latest/userguide/"
                     target="_blank"
                     rel="noreferrer"
-                    className="block px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
+                    className="flex items-center justify-between px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
                   >
-                    📖 AWS Emulator User Guide ↗
+                    <span>AWS Emulator User Guide</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8d9ba8]">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
                   </a>
                   <a
                     href="https://github.com/aws/aws-emulator"
                     target="_blank"
                     rel="noreferrer"
-                    className="block px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
+                    className="flex items-center justify-between px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
                   >
-                    🐙 Official Emulator Repo ↗
+                    <span>Official Emulator Repo</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8d9ba8]">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
                   </a>
                   <a
                     href="https://github.com/Shubham-Bhayaje/aws-emulator-ui"
                     target="_blank"
                     rel="noreferrer"
-                    className="block px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
+                    className="flex items-center justify-between px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
                   >
-                    ⭐ AWS Emulator UI Repo ↗
+                    <span>AWS Emulator UI Repo</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8d9ba8]">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
                   </a>
                   <a
                     href="https://github.com/Shubham-Bhayaje/aws-emulator-ui/issues"
                     target="_blank"
                     rel="noreferrer"
-                    className="block px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
+                    className="flex items-center justify-between px-4 py-2 text-[12px] text-[#16191f] hover:bg-[#f2f3f3] hover:text-[#0073bb]"
                   >
-                    🐛 Report an Issue ↗
+                    <span>Report an Issue</span>
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#8d9ba8]">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
                   </a>
                 </div>
                 <div className="px-4 py-2.5 border-t border-[#eaeded] bg-[#fafafa] text-[11px] text-[#545b64]">
@@ -643,7 +572,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                     onClick={handleClearHistory}
                     className="mt-1 text-[12px] px-2.5 py-1 bg-[#eaeded] hover:bg-[#d5dbdb] rounded text-[#16191f] transition-colors"
                   >
-                    {historyCleared ? "✓ History Cleared" : "Clear Visited Services"}
+                    {historyCleared ? "History Cleared" : "Clear Visited Services"}
                   </button>
                 </div>
 
@@ -713,11 +642,11 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
               className={`flex items-center gap-1.5 px-3 h-full hover:bg-white/10 text-white text-[12px] border-l border-white/20 transition-colors ${accountOpen ? "bg-white/15" : ""}`}
             >
               {activeIdentity.type === "admin" ? (
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono font-medium">👑 Admin</span>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono font-medium">Admin</span>
               ) : activeIdentity.type === "role" ? (
-                <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-mono font-medium">🎭 Role</span>
+                <span className="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-mono font-medium">Role</span>
               ) : (
-                <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-mono font-medium">👤 User</span>
+                <span className="text-[10px] bg-blue-500/20 text-blue-300 px-1.5 py-0.5 rounded font-mono font-medium">User</span>
               )}
               <span>{activeIdentity.name} @ {activeIdentity.accountId}</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className="text-white/60">
@@ -735,7 +664,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                       onClick={() => copyToClipboard(activeIdentity.accountId, "account")}
                       className="text-[11px] text-[#0073bb] hover:underline"
                     >
-                      {copiedKey === "account" ? "✓ Copied" : "Copy"}
+                      {copiedKey === "account" ? "Copied" : "Copy"}
                     </button>
                   </div>
                 </div>
@@ -762,9 +691,13 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                     className="w-full flex items-center justify-between px-3 py-2 bg-[#ec7211] hover:bg-[#eb5f07] text-white rounded text-[12px] font-semibold transition-colors shadow-xs"
                   >
                     <span className="flex items-center gap-1.5">
-                      🔄 Switch User / Role
+                      Switch User / Role
                     </span>
-                    <span className="text-[11px] opacity-80">Modal ↗</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="opacity-80">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                      <polyline points="15 3 21 3 21 9"/>
+                      <line x1="10" y1="14" x2="21" y2="3"/>
+                    </svg>
                   </button>
                 </div>
 
@@ -774,14 +707,14 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                     onClick={() => setAccountOpen(false)}
                     className="block py-1.5 text-[12px] text-[#0073bb] hover:underline font-medium"
                   >
-                    IAM Dashboard ↗
+                    IAM Dashboard
                   </Link>
                   <Link
                     href="/iam/users"
                     onClick={() => setAccountOpen(false)}
                     className="block py-1.5 text-[12px] text-[#0073bb] hover:underline"
                   >
-                    Manage Users & Policies ↗
+                    Manage Users & Policies
                   </Link>
                 </div>
 

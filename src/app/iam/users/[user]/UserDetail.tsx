@@ -278,9 +278,13 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
               </div>
               <button
                 onClick={() => setInspectedPolicy(null)}
-                className="text-[#879596] hover:text-[#16191f] text-[16px]"
+                className="text-[#879596] hover:text-[#16191f] p-1"
+                title="Close"
               >
-                ✕
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             </div>
 
@@ -318,9 +322,13 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
               </h3>
               <button
                 onClick={() => setShowAttachModal(false)}
-                className="text-[#879596] hover:text-[#16191f] text-[16px]"
+                className="text-[#879596] hover:text-[#16191f] p-1"
+                title="Close"
               >
-                ✕
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
               </button>
             </div>
 

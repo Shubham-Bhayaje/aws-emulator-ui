@@ -179,17 +179,29 @@ export default function CloudShellTerminal({ isOpen, onClose }: CloudShellTermin
           </button>
           <button
             onClick={() => setIsMaximized(!isMaximized)}
-            className="text-[12px] px-2 py-0.5 rounded text-[#8d9ba8] hover:text-white hover:bg-white/10"
+            className="p-1 rounded text-[#8d9ba8] hover:text-white hover:bg-white/10"
             title={isMaximized ? "Restore Height" : "Maximize"}
           >
-            {isMaximized ? "🗗" : "🗖"}
+            {isMaximized ? (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="5" y="9" width="14" height="11" rx="1" />
+                <path d="M9 5h10a1 1 0 0 1 1 1v10" />
+              </svg>
+            ) : (
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+              </svg>
+            )}
           </button>
           <button
             onClick={onClose}
-            className="text-[14px] px-2 py-0.5 rounded text-white/60 hover:text-white hover:bg-white/10"
+            className="p-1 rounded text-white/60 hover:text-white hover:bg-white/10"
             title="Close CloudShell"
           >
-            ✕
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
           </button>
         </div>
       </div>
