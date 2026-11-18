@@ -91,7 +91,8 @@ export default function InstanceDetailClient({
           <div className="pt-2">
             <Link
               href="/ec2/instances"
-              className="px-4 py-2 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07]"
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors"
             >
               Return to instances
             </Link>
@@ -145,7 +146,8 @@ export default function InstanceDetailClient({
             {instance.state === "running" && (
               <button
                 onClick={() => setShowTerminalModal(true)}
-                className="px-3 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-3 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Connect
               </button>
@@ -155,7 +157,8 @@ export default function InstanceDetailClient({
               <button
                 onClick={() => handleStateChange("stopped")}
                 disabled={isPending}
-                className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] disabled:opacity-50"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-3 border border-[#545b64] rounded-sm text-[#16191f] text-[13px] font-bold hover:bg-[#f2f3f3] disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Stop instance
               </button>
@@ -163,7 +166,8 @@ export default function InstanceDetailClient({
               <button
                 onClick={() => handleStateChange("running")}
                 disabled={isPending}
-                className="px-3 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm hover:bg-[#005a9e] disabled:opacity-50"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-3 bg-[#0073bb] text-white rounded-sm text-[13px] font-bold hover:bg-[#005a9e] disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Start instance
               </button>
@@ -171,7 +175,8 @@ export default function InstanceDetailClient({
 
             <Link
               href="/ec2/instances"
-              className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3]"
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="px-3 border border-[#545b64] rounded-sm text-[#16191f] text-[13px] font-bold hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
             >
               Back to instances
             </Link>

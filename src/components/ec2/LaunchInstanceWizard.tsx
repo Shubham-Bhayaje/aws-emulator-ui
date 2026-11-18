@@ -6,13 +6,10 @@
 
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  DEFAULT_INSTANCES,
-  DEFAULT_SECURITY_GROUPS,
-  DEFAULT_KEY_PAIRS,
   EC2Instance,
   SecurityGroup,
   KeyPair,
@@ -69,8 +66,8 @@ interface LaunchInstanceWizardProps {
 }
 
 export default function LaunchInstanceWizard({
-  initialSecurityGroups = DEFAULT_SECURITY_GROUPS,
-  initialKeyPairs = DEFAULT_KEY_PAIRS,
+  initialSecurityGroups = [],
+  initialKeyPairs = [],
 }: LaunchInstanceWizardProps) {
   const router = useRouter();
 
@@ -79,10 +76,10 @@ export default function LaunchInstanceWizard({
   const [selectedAmiId, setSelectedAmiId] = useState(AMI_OPTIONS[0].id);
   const [selectedType, setSelectedType] = useState("t3.micro");
   const [selectedKeyPair, setSelectedKeyPair] = useState(
-    initialKeyPairs[0]?.name || "test-key"
+    initialKeyPairs[0]?.name || ""
   );
   const [selectedSgId, setSelectedSgId] = useState(
-    initialSecurityGroups[0]?.id || "sg-0000000000000000d"
+    initialSecurityGroups[0]?.id || ""
   );
   const [allowSsh, setAllowSsh] = useState(true);
   const [allowHttp, setAllowHttp] = useState(true);
@@ -91,23 +88,10 @@ export default function LaunchInstanceWizard({
   const [iamRole, setIamRole] = useState("None");
   const [userData, setUserData] = useState("#!/bin/bash\necho 'Hello from EC2' > /var/www/html/index.html");
 
-  const [instances, setInstances] = useState<EC2Instance[]>(DEFAULT_INSTANCES);
-  const [secGroups, setSecGroups] = useState<SecurityGroup[]>(initialSecurityGroups);
-  const [keyPairs, setKeyPairs] = useState<KeyPair[]>(initialKeyPairs);
+  const [secGroups] = useState<SecurityGroup[]>(initialSecurityGroups);
+  const [keyPairs] = useState<KeyPair[]>(initialKeyPairs);
   const [isLaunching, setIsLaunching] = useState(false);
-
-  useEffect(() => {
-    try {
-      const savedInst = localStorage.getItem("aws_ec2_instances");
-      if (savedInst) setInstances(JSON.parse(savedInst));
-
-      const savedSg = localStorage.getItem("aws_ec2_sec_groups");
-      if (savedSg) setSecGroups(JSON.parse(savedSg));
-
-      const savedKeys = localStorage.getItem("aws_ec2_key_pairs");
-      if (savedKeys) setKeyPairs(JSON.parse(savedKeys));
-    } catch { /* ignore */ }
-  }, []);
+  const [launchError, setLaunchError] = useState<string | null>(null);
 
   const currentAmi = AMI_OPTIONS.find((a) => a.id === selectedAmiId) || AMI_OPTIONS[0];
   const currentTypeObj = INSTANCE_TYPES.find((t) => t.type === selectedType) || INSTANCE_TYPES[1];
@@ -116,14 +100,15 @@ export default function LaunchInstanceWizard({
   async function handleLaunch(e: React.FormEvent) {
     e.preventDefault();
     setIsLaunching(true);
+    setLaunchError(null);
 
     try {
       const res = await launchLiveInstance({
         name: instanceName.trim() || `instance-${Date.now().toString().slice(-4)}`,
         imageId: selectedAmiId,
         instanceType: selectedType,
-        keyName: selectedKeyPair,
-        securityGroupId: selectedSgId,
+        keyName: selectedKeyPair && selectedKeyPair !== "none" ? selectedKeyPair : undefined,
+        securityGroupId: selectedSgId || undefined,
       });
 
       if (res.success && res.instance) {
@@ -131,52 +116,12 @@ export default function LaunchInstanceWizard({
         router.push("/ec2/instances");
         return;
       }
-    } catch (err) {
-      console.warn("Live launch fallback:", err);
-    }
-
-    const randHex = Math.random().toString(16).substring(2, 10) + Math.random().toString(16).substring(2, 11);
-    const newId = `i-${randHex.substring(0, 17)}`;
-    const randIp = `54.210.${Math.floor(Math.random() * 200 + 10)}.${Math.floor(Math.random() * 200 + 10)}`;
-    const randPriv = `172.31.${Math.floor(Math.random() * 50 + 10)}.${Math.floor(Math.random() * 200 + 10)}`;
-
-    const newInst: EC2Instance = {
-      id: newId,
-      name: instanceName.trim() || `instance-${instances.length + 1}`,
-      state: "running",
-      instanceType: selectedType,
-      statusCheck: "2/2 checks passed",
-      availabilityZone: "us-east-1a",
-      publicIp: randIp,
-      privateIp: randPriv,
-      publicDns: `ec2-${randIp.replace(/\./g, "-")}.compute-1.amazonaws.com`,
-      privateDns: `ip-${randPriv.replace(/\./g, "-")}.ec2.internal`,
-      amiId: currentAmi.id,
-      amiName: currentAmi.name,
-      platform: currentAmi.platform,
-      architecture: "x86_64",
-      securityGroupId: currentSg.id,
-      securityGroupName: currentSg.name,
-      keyName: selectedKeyPair,
-      vpcId: "vpc-00000000000000001",
-      subnetId: "subnet-00000000000000007",
-      iamRole: iamRole !== "None" ? iamRole : undefined,
-      launchTime: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) + ", " + new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      rootDeviceType: "ebs",
-      rootDeviceName: "/dev/xvda",
-      volumeSizeGb: parseInt(volumeSizeGb, 10) || 20,
-      tags: { Name: instanceName.trim() || `instance-${instances.length + 1}`, Environment: "Development" },
-    };
-
-    const updated = [newInst, ...instances];
-    try {
-      localStorage.setItem("aws_ec2_instances", JSON.stringify(updated));
-    } catch { /* ignore */ }
-
-    setTimeout(() => {
+      setLaunchError(res.error || "Failed to launch instance on AWS Emulator.");
       setIsLaunching(false);
-      router.push("/ec2/instances");
-    }, 600);
+    } catch (err: any) {
+      setLaunchError(err.message || "Failed to communicate with AWS Emulator.");
+      setIsLaunching(false);
+    }
   }
 
   return (
@@ -197,6 +142,17 @@ export default function LaunchInstanceWizard({
           </p>
         </div>
       </div>
+
+      {launchError && (
+        <div className="p-3 bg-[#fdf3f1] border border-[#f5b8b0] text-[#d13212] text-[13px] rounded-sm flex items-center gap-2">
+          <svg className="w-4 h-4 shrink-0 text-[#d13212]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>Error launching instance: {launchError}</span>
+        </div>
+      )}
 
       <form onSubmit={handleLaunch} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         {/* Left Form Content (8 Cols) */}
@@ -470,11 +426,12 @@ export default function LaunchInstanceWizard({
               </div>
             </div>
 
-            <div className="pt-3 border-t border-[#eaeded]">
+            <div className="pt-3 border-t border-[#eaeded] space-y-2">
               <button
                 type="submit"
                 disabled={isLaunching}
-                className="w-full py-2.5 px-4 bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07] transition-colors shadow-xs text-[14px] flex items-center justify-center gap-2"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="w-full bg-[#ec7211] text-white rounded-sm font-bold hover:bg-[#eb5f07] transition-colors shadow-xs text-[13px] whitespace-nowrap inline-flex items-center justify-center gap-2"
               >
                 {isLaunching ? (
                   <>
@@ -488,6 +445,13 @@ export default function LaunchInstanceWizard({
                   <span>Launch instance</span>
                 )}
               </button>
+              <Link
+                href="/ec2/instances"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="w-full border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] rounded-sm font-bold text-[13px] whitespace-nowrap inline-flex items-center justify-center transition-colors"
+              >
+                Cancel
+              </Link>
             </div>
           </div>
         </div>

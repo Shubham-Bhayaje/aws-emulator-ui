@@ -43,7 +43,7 @@ export default function InstanceTypesClient({ types, isLive }: Props) {
               }`}
             />
             <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "Live Instance Types (AWS Emulator)" : "Mock Mode"}
+              {isLive ? "Live Instance Types (AWS Emulator)" : "Offline (Check AWS Emulator Connection)"}
             </span>
           </div>
           <span className="text-[#95a5a6] text-[12px]">|</span>
@@ -63,7 +63,8 @@ export default function InstanceTypesClient({ types, isLive }: Props) {
           </div>
           <Link
             href="/ec2/launch"
-            className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07]"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors"
           >
             Launch with instance type
           </Link>

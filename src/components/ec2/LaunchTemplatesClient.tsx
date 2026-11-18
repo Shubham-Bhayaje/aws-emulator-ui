@@ -199,7 +199,7 @@ export default function LaunchTemplatesClient({ initialTemplates, isLive }: Prop
               }`}
             />
             <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "Launch Templates Connected (AWS Emulator)" : "Mock Mode"}
+              {isLive ? "Launch Templates Connected (AWS Emulator)" : "Disconnected from Emulator"}
             </span>
           </div>
           <span className="text-[#95a5a6] text-[12px]">|</span>

@@ -58,6 +58,9 @@ export interface KeyPair {
   format: "pem" | "ppk";
   fingerprint: string;
   createTime: string;
+  arn?: string;
+  tags?: Record<string, string>;
+  publicKey?: string;
 }
 
 export interface ElasticIp {
@@ -65,8 +68,13 @@ export interface ElasticIp {
   publicIp: string;
   associatedInstanceId?: string;
   associatedInstanceName?: string;
+  associationId?: string;
+  privateIpAddress?: string;
   networkInterfaceId?: string;
+  networkBorderGroup?: string;
   domain: "vpc";
+  arn?: string;
+  tags?: Record<string, string>;
 }
 
 export interface EC2Instance {

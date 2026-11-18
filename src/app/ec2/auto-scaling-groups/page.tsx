@@ -1,23 +1,32 @@
 /**
- * src/app/ec2/auto-scaling-groups/page.tsx – EC2 Auto Scaling Groups.
+ * src/app/ec2/auto-scaling-groups/page.tsx – EC2 Auto Scaling Groups Page.
  * Zero emojis, Cloudscape enterprise styling.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
 import { ec2Nav } from "@/components/ec2/EC2Nav";
-import EC2PlaceholderView from "@/components/ec2/EC2PlaceholderView";
+import AutoScalingGroupsClient from "@/components/ec2/AutoScalingGroupsClient";
+import { fetchLiveAutoScalingGroups, fetchLiveLaunchTemplates } from "../actions";
 
-export default function AutoScalingGroupsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AutoScalingGroupsPage() {
+  const [asgRes, ltRes] = await Promise.all([
+    fetchLiveAutoScalingGroups(),
+    fetchLiveLaunchTemplates(),
+  ]);
+
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
-      <EC2PlaceholderView
-        title="Auto Scaling Groups"
-        description="Amazon EC2 Auto Scaling contains a collection of EC2 instances that are treated as a logical grouping for automatic scaling and management."
-        primaryActionLabel="Create Auto Scaling group"
-        columns={["Auto Scaling group name", "Launch template", "Instances", "Desired capacity", "Min", "Max", "Status"]}
-        rows={[]}
-        emptyTitle="No Auto Scaling groups found"
-        emptyDescription="Create an Auto Scaling group to maintain application availability and automatically add or remove instances according to demand."
+      <AutoScalingGroupsClient
+        initialGroups={asgRes.autoScalingGroups || []}
+        launchTemplates={(ltRes.templates || []).map((lt) => ({
+          id: lt.id,
+          name: lt.name,
+          defaultVersionNumber: lt.defaultVersion,
+        }))}
+        isLive={asgRes.isLive}
+        liveError={asgRes.error}
       />
     </ServiceLayout>
   );

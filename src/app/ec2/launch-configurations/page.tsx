@@ -1,22 +1,25 @@
 /**
- * src/app/ec2/launch-configurations/page.tsx – EC2 Launch Configurations.
+ * src/app/ec2/launch-configurations/page.tsx – EC2 Launch Configurations Page.
  * Zero emojis, Cloudscape enterprise styling.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
 import { ec2Nav } from "@/components/ec2/EC2Nav";
-import EC2PlaceholderView from "@/components/ec2/EC2PlaceholderView";
+import LaunchConfigurationsClient from "@/components/ec2/LaunchConfigurationsClient";
+import { fetchLiveLaunchConfigurations } from "../actions";
 
-export default function LaunchConfigurationsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function LaunchConfigurationsPage() {
+  const { launchConfigurations = [], isLive = true, error } =
+    await fetchLiveLaunchConfigurations();
+
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
-      <EC2PlaceholderView
-        title="Launch Configurations"
-        description="A launch configuration is an instance configuration template that an Auto Scaling group uses to launch EC2 instances."
-        columns={["Name", "AMI ID", "Instance type", "Created time", "Security groups"]}
-        rows={[]}
-        emptyTitle="No launch configurations found"
-        emptyDescription="AWS recommends using Launch Templates instead of Launch Configurations for new Auto Scaling groups."
+      <LaunchConfigurationsClient
+        initialConfigurations={launchConfigurations || []}
+        isLive={isLive}
+        liveError={error}
       />
     </ServiceLayout>
   );

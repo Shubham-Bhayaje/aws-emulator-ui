@@ -1,17 +1,12 @@
 /**
- * SecurityGroupsClient.tsx – Authentic AWS Management Console Security Groups manager.
- * Complete with Details, Inbound rules, Outbound rules, and Tags tabs, Actions dropdown,
- * and comprehensive rule builder supporting all 25 AWS standard protocols/ports.
- * Connected to live AWS Emulator via Server Actions.
+ * src/components/ec2/SecurityGroupsClient.tsx – AWS Security Groups Console Replica.
  * Zero emojis, Cloudscape enterprise styling.
  */
 
 "use client";
 
-import { useState, useTransition } from "react";
-import Link from "next/link";
+import React, { useState, useTransition } from "react";
 import {
-  DEFAULT_SECURITY_GROUPS,
   SecurityGroup,
   SecurityGroupRule,
   AWS_SECURITY_GROUP_RULE_PRESETS,
@@ -31,17 +26,19 @@ interface SecurityGroupsClientProps {
 }
 
 export default function SecurityGroupsClient({
-  initialSecurityGroups = DEFAULT_SECURITY_GROUPS,
+  initialSecurityGroups = [],
   isLive = true,
   liveError,
 }: SecurityGroupsClientProps) {
-  const [secGroups, setSecGroups] = useState<SecurityGroup[]>(initialSecurityGroups);
-  const [selectedId, setSelectedId] = useState<string | null>(initialSecurityGroups[0]?.id || null);
+  const [secGroups, setSecGroups] = useState<SecurityGroup[]>(initialSecurityGroups || []);
+  const [selectedId, setSelectedId] = useState<string | null>(
+    initialSecurityGroups && initialSecurityGroups.length > 0 ? initialSecurityGroups[0]?.id : null
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [activeBottomTab, setActiveBottomTab] = useState<"details" | "inbound" | "outbound" | "tags">("details");
+  const [feedback, setFeedback] = useState<string | null>(null);
 
   // Modals & dropdowns
-  const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditInboundModal, setShowEditInboundModal] = useState(false);
   const [showEditOutboundModal, setShowEditOutboundModal] = useState(false);
@@ -59,7 +56,18 @@ export default function SecurityGroupsClient({
   const [editingInboundRules, setEditingInboundRules] = useState<SecurityGroupRule[]>([]);
   const [editingOutboundRules, setEditingOutboundRules] = useState<SecurityGroupRule[]>([]);
 
-  const selectedSg = secGroups.find((s) => s.id === selectedId) || null;
+  const selectedSg = (secGroups || []).find((s) => s.id === selectedId) || null;
+
+  function refreshGroups() {
+    startTransition(async () => {
+      const res = await fetchLiveSecurityGroups();
+      const list = res.securityGroups || [];
+      setSecGroups(list);
+      if (list.length > 0 && (!selectedId || !list.some((s) => s.id === selectedId))) {
+        setSelectedId(list[0]?.id || null);
+      }
+    });
+  }
 
   // -------------------------------------------------------------
   // Inbound Rules Editing
@@ -67,7 +75,6 @@ export default function SecurityGroupsClient({
   function handleOpenEditInbound() {
     if (!selectedSg) return;
     setEditingInboundRules(selectedSg.inboundRules.map((r) => ({ ...r })));
-    setShowActionsMenu(false);
     setShowEditInboundModal(true);
   }
 
@@ -102,13 +109,15 @@ export default function SecurityGroupsClient({
 
     startTransition(async () => {
       const res = await updateLiveSecurityGroupRules(selectedSg.id, editingInboundRules);
-      if (!res.success && res.error) {
-        alert("Failed to update inbound rules: " + res.error);
-        return;
+      if (res.success) {
+        setShowEditInboundModal(false);
+        const fresh = await fetchLiveSecurityGroups();
+        setSecGroups(fresh.securityGroups || []);
+        setFeedback(`Inbound rules updated for ${selectedSg.id}.`);
+      } else {
+        setFeedback(`Failed to update inbound rules: ${res.error || "Unknown error"}`);
       }
-      const fresh = await fetchLiveSecurityGroups();
-      if (fresh.isLive) setSecGroups(fresh.securityGroups);
-      setShowEditInboundModal(false);
+      setTimeout(() => setFeedback(null), 5000);
     });
   }
 
@@ -118,14 +127,13 @@ export default function SecurityGroupsClient({
   function handleOpenEditOutbound() {
     if (!selectedSg) return;
     setEditingOutboundRules(selectedSg.outboundRules.map((r) => ({ ...r })));
-    setShowActionsMenu(false);
     setShowEditOutboundModal(true);
   }
 
   function handleAddOutboundRule() {
     setEditingOutboundRules([
       ...editingOutboundRules,
-      { type: "All traffic", protocol: "All", portRange: "All", source: "0.0.0.0/0", description: "Allow all outbound" },
+      { type: "All traffic", protocol: "All", portRange: "All", source: "0.0.0.0/0", description: "" },
     ]);
   }
 
@@ -153,52 +161,92 @@ export default function SecurityGroupsClient({
 
     startTransition(async () => {
       const res = await updateLiveSecurityGroupOutboundRules(selectedSg.id, editingOutboundRules);
-      if (!res.success && res.error) {
-        alert("Failed to update outbound rules: " + res.error);
-        return;
+      if (res.success) {
+        setShowEditOutboundModal(false);
+        const fresh = await fetchLiveSecurityGroups();
+        setSecGroups(fresh.securityGroups || []);
+        setFeedback(`Outbound rules updated for ${selectedSg.id}.`);
+      } else {
+        setFeedback(`Failed to update outbound rules: ${res.error || "Unknown error"}`);
       }
-      const fresh = await fetchLiveSecurityGroups();
-      if (fresh.isLive) setSecGroups(fresh.securityGroups);
-      setShowEditOutboundModal(false);
+      setTimeout(() => setFeedback(null), 5000);
     });
   }
 
   // -------------------------------------------------------------
-  // Create / Delete SG
+  // Creation Form Rule Management
   // -------------------------------------------------------------
-  function handleCreateGroup(e: React.FormEvent) {
+  function handleAddRule() {
+    setNewRules([
+      ...newRules,
+      { type: "Custom TCP", protocol: "TCP", portRange: "80", source: "0.0.0.0/0", description: "" },
+    ]);
+  }
+
+  function handleRemoveRule(idx: number) {
+    setNewRules(newRules.filter((_, i) => i !== idx));
+  }
+
+  function handleRuleChange(idx: number, field: keyof SecurityGroupRule, val: string) {
+    const updated = [...newRules];
+    updated[idx] = { ...updated[idx], [field]: val };
+
+    if (field === "type") {
+      const preset = AWS_SECURITY_GROUP_RULE_PRESETS.find((p) => p.name === val);
+      if (preset) {
+        updated[idx].protocol = preset.protocol;
+        updated[idx].portRange = preset.defaultPort;
+      }
+    }
+    setNewRules(updated);
+  }
+
+  function handleCreateSecurityGroup(e: React.FormEvent) {
     e.preventDefault();
     if (!newSgName.trim()) return;
 
     startTransition(async () => {
       const res = await createLiveSecurityGroup(newSgName.trim(), newSgDesc.trim());
       if (res.success && res.securityGroup) {
-        setSecGroups([res.securityGroup, ...secGroups]);
-      } else {
+        if (newRules.length > 0) {
+          await updateLiveSecurityGroupRules(res.securityGroup.id, newRules);
+        }
+        setShowCreateModal(false);
+        setNewSgName("");
+        setNewSgDesc("");
+        setNewRules([{ type: "SSH", protocol: "TCP", portRange: "22", source: "0.0.0.0/0", description: "SSH access" }]);
         const fresh = await fetchLiveSecurityGroups();
-        if (fresh.isLive) setSecGroups(fresh.securityGroups);
+        setSecGroups(fresh.securityGroups || []);
+        setSelectedId(res.securityGroup.id);
+        setFeedback(`Security group ${res.securityGroup.id} created successfully.`);
+      } else {
+        setFeedback(`Creation failed: ${res.error || "Unknown error"}`);
       }
-      setNewSgName("");
-      setNewSgDesc("");
-      setShowCreateModal(false);
+      setTimeout(() => setFeedback(null), 5000);
     });
   }
 
   function handleDeleteGroup() {
-    if (!selectedSg) return;
-    const targetId = selectedSg.id;
-    setSecGroups(secGroups.filter((s) => s.id !== targetId));
-    setSelectedId(null);
+    if (!selectedId) return;
+    const targetId = selectedId;
     setShowDeleteModal(false);
 
     startTransition(async () => {
-      await deleteLiveSecurityGroup(targetId);
-      const fresh = await fetchLiveSecurityGroups();
-      if (fresh.isLive) setSecGroups(fresh.securityGroups);
+      const res = await deleteLiveSecurityGroup(targetId);
+      if (res.success) {
+        const fresh = await fetchLiveSecurityGroups();
+        const list = fresh.securityGroups || [];
+        setSecGroups(list);
+        setSelectedId(list[0]?.id || null);
+        setFeedback(`Security group ${targetId} was deleted.`);
+      } else {
+        setFeedback(`Failed to delete security group: ${res.error || "Unknown error"}`);
+      }
+      setTimeout(() => setFeedback(null), 5000);
     });
   }
 
-  const filteredGroups = secGroups.filter(
+  const filteredGroups = (secGroups || []).filter(
     (s) =>
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -206,291 +254,328 @@ export default function SecurityGroupsClient({
   );
 
   return (
-    <div className="space-y-4 max-w-[1500px]">
+    <div className="space-y-6 max-w-[1400px]">
       {/* Live Badge */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#f2f8f0] border border-[#b8dfaf] rounded-sm text-[12px] text-[#1d8102]">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#1d8102] animate-pulse" />
-          <span className="font-semibold">Live Security Groups</span>
-          <span className="text-[#545b64]">|</span>
-          <span>Configured on Docker AWS Emulator (127.0.0.1:9297)</span>
-        </div>
-      </div>
-
-      {/* Header with Title and Actions Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-[20px] font-bold text-[#16191f]">
-            Security Groups <span className="text-[#545b64] font-normal">({filteredGroups.length})</span>
-          </h1>
-          <p className="text-[13px] text-[#545b64]">
-            Manage stateful virtual firewalls that control inbound and outbound traffic for your EC2 instances.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Actions Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setShowActionsMenu(!showActionsMenu)}
-              disabled={!selectedSg}
-              className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-normal disabled:opacity-40 transition-colors flex items-center gap-1.5"
-            >
-              Actions
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="6 9 12 15 18 9" />
-              </svg>
-            </button>
-
-            {showActionsMenu && selectedSg && (
-              <div
-                className="absolute right-0 mt-1 w-56 bg-white border border-[#d5dbdb] rounded-sm shadow-lg z-30 py-1 text-[13px]"
-                onMouseLeave={() => setShowActionsMenu(false)}
-              >
-                <button
-                  onClick={handleOpenEditInbound}
-                  className="w-full text-left px-4 py-2 hover:bg-[#f2f3f3] text-[#16191f]"
-                >
-                  Edit inbound rules
-                </button>
-                <button
-                  onClick={handleOpenEditOutbound}
-                  className="w-full text-left px-4 py-2 hover:bg-[#f2f3f3] text-[#16191f]"
-                >
-                  Edit outbound rules
-                </button>
-                <div className="border-t border-[#eaeded] my-1" />
-                <button
-                  onClick={() => {
-                    setShowActionsMenu(false);
-                    setShowDeleteModal(true);
-                  }}
-                  className="w-full text-left px-4 py-2 text-[#d13212] hover:bg-[#fdf3f1]"
-                >
-                  Delete security group
-                </button>
-              </div>
-            )}
+      <div className="flex items-center justify-between bg-white border border-[#d5dbdb] px-4 py-2.5 rounded-sm awsui-shadow">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block w-2.5 h-2.5 rounded-full ${
+                isLive ? "bg-[#1d8102]" : "bg-[#ec7211]"
+              }`}
+            />
+            <span className="text-[12px] font-semibold text-[#16191f]">
+              {isLive ? "Security Group Service Connected (AWS Emulator)" : "Mock Data Mode"}
+            </span>
           </div>
+          <span className="text-[#95a5a6] text-[12px]">|</span>
+          <span className="text-[12px] font-mono text-[#545b64]">Region: us-east-1</span>
+        </div>
+        {feedback && <span className="text-[12px] text-[#0073bb] font-medium">{feedback}</span>}
+      </div>
 
-          <button
-            onClick={handleOpenEditInbound}
-            disabled={!selectedSg}
-            className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-medium disabled:opacity-40 transition-colors"
-          >
-            Edit inbound rules
-          </button>
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="bg-white border border-[#eaeded] p-4 rounded-sm awsui-shadow">
+          <div className="text-[12px] font-medium text-[#545b64] uppercase tracking-wide">
+            Total Security Groups
+          </div>
+          <div className="text-[26px] font-bold text-[#16191f] mt-1">{(secGroups || []).length}</div>
+        </div>
 
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            disabled={!selectedSg}
-            className={`px-3 py-1.5 text-[13px] rounded-sm font-medium border transition-colors ${
-              selectedSg
-                ? "border-[#d5dbdb] text-[#d13212] hover:bg-[#fdf3f1]"
-                : "border-[#d5dbdb] text-[#aab7b8] cursor-not-allowed bg-white"
-            }`}
-          >
-            Delete
-          </button>
+        <div className="bg-white border border-[#eaeded] p-4 rounded-sm awsui-shadow">
+          <div className="text-[12px] font-medium text-[#545b64] uppercase tracking-wide">
+            Inbound Rules Configured
+          </div>
+          <div className="text-[26px] font-bold text-[#0073bb] mt-1">
+            {(secGroups || []).reduce((acc, s) => acc + (s.inboundRules?.length || 0), 0)}
+          </div>
+        </div>
 
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="px-4 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
-          >
-            Create security group
-          </button>
+        <div className="bg-white border border-[#eaeded] p-4 rounded-sm awsui-shadow">
+          <div className="text-[12px] font-medium text-[#545b64] uppercase tracking-wide">
+            Outbound Rules Configured
+          </div>
+          <div className="text-[26px] font-bold text-[#1d8102] mt-1">
+            {(secGroups || []).reduce((acc, s) => acc + (s.outboundRules?.length || 0), 0)}
+          </div>
         </div>
       </div>
 
-      {/* Filter Bar */}
-      <div className="bg-white border border-[#d5dbdb] rounded-sm p-3">
-        <input
-          type="text"
-          placeholder="Filter security groups by name, ID, or description..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full max-w-md px-3 py-1.5 text-[13px] border border-[#aab7b8] rounded-sm text-[#16191f] focus:border-[#0073bb] outline-hidden"
-        />
-      </div>
-
-      {/* Security Groups Table */}
-      <div className="bg-white border border-[#d5dbdb] rounded-sm awsui-shadow overflow-x-auto">
-        <table className="w-full text-[13px] text-left border-collapse">
-          <thead className="bg-[#f2f3f3] text-[#545b64] font-semibold border-b border-[#eaeded]">
-            <tr>
-              <th className="py-2.5 px-3 w-10 text-center">
-                <input
-                  type="checkbox"
-                  checked={selectedId !== null && filteredGroups.some((g) => g.id === selectedId)}
-                  onChange={(e) => {
-                    if (e.target.checked && filteredGroups.length > 0) {
-                      setSelectedId(filteredGroups[0].id);
-                    } else {
-                      setSelectedId(null);
-                    }
-                  }}
-                  className="rounded border-[#aab7b8]"
-                  aria-label="Select all security groups"
-                />
-              </th>
-              <th className="py-2.5 px-3">Name</th>
-              <th className="py-2.5 px-3">Security Group ID</th>
-              <th className="py-2.5 px-3">Description</th>
-              <th className="py-2.5 px-3">VPC ID</th>
-              <th className="py-2.5 px-3">Inbound Rules</th>
-              <th className="py-2.5 px-3">Outbound Rules</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#eaeded]">
-            {filteredGroups.length === 0 ? (
-              <tr>
-                <td colSpan={7} className="py-6 text-center text-[#545b64]">
-                  No security groups found.
-                </td>
-              </tr>
-            ) : (
-              filteredGroups.map((sg) => {
-                const isSelected = selectedId === sg.id;
-                return (
-                  <tr
-                    key={sg.id}
-                    onClick={() => setSelectedId(isSelected ? null : sg.id)}
-                    className={`cursor-pointer transition-colors ${isSelected ? "bg-[#f2f8f8]" : "hover:bg-[#fafafa]"}`}
-                  >
-                    <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => setSelectedId(isSelected ? null : sg.id)}
-                        className="rounded border-[#aab7b8]"
-                        aria-label={`Select ${sg.name}`}
-                      />
-                    </td>
-                    <td className="py-2.5 px-3 font-medium text-[#0073bb]">{sg.name}</td>
-                    <td className="py-2.5 px-3 font-mono text-[12px] text-[#0073bb]">{sg.id}</td>
-                    <td className="py-2.5 px-3 text-[#545b64]">{sg.description}</td>
-                    <td className="py-2.5 px-3 font-mono text-[12px] text-[#545b64]">{sg.vpcId}</td>
-                    <td className="py-2.5 px-3 text-[#16191f] font-mono">
-                      {sg.inboundRules.length} {sg.inboundRules.length === 1 ? "rule" : "rules"}
-                    </td>
-                    <td className="py-2.5 px-3 text-[#16191f] font-mono">
-                      {sg.outboundRules.length} {sg.outboundRules.length === 1 ? "rule" : "rules"}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Selected Group Bottom Details Drawer with Full AWS Tabs */}
-      {selectedSg && (
-        <div className="bg-white border border-[#d5dbdb] rounded-sm awsui-shadow">
-          {/* Drawer Header */}
-          <div className="px-5 py-3 border-b border-[#eaeded] flex items-center justify-between bg-[#fafafa]">
-            <div className="flex items-center gap-3">
-              <span className="font-semibold text-[14px] text-[#16191f]">{selectedSg.name}</span>
-              <span className="font-mono text-[12px] text-[#545b64]">({selectedSg.id})</span>
-            </div>
+      {/* Main Table Card */}
+      <div className="bg-white border border-[#eaeded] rounded-sm awsui-shadow">
+        <div className="p-4 border-b border-[#eaeded] flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleOpenEditInbound}
-                className="px-3 py-1 bg-[#ec7211] text-white rounded text-[12px] font-medium hover:bg-[#eb5f07]"
-              >
-                Edit inbound rules
-              </button>
-              <button onClick={() => setSelectedId(null)} className="text-[#879596] hover:text-[#16191f] p-1">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+              <h2 className="text-[18px] font-bold text-[#16191f]">Security Groups</h2>
+              <span className="text-[13px] text-[#545b64]">({filteredGroups.length})</span>
             </div>
+            <p className="text-[13px] text-[#545b64] mt-0.5">
+              Manage virtual firewalls that control inbound and outbound traffic for your Amazon EC2 instances.
+            </p>
           </div>
 
-          {/* Drawer Tabs (Details | Inbound rules | Outbound rules | Tags) */}
-          <div className="flex items-center gap-1 border-b border-[#eaeded] px-5 text-[13px] bg-white">
-            {(["details", "inbound", "outbound", "tags"] as const).map((tb) => (
+          <div className="flex items-center gap-2 flex-shrink-0 self-start md:self-center">
+            <button
+              onClick={refreshGroups}
+              disabled={isPending}
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="h-[32px] px-3.5 bg-white border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+            >
+              Refresh
+            </button>
+            <button
+              onClick={handleOpenEditInbound}
+              disabled={!selectedSg}
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="h-[32px] px-3.5 border border-[#aab7b8] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors hover:border-[#16191f] disabled:border-[#eaeded] disabled:bg-[#f2f3f3] disabled:text-[#aab7b8] disabled:cursor-not-allowed cursor-pointer"
+            >
+              Edit inbound rules
+            </button>
+            <button
+              onClick={handleOpenEditOutbound}
+              disabled={!selectedSg}
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="h-[32px] px-3.5 border border-[#aab7b8] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors hover:border-[#16191f] disabled:border-[#eaeded] disabled:bg-[#f2f3f3] disabled:text-[#aab7b8] disabled:cursor-not-allowed cursor-pointer"
+            >
+              Edit outbound rules
+            </button>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              disabled={!selectedSg || selectedSg.name === "default"}
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="h-[32px] px-3.5 border border-[#aab7b8] text-[#d13212] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors hover:border-[#d13212] disabled:border-[#eaeded] disabled:bg-[#f2f3f3] disabled:text-[#aab7b8] disabled:cursor-not-allowed cursor-pointer"
+            >
+              Delete security group
+            </button>
+            <button
+              onClick={() => setShowCreateModal(true)}
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="h-[32px] px-4 bg-[#ec7211] hover:bg-[#eb5f07] text-white text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center shadow-sm transition-colors cursor-pointer"
+            >
+              Create security group
+            </button>
+          </div>
+        </div>
+
+        {/* Filter Bar */}
+        <div className="p-4 bg-[#f8f9fa] border-b border-[#eaeded] flex items-center justify-between">
+          <div className="relative w-full max-w-md">
+            <input
+              type="text"
+              placeholder="Filter security groups by name, ID, or description..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-3 pr-8 py-1.5 text-[13px] border border-[#aab7b8] rounded-sm focus:outline-none focus:border-[#ec7211] bg-white text-[#16191f]"
+            />
+          </div>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-[13px]">
+            <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64] text-[11px] font-semibold uppercase tracking-wider">
+              <tr>
+                <th className="py-2.5 px-4 w-10 text-center"></th>
+                <th className="py-2.5 px-3">Name</th>
+                <th className="py-2.5 px-3">Security group ID</th>
+                <th className="py-2.5 px-3">Security group name</th>
+                <th className="py-2.5 px-3">VPC ID</th>
+                <th className="py-2.5 px-3">Description</th>
+                <th className="py-2.5 px-3">Owner</th>
+                <th className="py-2.5 px-3">Inbound rules</th>
+                <th className="py-2.5 px-3">Outbound rules</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#eaeded] text-[#16191f]">
+              {filteredGroups.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="py-8 text-center text-[#545b64]">
+                    No security groups found matching your criteria.
+                  </td>
+                </tr>
+              ) : (
+                filteredGroups.map((sg) => {
+                  const isSelected = selectedId === sg.id;
+                  return (
+                    <tr
+                      key={sg.id}
+                      onClick={() => setSelectedId(sg.id)}
+                      className={`cursor-pointer transition-colors ${
+                        isSelected ? "bg-[#f2f8fd]" : "hover:bg-[#f9fafb]"
+                      }`}
+                    >
+                      <td className="py-3 px-4 text-center">
+                        <input
+                          type="radio"
+                          name="security-group-select"
+                          checked={isSelected}
+                          onChange={() => setSelectedId(sg.id)}
+                          className="h-4 w-4 text-[#ec7211] border-[#aab7b8] focus:ring-0"
+                        />
+                      </td>
+                      <td className="py-3 px-3 font-medium text-[#16191f]">
+                        {sg.name}
+                      </td>
+                      <td className="py-3 px-3 font-mono font-bold text-[#0073bb]">
+                        {sg.id}
+                      </td>
+                      <td className="py-3 px-3 text-[#16191f] font-mono text-[12px]">
+                        {sg.name}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-[12px] text-[#545b64]">
+                        {sg.vpcId}
+                      </td>
+                      <td className="py-3 px-3 text-[#545b64] max-w-xs truncate" title={sg.description}>
+                        {sg.description}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-[12px] text-[#545b64]">
+                        {sg.ownerId || "000000000000"}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-[#16191f]">
+                        {sg.inboundRules?.length || 0}
+                      </td>
+                      <td className="py-3 px-3 font-mono text-[#16191f]">
+                        {sg.outboundRules?.length || 0}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Bottom Detail Drawer */}
+      {selectedSg && (
+        <div className="bg-white border border-[#eaeded] rounded-sm awsui-shadow">
+          <div className="border-b border-[#eaeded] px-6 pt-4">
+            <div className="flex items-center gap-3 mb-3">
+              <h3 className="text-[16px] font-bold text-[#16191f] font-mono">
+                {selectedSg.id}
+              </h3>
+              <span className="text-[13px] text-[#545b64]">({selectedSg.name})</span>
+            </div>
+
+            <div className="flex gap-6 border-b border-[#eaeded] -mb-[1px]">
               <button
-                key={tb}
-                onClick={() => setActiveBottomTab(tb)}
-                className={`px-4 py-2.5 border-b-2 font-medium capitalize transition-colors ${
-                  activeBottomTab === tb
-                    ? "border-[#0073bb] text-[#0073bb]"
+                onClick={() => setActiveBottomTab("details")}
+                className={`pb-2 text-[13px] font-bold border-b-2 transition-colors ${
+                  activeBottomTab === "details"
+                    ? "border-[#ec7211] text-[#ec7211]"
                     : "border-transparent text-[#545b64] hover:text-[#16191f]"
                 }`}
               >
-                {tb === "inbound"
-                  ? `Inbound rules (${selectedSg.inboundRules.length})`
-                  : tb === "outbound"
-                  ? `Outbound rules (${selectedSg.outboundRules.length})`
-                  : tb}
+                Details
               </button>
-            ))}
+              <button
+                onClick={() => setActiveBottomTab("inbound")}
+                className={`pb-2 text-[13px] font-bold border-b-2 transition-colors ${
+                  activeBottomTab === "inbound"
+                    ? "border-[#ec7211] text-[#ec7211]"
+                    : "border-transparent text-[#545b64] hover:text-[#16191f]"
+                }`}
+              >
+                Inbound rules ({selectedSg.inboundRules?.length || 0})
+              </button>
+              <button
+                onClick={() => setActiveBottomTab("outbound")}
+                className={`pb-2 text-[13px] font-bold border-b-2 transition-colors ${
+                  activeBottomTab === "outbound"
+                    ? "border-[#ec7211] text-[#ec7211]"
+                    : "border-transparent text-[#545b64] hover:text-[#16191f]"
+                }`}
+              >
+                Outbound rules ({selectedSg.outboundRules?.length || 0})
+              </button>
+              <button
+                onClick={() => setActiveBottomTab("tags")}
+                className={`pb-2 text-[13px] font-bold border-b-2 transition-colors ${
+                  activeBottomTab === "tags"
+                    ? "border-[#ec7211] text-[#ec7211]"
+                    : "border-transparent text-[#545b64] hover:text-[#16191f]"
+                }`}
+              >
+                Tags ({Object.keys(selectedSg.tags || {}).length})
+              </button>
+            </div>
           </div>
 
-          {/* Drawer Tab Content */}
-          <div className="p-5 text-[13px]">
-            {/* Tab 1: Details */}
+          <div className="p-6">
             {activeBottomTab === "details" && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                <div>
-                  <div className="text-[11px] text-[#545b64] uppercase font-bold">Security group name</div>
-                  <div className="text-[#16191f] mt-1 font-semibold">{selectedSg.name}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#545b64] uppercase font-bold">Security group ID</div>
-                  <div className="font-mono text-[#0073bb] mt-1">{selectedSg.id}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#545b64] uppercase font-bold">VPC ID</div>
-                  <div className="font-mono text-[#0073bb] mt-1">{selectedSg.vpcId}</div>
-                </div>
-                <div>
-                  <div className="text-[11px] text-[#545b64] uppercase font-bold">Owner</div>
-                  <div className="font-mono text-[#16191f] mt-1">{selectedSg.ownerId || "000000000000"}</div>
-                </div>
-                <div className="col-span-2">
-                  <div className="text-[11px] text-[#545b64] uppercase font-bold">ARN</div>
-                  <div className="font-mono text-[#545b64] mt-1 text-[12px] truncate">
-                    {selectedSg.arn || `arn:aws:ec2:us-east-1:000000000000:security-group/${selectedSg.id}`}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-[13px]">
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">Security group ID</span>
+                    <span className="font-mono font-bold text-[#16191f]">{selectedSg.id}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">Security group name</span>
+                    <span className="text-[#16191f] font-semibold">{selectedSg.name}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">Description</span>
+                    <span className="text-[#16191f]">{selectedSg.description}</span>
                   </div>
                 </div>
-                <div className="col-span-2">
-                  <div className="text-[11px] text-[#545b64] uppercase font-bold">Description</div>
-                  <div className="text-[#16191f] mt-1">{selectedSg.description}</div>
+
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">VPC ID</span>
+                    <span className="font-mono text-[#0073bb]">{selectedSg.vpcId}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">Owner</span>
+                    <span className="font-mono text-[#16191f]">{selectedSg.ownerId || "000000000000"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">Amazon Resource Name (ARN)</span>
+                    <span className="font-mono text-[12px] text-[#545b64] break-all">{selectedSg.arn}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">Inbound rules count</span>
+                    <span className="font-mono text-[#16191f]">{selectedSg.inboundRules?.length || 0}</span>
+                  </div>
+                  <div>
+                    <span className="text-[#545b64] block text-[12px]">Outbound rules count</span>
+                    <span className="font-mono text-[#16191f]">{selectedSg.outboundRules?.length || 0}</span>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* Tab 2: Inbound rules */}
             {activeBottomTab === "inbound" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <p className="text-[12px] text-[#545b64]">
-                    Inbound rules specify the protocols, ports, and source IP ranges that are allowed to reach your instances.
+                    Inbound rules allow specific traffic to reach instances associated with this security group.
                   </p>
                   <button
                     onClick={handleOpenEditInbound}
-                    className="px-3 py-1 bg-[#0073bb] text-white rounded text-[12px] font-medium hover:bg-[#005a9e]"
+                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                    className="h-[32px] px-3.5 bg-white border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer"
                   >
                     Edit inbound rules
                   </button>
                 </div>
 
-                <div className="border border-[#eaeded] rounded overflow-hidden">
-                  <table className="w-full text-[12px] text-left">
-                    <thead className="bg-[#f2f3f3] text-[#545b64] font-semibold">
+                <div className="border border-[#eaeded] rounded-sm overflow-hidden">
+                  <table className="w-full text-left text-[13px]">
+                    <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64] text-[11px] font-semibold uppercase">
                       <tr>
-                        <th className="py-2 px-3">Type</th>
-                        <th className="py-2 px-3">Protocol</th>
-                        <th className="py-2 px-3">Port range</th>
-                        <th className="py-2 px-3">Source</th>
-                        <th className="py-2 px-3">Description</th>
+                        <th className="py-2.5 px-4">Type</th>
+                        <th className="py-2.5 px-3">Protocol</th>
+                        <th className="py-2.5 px-3">Port range</th>
+                        <th className="py-2.5 px-3">Source</th>
+                        <th className="py-2.5 px-3">Description</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#eaeded]">
-                      {selectedSg.inboundRules.length === 0 ? (
+                      {(selectedSg.inboundRules || []).length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-6 text-center text-[#545b64]">
                             No inbound rules configured. All inbound traffic is blocked.
@@ -499,11 +584,11 @@ export default function SecurityGroupsClient({
                       ) : (
                         selectedSg.inboundRules.map((r, i) => (
                           <tr key={i}>
-                            <td className="py-2 px-3 font-medium text-[#16191f]">{r.type}</td>
-                            <td className="py-2 px-3 text-[#545b64]">{r.protocol}</td>
-                            <td className="py-2 px-3 font-mono font-bold text-[#0073bb]">{r.portRange}</td>
-                            <td className="py-2 px-3 font-mono">{r.source}</td>
-                            <td className="py-2 px-3 text-[#545b64]">{r.description || "—"}</td>
+                            <td className="py-2.5 px-4 font-medium text-[#16191f]">{r.type}</td>
+                            <td className="py-2.5 px-3 font-mono text-[#545b64]">{r.protocol}</td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-[#0073bb]">{r.portRange}</td>
+                            <td className="py-2.5 px-3 font-mono text-[#16191f]">{r.source}</td>
+                            <td className="py-2.5 px-3 text-[#545b64]">{r.description || "—"}</td>
                           </tr>
                         ))
                       )}
@@ -513,7 +598,6 @@ export default function SecurityGroupsClient({
               </div>
             )}
 
-            {/* Tab 3: Outbound rules */}
             {activeBottomTab === "outbound" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -522,25 +606,26 @@ export default function SecurityGroupsClient({
                   </p>
                   <button
                     onClick={handleOpenEditOutbound}
-                    className="px-3 py-1 bg-[#0073bb] text-white rounded text-[12px] font-medium hover:bg-[#005a9e]"
+                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                    className="h-[32px] px-3.5 bg-white border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer"
                   >
                     Edit outbound rules
                   </button>
                 </div>
 
-                <div className="border border-[#eaeded] rounded overflow-hidden">
-                  <table className="w-full text-[12px] text-left">
-                    <thead className="bg-[#f2f3f3] text-[#545b64] font-semibold">
+                <div className="border border-[#eaeded] rounded-sm overflow-hidden">
+                  <table className="w-full text-left text-[13px]">
+                    <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64] text-[11px] font-semibold uppercase">
                       <tr>
-                        <th className="py-2 px-3">Type</th>
-                        <th className="py-2 px-3">Protocol</th>
-                        <th className="py-2 px-3">Port range</th>
-                        <th className="py-2 px-3">Destination</th>
-                        <th className="py-2 px-3">Description</th>
+                        <th className="py-2.5 px-4">Type</th>
+                        <th className="py-2.5 px-3">Protocol</th>
+                        <th className="py-2.5 px-3">Port range</th>
+                        <th className="py-2.5 px-3">Destination</th>
+                        <th className="py-2.5 px-3">Description</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#eaeded]">
-                      {selectedSg.outboundRules.length === 0 ? (
+                      {(selectedSg.outboundRules || []).length === 0 ? (
                         <tr>
                           <td colSpan={5} className="py-6 text-center text-[#545b64]">
                             No outbound rules configured. All outbound traffic is blocked.
@@ -549,11 +634,11 @@ export default function SecurityGroupsClient({
                       ) : (
                         selectedSg.outboundRules.map((r, i) => (
                           <tr key={i}>
-                            <td className="py-2 px-3 font-medium text-[#16191f]">{r.type}</td>
-                            <td className="py-2 px-3 text-[#545b64]">{r.protocol}</td>
-                            <td className="py-2 px-3 font-mono font-bold text-[#0073bb]">{r.portRange}</td>
-                            <td className="py-2 px-3 font-mono">{r.source}</td>
-                            <td className="py-2 px-3 text-[#545b64]">{r.description || "—"}</td>
+                            <td className="py-2.5 px-4 font-medium text-[#16191f]">{r.type}</td>
+                            <td className="py-2.5 px-3 font-mono text-[#545b64]">{r.protocol}</td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-[#0073bb]">{r.portRange}</td>
+                            <td className="py-2.5 px-3 font-mono text-[#16191f]">{r.source}</td>
+                            <td className="py-2.5 px-3 text-[#545b64]">{r.description || "—"}</td>
                           </tr>
                         ))
                       )}
@@ -563,498 +648,449 @@ export default function SecurityGroupsClient({
               </div>
             )}
 
-            {/* Tab 4: Tags */}
             {activeBottomTab === "tags" && (
-              <div className="space-y-3">
-                <p className="text-[12px] text-[#545b64]">
-                  A tag is a label that you assign to an AWS resource. Each tag consists of a key and an optional value.
-                </p>
-                <div className="border border-[#eaeded] rounded overflow-hidden">
-                  <table className="w-full text-[12px] text-left">
-                    <thead className="bg-[#f2f3f3] text-[#545b64] font-semibold">
-                      <tr>
-                        <th className="py-2 px-3">Key</th>
-                        <th className="py-2 px-3">Value</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#eaeded]">
-                      <tr>
-                        <td className="py-2 px-3 font-medium text-[#16191f]">Name</td>
-                        <td className="py-2 px-3 text-[#545b64]">{selectedSg.name}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
+              <div className="space-y-4">
+                {selectedSg.tags && Object.keys(selectedSg.tags).length > 0 ? (
+                  <div className="border border-[#eaeded] rounded-sm overflow-hidden">
+                    <table className="w-full text-left text-[13px]">
+                      <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64] text-[11px] font-semibold uppercase">
+                        <tr>
+                          <th className="py-2.5 px-4">Key</th>
+                          <th className="py-2.5 px-4">Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#eaeded]">
+                        {Object.entries(selectedSg.tags).map(([k, v]) => (
+                          <tr key={k}>
+                            <td className="py-2.5 px-4 font-mono font-semibold text-[#16191f]">{k}</td>
+                            <td className="py-2.5 px-4 text-[#545b64]">{v}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="py-6 text-center text-[#545b64] text-[13px]">
+                    No custom tags assigned to this security group.
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Edit Inbound Rules Modal (With All 25 AWS Protocol Presets) */}
-      {showEditInboundModal && selectedSg && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <form
-            onSubmit={handleSaveInboundRules}
-            className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-5xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col"
-          >
-            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3 shrink-0">
-              <div>
-                <h3 className="text-[17px] font-bold text-[#16191f]">
-                  Edit inbound rules: {selectedSg.name} ({selectedSg.id})
-                </h3>
-                <p className="text-[12px] text-[#545b64]">
-                  Configure inbound network rules allowing traffic into instances associated with this group.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowEditInboundModal(false)}
-                className="text-[#879596] hover:text-[#16191f]"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 space-y-4 text-[13px] pr-1">
-              <table className="w-full text-left border-collapse text-[12px]">
-                <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64]">
-                  <tr>
-                    <th className="py-2 px-2">Type</th>
-                    <th className="py-2 px-2">Protocol</th>
-                    <th className="py-2 px-2">Port range</th>
-                    <th className="py-2 px-2">Source</th>
-                    <th className="py-2 px-2">Description</th>
-                    <th className="py-2 px-2 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#eaeded]">
-                  {editingInboundRules.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="py-6 text-center text-[#545b64]">
-                        No inbound rules. Click &quot;+ Add rule&quot; below to add one, or click &quot;Save rules&quot; to remove all inbound traffic rules.
-                      </td>
-                    </tr>
-                  )}
-                  {editingInboundRules.map((rule, idx) => {
-                    const preset = AWS_SECURITY_GROUP_RULE_PRESETS.find((p) => p.name === rule.type);
-                    const canEditPort = preset ? preset.canEditPort : true;
-
-                    return (
-                      <tr key={idx}>
-                        <td className="py-2 px-1">
-                          <select
-                            value={rule.type}
-                            onChange={(e) => handleInboundRuleChange(idx, "type", e.target.value)}
-                            className="w-full px-2 py-1 border border-[#aab7b8] rounded text-[#16191f]"
-                          >
-                            {AWS_SECURITY_GROUP_RULE_PRESETS.map((p) => (
-                              <option key={p.name} value={p.name}>
-                                {p.name} {p.defaultPort !== "All" && p.defaultPort !== "0 - 65535" ? `(${p.defaultPort})` : ""}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                        <td className="py-2 px-1 font-mono text-[#545b64]">
-                          {rule.protocol}
-                        </td>
-                        <td className="py-2 px-1">
-                          <input
-                            type="text"
-                            value={rule.portRange}
-                            disabled={!canEditPort}
-                            onChange={(e) => handleInboundRuleChange(idx, "portRange", e.target.value)}
-                            placeholder="e.g. 8080"
-                            className="w-24 px-2 py-1 border border-[#aab7b8] rounded font-mono disabled:bg-[#f2f3f3]"
-                          />
-                        </td>
-                        <td className="py-2 px-1">
-                          <div className="flex items-center gap-1">
-                            <input
-                              type="text"
-                              value={rule.source}
-                              onChange={(e) => handleInboundRuleChange(idx, "source", e.target.value)}
-                              placeholder="0.0.0.0/0"
-                              className="w-32 px-2 py-1 border border-[#aab7b8] rounded font-mono"
-                            />
-                            <select
-                              onChange={(e) => {
-                                if (e.target.value) handleInboundRuleChange(idx, "source", e.target.value);
-                              }}
-                              className="text-[11px] px-1 py-1 border border-[#aab7b8] rounded"
-                            >
-                              <option value="">Presets...</option>
-                              <option value="0.0.0.0/0">Anywhere-IPv4</option>
-                              <option value="::/0">Anywhere-IPv6</option>
-                              <option value="172.31.0.0/16">VPC Subnet</option>
-                            </select>
-                          </div>
-                        </td>
-                        <td className="py-2 px-1">
-                          <input
-                            type="text"
-                            value={rule.description}
-                            onChange={(e) => handleInboundRuleChange(idx, "description", e.target.value)}
-                            placeholder="Optional note"
-                            className="w-full px-2 py-1 border border-[#aab7b8] rounded text-[#16191f]"
-                          />
-                        </td>
-                        <td className="py-2 px-1 text-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveInboundRule(idx)}
-                            className="text-[#d13212] hover:text-[#a02008] p-1 font-bold"
-                            title="Delete rule"
-                          >
-                            &times;
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-
-              <button
-                type="button"
-                onClick={handleAddInboundRule}
-                className="px-3 py-1.5 border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] text-[12px] font-medium rounded"
-              >
-                + Add rule
-              </button>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-[#eaeded] pt-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowEditInboundModal(false)}
-                className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px] text-[#16191f] hover:bg-[#f2f3f3]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07] disabled:opacity-50"
-              >
-                {isPending ? "Saving to Emulator..." : "Save rules"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Edit Outbound Rules Modal */}
-      {showEditOutboundModal && selectedSg && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <form
-            onSubmit={handleSaveOutboundRules}
-            className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-5xl w-full p-6 space-y-4 max-h-[90vh] flex flex-col"
-          >
-            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3 shrink-0">
-              <div>
-                <h3 className="text-[17px] font-bold text-[#16191f]">
-                  Edit outbound rules: {selectedSg.name} ({selectedSg.id})
-                </h3>
-                <p className="text-[12px] text-[#545b64]">
-                  Configure outbound network rules allowing traffic out of instances associated with this group.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowEditOutboundModal(false)}
-                className="text-[#879596] hover:text-[#16191f]"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 space-y-4 text-[13px] pr-1">
-              <table className="w-full text-left border-collapse text-[12px]">
-                <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64]">
-                  <tr>
-                    <th className="py-2 px-2">Type</th>
-                    <th className="py-2 px-2">Protocol</th>
-                    <th className="py-2 px-2">Port range</th>
-                    <th className="py-2 px-2">Destination</th>
-                    <th className="py-2 px-2">Description</th>
-                    <th className="py-2 px-2 w-10"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#eaeded]">
-                  {editingOutboundRules.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="py-6 text-center text-[#545b64]">
-                        No outbound rules. Click &quot;+ Add rule&quot; below to add one, or click &quot;Save rules&quot; to remove all outbound traffic rules.
-                      </td>
-                    </tr>
-                  )}
-                  {editingOutboundRules.map((rule, idx) => (
-                    <tr key={idx}>
-                      <td className="py-2 px-1">
-                        <select
-                          value={rule.type}
-                          onChange={(e) => handleOutboundRuleChange(idx, "type", e.target.value)}
-                          className="w-full px-2 py-1 border border-[#aab7b8] rounded text-[#16191f]"
-                        >
-                          {AWS_SECURITY_GROUP_RULE_PRESETS.map((p) => (
-                            <option key={p.name} value={p.name}>
-                              {p.name} {p.defaultPort !== "All" && p.defaultPort !== "0 - 65535" ? `(${p.defaultPort})` : ""}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-2 px-1 font-mono text-[#545b64]">
-                        {rule.protocol}
-                      </td>
-                      <td className="py-2 px-1">
-                        <input
-                          type="text"
-                          value={rule.portRange}
-                          disabled={rule.type === "All traffic"}
-                          onChange={(e) => handleOutboundRuleChange(idx, "portRange", e.target.value)}
-                          placeholder="e.g. 80"
-                          className="w-24 px-2 py-1 border border-[#aab7b8] rounded font-mono disabled:bg-[#f2f3f3]"
-                        />
-                      </td>
-                      <td className="py-2 px-1">
-                        <input
-                          type="text"
-                          value={rule.source}
-                          onChange={(e) => handleOutboundRuleChange(idx, "source", e.target.value)}
-                          placeholder="0.0.0.0/0"
-                          className="w-32 px-2 py-1 border border-[#aab7b8] rounded font-mono"
-                        />
-                      </td>
-                      <td className="py-2 px-1">
-                        <input
-                          type="text"
-                          value={rule.description}
-                          onChange={(e) => handleOutboundRuleChange(idx, "description", e.target.value)}
-                          placeholder="Optional note"
-                          className="w-full px-2 py-1 border border-[#aab7b8] rounded text-[#16191f]"
-                        />
-                      </td>
-                      <td className="py-2 px-1 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveOutboundRule(idx)}
-                          className="text-[#d13212] hover:text-[#a02008] p-1 font-bold"
-                          title="Delete rule"
-                        >
-                          &times;
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-
-              <button
-                type="button"
-                onClick={handleAddOutboundRule}
-                className="px-3 py-1.5 border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] text-[12px] font-medium rounded"
-              >
-                + Add rule
-              </button>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 border-t border-[#eaeded] pt-3 shrink-0">
-              <button
-                type="button"
-                onClick={() => setShowEditOutboundModal(false)}
-                className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px] text-[#16191f] hover:bg-[#f2f3f3]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isPending}
-                className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07] disabled:opacity-50"
-              >
-                {isPending ? "Saving to Emulator..." : "Save rules"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Create Security Group Modal */}
+      {/* Modal 1: Create Security Group */}
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
           <form
-            onSubmit={handleCreateGroup}
-            className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[700px] w-full p-6 space-y-4 max-h-[90vh] flex flex-col"
+            onSubmit={handleCreateSecurityGroup}
+            className="bg-white rounded-sm border border-[#d5dbdb] awsui-shadow w-full max-w-4xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
           >
-            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3 shrink-0">
-              <h3 className="text-[17px] font-bold text-[#16191f]">Create security group</h3>
-              <button type="button" onClick={() => setShowCreateModal(false)} className="text-[#879596] hover:text-[#16191f]">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                  <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
+            <div className="border-b border-[#eaeded] pb-3">
+              <h3 className="text-[18px] font-bold text-[#16191f]">Create security group</h3>
+              <p className="text-[12px] text-[#545b64] mt-0.5">
+                A security group acts as a virtual firewall for your EC2 instances to control incoming and outgoing traffic.
+              </p>
             </div>
 
-            <div className="overflow-y-auto flex-1 space-y-4 text-[13px] pr-1">
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block font-medium text-[#16191f] mb-1">Security group name</label>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                  Security group name
+                </label>
                 <input
                   type="text"
-                  required
-                  placeholder="e.g. database-sg"
+                  placeholder="e.g. web-tier-sg"
                   value={newSgName}
                   onChange={(e) => setNewSgName(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-[#aab7b8] rounded text-[#16191f] outline-hidden focus:border-[#0073bb]"
+                  className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] text-[#16191f]"
+                  required
                 />
               </div>
 
               <div>
-                <label className="block font-medium text-[#16191f] mb-1">Description</label>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                  VPC
+                </label>
                 <input
                   type="text"
-                  placeholder="e.g. Inbound access rules for database cluster"
-                  value={newSgDesc}
-                  onChange={(e) => setNewSgDesc(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-[#aab7b8] rounded text-[#16191f] outline-hidden focus:border-[#0073bb]"
+                  disabled
+                  value="vpc-00000000000000001 (Default VPC)"
+                  className="w-full px-3 py-1.5 border border-[#eaeded] bg-[#f8f9fa] rounded-sm text-[13px] text-[#545b64] font-mono"
                 />
               </div>
+            </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <label className="font-bold text-[#16191f]">Inbound rules</label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewRules([
-                        ...newRules,
-                        { type: "Custom TCP", protocol: "TCP", portRange: "80", source: "0.0.0.0/0", description: "" },
-                      ]);
-                    }}
-                    className="text-[#0073bb] hover:underline text-[12px] font-medium"
-                  >
-                    + Add rule
-                  </button>
+            <div>
+              <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                Description
+              </label>
+              <textarea
+                rows={2}
+                placeholder="e.g. Security group for public web servers"
+                value={newSgDesc}
+                onChange={(e) => setNewSgDesc(e.target.value)}
+                className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] text-[#16191f]"
+                required
+              />
+            </div>
+
+            {/* Inbound Rules Builder */}
+            <div className="border-t border-[#eaeded] pt-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h4 className="text-[14px] font-bold text-[#16191f]">Inbound rules</h4>
+                  <p className="text-[11px] text-[#545b64]">Allow network traffic from specified sources to instances.</p>
                 </div>
+                <button
+                  type="button"
+                  onClick={handleAddRule}
+                  style={{ height: "28px", minHeight: "28px", maxHeight: "28px", whiteSpace: "nowrap" }}
+                  className="h-[28px] px-3 border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[12px] font-bold rounded-sm inline-flex items-center justify-center cursor-pointer"
+                >
+                  Add rule
+                </button>
+              </div>
 
-                <div className="space-y-2">
-                  {newRules.map((rule, idx) => (
-                    <div key={idx} className="flex flex-wrap items-center gap-2 p-2.5 bg-[#fafafa] border border-[#eaeded] rounded">
+              <div className="space-y-2">
+                {newRules.map((rule, idx) => (
+                  <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-[#fafafa] p-2.5 border border-[#eaeded] rounded-sm text-[12px]">
+                    <div className="col-span-3">
                       <select
                         value={rule.type}
-                        onChange={(e) => {
-                          const updated = [...newRules];
-                          updated[idx].type = e.target.value;
-                          const preset = AWS_SECURITY_GROUP_RULE_PRESETS.find((p) => p.name === e.target.value);
-                          if (preset) {
-                            updated[idx].protocol = preset.protocol;
-                            updated[idx].portRange = preset.defaultPort;
-                          }
-                          setNewRules(updated);
-                        }}
-                        className="px-2 py-1 border border-[#aab7b8] rounded text-[#16191f] bg-white text-[12px]"
+                        onChange={(e) => handleRuleChange(idx, "type", e.target.value)}
+                        className="w-full p-1 border border-[#aab7b8] rounded-sm bg-white text-[#16191f]"
                       >
                         {AWS_SECURITY_GROUP_RULE_PRESETS.map((p) => (
                           <option key={p.name} value={p.name}>
-                            {p.name}
+                            {p.name} ({p.protocol} {p.defaultPort})
                           </option>
                         ))}
                       </select>
-
-                      <input
-                        type="text"
-                        placeholder="Port"
-                        value={rule.portRange}
-                        onChange={(e) => {
-                          const updated = [...newRules];
-                          updated[idx].portRange = e.target.value;
-                          setNewRules(updated);
-                        }}
-                        className="w-16 px-2 py-1 border border-[#aab7b8] rounded text-[#16191f] bg-white text-[12px] font-mono"
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Source CIDR"
-                        value={rule.source}
-                        onChange={(e) => {
-                          const updated = [...newRules];
-                          updated[idx].source = e.target.value;
-                          setNewRules(updated);
-                        }}
-                        className="w-28 px-2 py-1 border border-[#aab7b8] rounded text-[#16191f] bg-white text-[12px] font-mono"
-                      />
-
-                      <input
-                        type="text"
-                        placeholder="Description"
-                        value={rule.description}
-                        onChange={(e) => {
-                          const updated = [...newRules];
-                          updated[idx].description = e.target.value;
-                          setNewRules(updated);
-                        }}
-                        className="flex-1 min-w-[120px] px-2 py-1 border border-[#aab7b8] rounded text-[#16191f] bg-white text-[12px]"
-                      />
-
-                      {newRules.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => setNewRules(newRules.filter((_, i) => i !== idx))}
-                          className="text-[#d13212] hover:bg-[#fdf3f1] p-1 rounded"
-                        >
-                          &times;
-                        </button>
-                      )}
                     </div>
-                  ))}
-                </div>
+
+                    <div className="col-span-2 font-mono text-[#545b64] text-center">
+                      {rule.protocol}
+                    </div>
+
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        value={rule.portRange}
+                        onChange={(e) => handleRuleChange(idx, "portRange", e.target.value)}
+                        placeholder="Port"
+                        className="w-full p-1 border border-[#aab7b8] rounded-sm font-mono text-[#16191f]"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        value={rule.source}
+                        onChange={(e) => handleRuleChange(idx, "source", e.target.value)}
+                        placeholder="0.0.0.0/0"
+                        className="w-full p-1 border border-[#aab7b8] rounded-sm font-mono text-[#16191f]"
+                      />
+                    </div>
+
+                    <div className="col-span-2">
+                      <input
+                        type="text"
+                        value={rule.description}
+                        onChange={(e) => handleRuleChange(idx, "description", e.target.value)}
+                        placeholder="Description"
+                        className="w-full p-1 border border-[#aab7b8] rounded-sm text-[#16191f]"
+                      />
+                    </div>
+
+                    <div className="col-span-1 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveRule(idx)}
+                        className="text-[#d13212] hover:underline font-bold text-[13px]"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 border-t border-[#eaeded] pt-3 shrink-0">
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#eaeded]">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px] text-[#16191f] hover:bg-[#f2f3f3]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-3.5 border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={isPending}
-                className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07] disabled:opacity-50"
+                disabled={isPending || !newSgName.trim()}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 bg-[#ec7211] hover:bg-[#eb5f07] text-white text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
               >
-                Create security group
+                {isPending ? "Creating..." : "Create security group"}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* Modal 2: Edit Inbound Rules */}
+      {showEditInboundModal && selectedSg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <form
+            onSubmit={handleSaveInboundRules}
+            className="bg-white rounded-sm border border-[#d5dbdb] awsui-shadow w-full max-w-4xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="border-b border-[#eaeded] pb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-[18px] font-bold text-[#16191f]">
+                  Edit inbound rules: {selectedSg.id} ({selectedSg.name})
+                </h3>
+                <p className="text-[12px] text-[#545b64] mt-0.5">
+                  Update allowed incoming network traffic rules for this security group.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddInboundRule}
+                style={{ height: "28px", minHeight: "28px", maxHeight: "28px", whiteSpace: "nowrap" }}
+                className="h-[28px] px-3 border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[12px] font-bold rounded-sm inline-flex items-center justify-center cursor-pointer"
+              >
+                Add rule
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {editingInboundRules.map((rule, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-[#fafafa] p-2.5 border border-[#eaeded] rounded-sm text-[12px]">
+                  <div className="col-span-3">
+                    <select
+                      value={rule.type}
+                      onChange={(e) => handleInboundRuleChange(idx, "type", e.target.value)}
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm bg-white text-[#16191f]"
+                    >
+                      {AWS_SECURITY_GROUP_RULE_PRESETS.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.name} ({p.protocol} {p.defaultPort})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-span-2 font-mono text-[#545b64] text-center">
+                    {rule.protocol}
+                  </div>
+
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      value={rule.portRange}
+                      onChange={(e) => handleInboundRuleChange(idx, "portRange", e.target.value)}
+                      placeholder="Port"
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm font-mono text-[#16191f]"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      value={rule.source}
+                      onChange={(e) => handleInboundRuleChange(idx, "source", e.target.value)}
+                      placeholder="0.0.0.0/0"
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm font-mono text-[#16191f]"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      value={rule.description}
+                      onChange={(e) => handleInboundRuleChange(idx, "description", e.target.value)}
+                      placeholder="Description"
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm text-[#16191f]"
+                    />
+                  </div>
+
+                  <div className="col-span-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveInboundRule(idx)}
+                      className="text-[#d13212] hover:underline font-bold text-[13px]"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#eaeded]">
+              <button
+                type="button"
+                onClick={() => setShowEditInboundModal(false)}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-3.5 border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 bg-[#ec7211] hover:bg-[#eb5f07] text-white text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isPending ? "Saving..." : "Save rules"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal 3: Edit Outbound Rules */}
+      {showEditOutboundModal && selectedSg && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <form
+            onSubmit={handleSaveOutboundRules}
+            className="bg-white rounded-sm border border-[#d5dbdb] awsui-shadow w-full max-w-4xl p-6 space-y-4 max-h-[90vh] overflow-y-auto"
+          >
+            <div className="border-b border-[#eaeded] pb-3 flex items-center justify-between">
+              <div>
+                <h3 className="text-[18px] font-bold text-[#16191f]">
+                  Edit outbound rules: {selectedSg.id} ({selectedSg.name})
+                </h3>
+                <p className="text-[12px] text-[#545b64] mt-0.5">
+                  Update outbound rules to control traffic allowed out of instances in this security group.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleAddOutboundRule}
+                style={{ height: "28px", minHeight: "28px", maxHeight: "28px", whiteSpace: "nowrap" }}
+                className="h-[28px] px-3 border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[12px] font-bold rounded-sm inline-flex items-center justify-center cursor-pointer"
+              >
+                Add rule
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              {editingOutboundRules.map((rule, idx) => (
+                <div key={idx} className="grid grid-cols-12 gap-2 items-center bg-[#fafafa] p-2.5 border border-[#eaeded] rounded-sm text-[12px]">
+                  <div className="col-span-3">
+                    <select
+                      value={rule.type}
+                      onChange={(e) => handleOutboundRuleChange(idx, "type", e.target.value)}
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm bg-white text-[#16191f]"
+                    >
+                      {AWS_SECURITY_GROUP_RULE_PRESETS.map((p) => (
+                        <option key={p.name} value={p.name}>
+                          {p.name} ({p.protocol} {p.defaultPort})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="col-span-2 font-mono text-[#545b64] text-center">
+                    {rule.protocol}
+                  </div>
+
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      value={rule.portRange}
+                      onChange={(e) => handleOutboundRuleChange(idx, "portRange", e.target.value)}
+                      placeholder="Port"
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm font-mono text-[#16191f]"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      value={rule.source}
+                      onChange={(e) => handleOutboundRuleChange(idx, "source", e.target.value)}
+                      placeholder="0.0.0.0/0"
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm font-mono text-[#16191f]"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <input
+                      type="text"
+                      value={rule.description}
+                      onChange={(e) => handleOutboundRuleChange(idx, "description", e.target.value)}
+                      placeholder="Description"
+                      className="w-full p-1 border border-[#aab7b8] rounded-sm text-[#16191f]"
+                    />
+                  </div>
+
+                  <div className="col-span-1 text-center">
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveOutboundRule(idx)}
+                      className="text-[#d13212] hover:underline font-bold text-[13px]"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-4 border-t border-[#eaeded]">
+              <button
+                type="button"
+                onClick={() => setShowEditOutboundModal(false)}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-3.5 border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 bg-[#ec7211] hover:bg-[#eb5f07] text-white text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {isPending ? "Saving..." : "Save rules"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Modal 4: Delete Security Group */}
       {showDeleteModal && selectedSg && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[450px] w-full p-6 space-y-4">
-            <h3 className="text-[17px] font-bold text-[#d13212]">Delete security group?</h3>
-            <p className="text-[13px] text-[#545b64]">
-              Are you sure you want to delete <strong className="text-[#16191f]">{selectedSg.name}</strong> ({selectedSg.id})? Instances associated with this group will no longer be protected by its rules.
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-sm border border-[#d5dbdb] awsui-shadow w-full max-w-md p-6">
+            <h3 className="text-[18px] font-bold text-[#16191f]">Delete security group</h3>
+            <p className="text-[13px] text-[#545b64] mt-2">
+              Are you sure you want to permanently delete security group{" "}
+              <strong className="text-[#16191f] font-mono">{selectedSg.id}</strong> ({selectedSg.name})?
             </p>
-            <div className="flex items-center justify-end gap-2 pt-2">
+            <p className="text-[12px] text-[#d13212] mt-3">
+              This security group will be detached and permanently removed from this region.
+            </p>
+            <div className="flex items-center justify-end gap-2 mt-6">
               <button
                 onClick={() => setShowDeleteModal(false)}
-                className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px] text-[#16191f] hover:bg-[#f2f3f3]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-3.5 border border-[#aab7b8] hover:border-[#16191f] text-[#16191f] text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteGroup}
-                className="px-4 py-1.5 bg-[#d13212] text-white rounded-sm text-[13px] font-medium hover:bg-[#b0280e]"
+                disabled={isPending}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 bg-[#d13212] hover:bg-[#b02008] text-white text-[13px] font-bold rounded-sm whitespace-nowrap inline-flex items-center justify-center transition-colors cursor-pointer disabled:opacity-50"
               >
-                Delete
+                {isPending ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

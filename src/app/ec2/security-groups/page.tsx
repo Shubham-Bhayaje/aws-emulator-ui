@@ -17,7 +17,7 @@ export default async function SecurityGroupsPage() {
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
       <SecurityGroupsClient
-        initialSecurityGroups={securityGroups}
+        initialSecurityGroups={securityGroups || []}
         isLive={isLive}
         liveError={error}
       />

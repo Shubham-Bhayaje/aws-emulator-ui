@@ -1,5 +1,5 @@
 /**
- * EC2 Key Pairs Page – Manage SSH credentials for instance login.
+ * src/app/ec2/key-pairs/page.tsx – EC2 Key Pairs Page.
  * Connected to live AWS Emulator via Server Actions.
  * Zero emojis, Cloudscape enterprise styling.
  */
@@ -12,12 +12,12 @@ import { fetchLiveKeyPairs } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function KeyPairsPage() {
-  const { keyPairs, isLive, error } = await fetchLiveKeyPairs();
+  const { keyPairs = [], isLive = true, error } = await fetchLiveKeyPairs();
 
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
       <KeyPairsClient
-        initialKeyPairs={keyPairs}
+        initialKeyPairs={keyPairs || []}
         isLive={isLive}
         liveError={error}
       />

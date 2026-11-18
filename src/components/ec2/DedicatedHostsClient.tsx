@@ -518,14 +518,16 @@ export default function DedicatedHostsClient({ initialHosts, isLive }: Props) {
                 <button
                   type="button"
                   onClick={() => setShowAllocateModal(false)}
-                  className="px-4 py-1.5 border border-[#d5dbdb] text-[#16191f] font-medium rounded-sm hover:bg-[#fafafa]"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="px-4 border border-[#545b64] text-[#16191f] font-bold text-[13px] rounded-sm hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPending}
-                  className="px-4 py-1.5 bg-[#ec7211] text-white font-medium rounded-sm hover:bg-[#eb5f07] disabled:opacity-50"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="px-4 bg-[#ec7211] text-white font-bold text-[13px] rounded-sm hover:bg-[#eb5f07] disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center transition-colors"
                 >
                   {isPending ? "Allocating..." : "Allocate"}
                 </button>
@@ -561,14 +563,16 @@ export default function DedicatedHostsClient({ initialHosts, isLive }: Props) {
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#eaeded]">
                 <button
                   onClick={() => setShowReleaseModal(false)}
-                  className="px-4 py-1.5 border border-[#d5dbdb] text-[#16191f] font-medium rounded-sm hover:bg-[#fafafa]"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="px-4 border border-[#545b64] text-[#16191f] font-bold text-[13px] rounded-sm hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleRelease}
                   disabled={isPending}
-                  className="px-4 py-1.5 bg-[#d13212] text-white font-medium rounded-sm hover:bg-[#b0270d] disabled:opacity-50"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="px-4 bg-[#d13212] text-white font-bold text-[13px] rounded-sm hover:bg-[#b0270d] disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center transition-colors"
                 >
                   {isPending ? "Releasing..." : "Release Host"}
                 </button>

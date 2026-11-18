@@ -1,6 +1,6 @@
 /**
- * EC2DashboardClient.tsx – Interactive client dashboard for Amazon EC2.
- * Calculates live compute metrics from the AWS Emulator.
+ * src/components/ec2/EC2DashboardClient.tsx – Interactive client dashboard for Amazon EC2.
+ * Calculates live compute metrics from the AWS Emulator across 12 resource categories.
  * Zero emojis, Cloudscape enterprise styling.
  */
 
@@ -14,21 +14,47 @@ import {
   KeyPair,
   ElasticIp,
 } from "@/lib/ec2-data";
+import {
+  EBSVolume,
+  EBSSnapshot,
+  PlacementGroupModel,
+  DedicatedHostItem,
+  LoadBalancerModel,
+  TargetGroupModel,
+  AutoScalingGroupModel,
+  NetworkInterfaceModel,
+} from "@/app/ec2/actions";
 
 interface EC2DashboardClientProps {
-  initialInstances: EC2Instance[];
-  initialSecurityGroups: SecurityGroup[];
-  initialKeyPairs: KeyPair[];
-  initialElasticIps: ElasticIp[];
+  initialInstances?: EC2Instance[];
+  initialSecurityGroups?: SecurityGroup[];
+  initialKeyPairs?: KeyPair[];
+  initialElasticIps?: ElasticIp[];
+  initialVolumes?: EBSVolume[];
+  initialSnapshots?: EBSSnapshot[];
+  initialPlacementGroups?: PlacementGroupModel[];
+  initialDedicatedHosts?: DedicatedHostItem[];
+  initialLoadBalancers?: LoadBalancerModel[];
+  initialTargetGroups?: TargetGroupModel[];
+  initialAutoScalingGroups?: AutoScalingGroupModel[];
+  initialNetworkInterfaces?: NetworkInterfaceModel[];
   isLive: boolean;
   liveError?: string;
 }
 
 export default function EC2DashboardClient({
-  initialInstances,
-  initialSecurityGroups,
-  initialKeyPairs,
-  initialElasticIps,
+  initialInstances = [],
+  initialSecurityGroups = [],
+  initialKeyPairs = [],
+  initialElasticIps = [],
+  initialVolumes = [],
+  initialSnapshots = [],
+  initialPlacementGroups = [],
+  initialDedicatedHosts = [],
+  initialLoadBalancers = [],
+  initialTargetGroups = [],
+  initialAutoScalingGroups = [],
+  initialNetworkInterfaces = [],
   isLive,
   liveError,
 }: EC2DashboardClientProps) {
@@ -36,9 +62,16 @@ export default function EC2DashboardClient({
   const [secGroups] = useState<SecurityGroup[]>(initialSecurityGroups);
   const [keyPairs] = useState<KeyPair[]>(initialKeyPairs);
   const [elasticIps] = useState<ElasticIp[]>(initialElasticIps);
+  const [volumes] = useState<EBSVolume[]>(initialVolumes);
+  const [snapshots] = useState<EBSSnapshot[]>(initialSnapshots);
+  const [placementGroups] = useState<PlacementGroupModel[]>(initialPlacementGroups);
+  const [dedicatedHosts] = useState<DedicatedHostItem[]>(initialDedicatedHosts);
+  const [loadBalancers] = useState<LoadBalancerModel[]>(initialLoadBalancers);
+  const [targetGroups] = useState<TargetGroupModel[]>(initialTargetGroups);
+  const [autoScalingGroups] = useState<AutoScalingGroupModel[]>(initialAutoScalingGroups);
+  const [networkInterfaces] = useState<NetworkInterfaceModel[]>(initialNetworkInterfaces);
 
   const runningCount = instances.filter((i) => i.state === "running").length;
-  const stoppedCount = instances.filter((i) => i.state === "stopped").length;
 
   return (
     <div className="space-y-6 max-w-[1400px]">
@@ -71,13 +104,15 @@ export default function EC2DashboardClient({
         <div className="flex items-center gap-2">
           <Link
             href="/ec2/instances"
-            className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-normal transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="px-3 border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-bold text-[13px] whitespace-nowrap inline-flex items-center justify-center transition-colors"
           >
             View instances
           </Link>
           <Link
             href="/ec2/launch"
-            className="px-4 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="px-4 bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-bold text-[13px] whitespace-nowrap inline-flex items-center justify-center transition-colors"
           >
             Launch instance
           </Link>
@@ -90,48 +125,51 @@ export default function EC2DashboardClient({
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white border border-[#d5dbdb] rounded-sm awsui-shadow">
             <div className="px-5 py-3.5 border-b border-[#eaeded] flex items-center justify-between">
-              <h2 className="text-[15px] font-bold text-[#16191f]">Resources</h2>
+              <div>
+                <h2 className="text-[15px] font-bold text-[#16191f]">Resources</h2>
+                <p className="text-[12px] text-[#545b64]">Resources in the active Region</p>
+              </div>
               <span className="text-[12px] text-[#545b64]">Region: US East (N. Virginia)</span>
             </div>
 
-            <div className="p-5 grid grid-cols-2 md:grid-cols-3 gap-6">
+            <div className="p-5 grid grid-cols-2 md:grid-cols-3 gap-y-6 gap-x-8">
               <div>
                 <div className="text-[12px] text-[#545b64]">Instances (running)</div>
                 <Link
                   href="/ec2/instances"
-                  className="text-[28px] font-semibold text-[#0073bb] hover:underline"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
                 >
                   {runningCount}
                 </Link>
               </div>
 
               <div>
-                <div className="text-[12px] text-[#545b64]">Instances (total)</div>
+                <div className="text-[12px] text-[#545b64]">Dedicated Hosts</div>
+                <Link
+                  href="/ec2/dedicated-hosts"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {dedicatedHosts.length}
+                </Link>
+              </div>
+
+              <div>
+                <div className="text-[12px] text-[#545b64]">Instances (all)</div>
                 <Link
                   href="/ec2/instances"
-                  className="text-[28px] font-semibold text-[#0073bb] hover:underline"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
                 >
                   {instances.length}
                 </Link>
               </div>
 
               <div>
-                <div className="text-[12px] text-[#545b64]">Security Groups</div>
+                <div className="text-[12px] text-[#545b64]">Placement Groups</div>
                 <Link
-                  href="/ec2/security-groups"
-                  className="text-[28px] font-semibold text-[#0073bb] hover:underline"
+                  href="/ec2/placement-groups"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
                 >
-                  {secGroups.length}
-                </Link>
-              </div>
-
-              <div>
-                <div className="text-[12px] text-[#545b64]">Key Pairs</div>
-                <Link
-                  href="/ec2/key-pairs"
-                  className="text-[28px] font-semibold text-[#0073bb] hover:underline"
-                >
-                  {keyPairs.length}
+                  {placementGroups.length}
                 </Link>
               </div>
 
@@ -139,17 +177,80 @@ export default function EC2DashboardClient({
                 <div className="text-[12px] text-[#545b64]">Elastic IPs</div>
                 <Link
                   href="/ec2/elastic-ips"
-                  className="text-[28px] font-semibold text-[#0073bb] hover:underline"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
                 >
                   {elasticIps.length}
                 </Link>
               </div>
 
               <div>
-                <div className="text-[12px] text-[#545b64]">Instances (stopped)</div>
-                <div className="text-[28px] font-semibold text-[#16191f]">
-                  {stoppedCount}
-                </div>
+                <div className="text-[12px] text-[#545b64]">Auto Scaling Groups</div>
+                <Link
+                  href="/ec2/auto-scaling-groups"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {autoScalingGroups.length}
+                </Link>
+              </div>
+
+              <div>
+                <div className="text-[12px] text-[#545b64]">Target Groups</div>
+                <Link
+                  href="/ec2/target-groups"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {targetGroups.length}
+                </Link>
+              </div>
+
+              <div>
+                <div className="text-[12px] text-[#545b64]">Load Balancers</div>
+                <Link
+                  href="/ec2/load-balancers"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {loadBalancers.length}
+                </Link>
+              </div>
+
+              <div>
+                <div className="text-[12px] text-[#545b64]">Key Pairs</div>
+                <Link
+                  href="/ec2/key-pairs"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {keyPairs.length}
+                </Link>
+              </div>
+
+              <div>
+                <div className="text-[12px] text-[#545b64]">Snapshots</div>
+                <Link
+                  href="/ec2/snapshots"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {snapshots.length}
+                </Link>
+              </div>
+
+              <div>
+                <div className="text-[12px] text-[#545b64]">Volumes</div>
+                <Link
+                  href="/ec2/volumes"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {volumes.length}
+                </Link>
+              </div>
+
+              <div>
+                <div className="text-[12px] text-[#545b64]">Security Groups</div>
+                <Link
+                  href="/ec2/security-groups"
+                  className="text-[26px] font-semibold text-[#0073bb] hover:underline"
+                >
+                  {secGroups.length}
+                </Link>
               </div>
             </div>
           </div>
@@ -163,13 +264,15 @@ export default function EC2DashboardClient({
             <div className="pt-2 flex items-center gap-3">
               <Link
                 href="/ec2/launch"
-                className="px-4 py-2 bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] text-[13px] font-medium"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] text-[13px] font-bold whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Launch instance
               </Link>
               <Link
                 href="/ec2/instances"
-                className="px-4 py-2 border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] text-[13px] font-normal rounded-sm"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] text-[13px] font-bold whitespace-nowrap inline-flex items-center justify-center rounded-sm transition-colors"
               >
                 Browse instances
               </Link>
@@ -215,6 +318,12 @@ export default function EC2DashboardClient({
               <div className="flex justify-between">
                 <span className="text-[#545b64]">Subnets:</span>
                 <span className="font-mono text-[#16191f]">3 Available</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-[#545b64]">Network Interfaces:</span>
+                <Link href="/ec2/network-interfaces" className="font-mono text-[#0073bb] hover:underline">
+                  {networkInterfaces.length} Active
+                </Link>
               </div>
               <div className="flex justify-between">
                 <span className="text-[#545b64]">Internet Gateway:</span>

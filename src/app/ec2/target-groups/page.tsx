@@ -1,23 +1,24 @@
 /**
- * src/app/ec2/target-groups/page.tsx – Elastic Load Balancing Target Groups.
+ * src/app/ec2/target-groups/page.tsx – Elastic Load Balancing Target Groups Page.
  * Zero emojis, Cloudscape enterprise styling.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
 import { ec2Nav } from "@/components/ec2/EC2Nav";
-import EC2PlaceholderView from "@/components/ec2/EC2PlaceholderView";
+import TargetGroupsClient from "@/components/ec2/TargetGroupsClient";
+import { fetchLiveTargetGroups } from "../actions";
 
-export default function TargetGroupsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function TargetGroupsPage() {
+  const { targetGroups = [], isLive = true, error } = await fetchLiveTargetGroups();
+
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
-      <EC2PlaceholderView
-        title="Target Groups"
-        description="Target groups route requests to individual registered targets, such as EC2 instances, using the specified protocol and port."
-        primaryActionLabel="Create target group"
-        columns={["Name", "Target type", "Protocol", "Port", "VPC ID", "Health check path", "Registered targets"]}
-        rows={[]}
-        emptyTitle="No target groups found"
-        emptyDescription="Create a target group and register your EC2 instances to receive load-balanced traffic."
+      <TargetGroupsClient
+        initialTargetGroups={targetGroups || []}
+        isLive={isLive}
+        liveError={error}
       />
     </ServiceLayout>
   );

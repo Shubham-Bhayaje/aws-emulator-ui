@@ -11,11 +11,11 @@ import { fetchLivePlacementGroups } from "../actions";
 export const dynamic = "force-dynamic";
 
 export default async function PlacementGroupsPage() {
-  const { placementGroups, isLive } = await fetchLivePlacementGroups();
+  const { placementGroups = [], isLive = true } = await fetchLivePlacementGroups();
 
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
-      <PlacementGroupsClient initialGroups={placementGroups} isLive={isLive} />
+      <PlacementGroupsClient initialGroups={placementGroups || []} isLive={isLive} />
     </ServiceLayout>
   );
 }

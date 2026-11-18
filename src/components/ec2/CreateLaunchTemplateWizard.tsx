@@ -646,14 +646,16 @@ export default function CreateLaunchTemplateWizard({
               <button
                 type="submit"
                 disabled={isPending || !templateName.trim()}
-                className="w-full py-2 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07] disabled:opacity-50 transition-colors shadow-xs"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="w-full bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] disabled:opacity-50 transition-colors shadow-xs whitespace-nowrap inline-flex items-center justify-center"
               >
                 {isPending ? "Creating template..." : "Create launch template"}
               </button>
 
               <Link
                 href="/ec2/launch-templates"
-                className="block text-center w-full py-1.5 border border-[#545b64] rounded-sm text-[13px] text-[#16191f] hover:bg-[#f2f3f3]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="w-full border border-[#545b64] rounded-sm text-[13px] font-bold text-[#16191f] hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Cancel
               </Link>

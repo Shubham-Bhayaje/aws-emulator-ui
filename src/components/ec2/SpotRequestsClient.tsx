@@ -424,14 +424,16 @@ export default function SpotRequestsClient({ initialSpotRequests, isLive }: Prop
               <button
                 type="button"
                 onClick={() => setShowRequestModal(false)}
-                className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 border border-[#545b64] rounded-sm text-[13px] font-bold text-[#16191f] hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isPending}
-                className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07] disabled:opacity-50"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 {isPending ? "Submitting..." : "Submit request"}
               </button>
@@ -453,14 +455,16 @@ export default function SpotRequestsClient({ initialSpotRequests, isLive }: Prop
             <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#eaeded]">
               <button
                 onClick={() => setShowCancelModal(false)}
-                className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 border border-[#545b64] rounded-sm text-[13px] font-bold text-[#16191f] hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Close
               </button>
               <button
                 onClick={handleCancelSpot}
                 disabled={isPending}
-                className="px-4 py-1.5 bg-[#d13212] text-white rounded-sm text-[13px] font-medium hover:bg-[#b02008] disabled:opacity-50"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 bg-[#d13212] text-white rounded-sm text-[13px] font-bold hover:bg-[#b02008] disabled:opacity-50 whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 {isPending ? "Cancelling..." : "Cancel request"}
               </button>

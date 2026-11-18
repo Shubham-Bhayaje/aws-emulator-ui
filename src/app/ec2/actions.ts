@@ -6,7 +6,23 @@
 
 "use server";
 
-import { ec2 } from "@/lib/aws";
+import { ec2, elbv2, autoScaling } from "@/lib/aws";
+import {
+  DescribeLoadBalancersCommand,
+  CreateLoadBalancerCommand,
+  DeleteLoadBalancerCommand,
+  DescribeTargetGroupsCommand,
+  CreateTargetGroupCommand,
+  DeleteTargetGroupCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+import {
+  DescribeAutoScalingGroupsCommand,
+  CreateAutoScalingGroupCommand,
+  UpdateAutoScalingGroupCommand,
+  DeleteAutoScalingGroupCommand,
+  DescribeLaunchConfigurationsCommand,
+  DeleteLaunchConfigurationCommand,
+} from "@aws-sdk/client-auto-scaling";
 import {
   DescribeInstancesCommand,
   StartInstancesCommand,
@@ -24,12 +40,19 @@ import {
   DescribeKeyPairsCommand,
   CreateKeyPairCommand,
   DeleteKeyPairCommand,
+  ImportKeyPairCommand,
   DescribeAddressesCommand,
   AllocateAddressCommand,
   ReleaseAddressCommand,
+  AssociateAddressCommand,
+  DisassociateAddressCommand,
   DescribeVolumesCommand,
   CreateVolumeCommand,
   DeleteVolumeCommand,
+  AttachVolumeCommand,
+  DetachVolumeCommand,
+  AttachNetworkInterfaceCommand,
+  DetachNetworkInterfaceCommand,
   DescribeNetworkInterfacesCommand,
   DescribeImagesCommand,
   RegisterImageCommand,
@@ -83,6 +106,8 @@ import {
   DEFAULT_ELASTIC_IPS,
   SecurityGroupRule,
 } from "@/lib/ec2-data";
+
+export type { EC2Instance };
 
 // -------------------------------------------------------------
 // Mappers: Convert AWS SDK responses to UI Models
@@ -178,6 +203,11 @@ function mapAwsSecurityGroupToModel(sg: any): SecurityGroup {
     };
   });
 
+  const tagsObj: Record<string, string> = {};
+  (sg.Tags || []).forEach((t: any) => {
+    if (t.Key && t.Value) tagsObj[t.Key] = t.Value;
+  });
+
   return {
     id: sg.GroupId || "sg-unknown",
     name: sg.GroupName || "default",
@@ -185,13 +215,18 @@ function mapAwsSecurityGroupToModel(sg: any): SecurityGroup {
     vpcId: sg.VpcId || "vpc-00000000000000001",
     ownerId: sg.OwnerId || "000000000000",
     arn: sg.SecurityGroupArn || `arn:aws:ec2:us-east-1:000000000000:security-group/${sg.GroupId}`,
-    tags: {},
+    tags: tagsObj,
     inboundRules,
     outboundRules,
   };
 }
 
 function mapAwsKeyPairToModel(kp: any): KeyPair {
+  const tagsObj: Record<string, string> = {};
+  (kp.Tags || []).forEach((t: any) => {
+    if (t.Key && t.Value) tagsObj[t.Key] = t.Value;
+  });
+
   return {
     id: kp.KeyPairId || kp.KeyName || "key-id",
     name: kp.KeyName || "key-pair",
@@ -199,6 +234,9 @@ function mapAwsKeyPairToModel(kp: any): KeyPair {
     format: "pem",
     fingerprint: kp.KeyFingerprint || "—",
     createTime: kp.CreateTime ? new Date(kp.CreateTime).toLocaleDateString() : "Just now",
+    arn: `arn:aws:ec2:us-east-1:000000000000:key-pair/${kp.KeyName}`,
+    tags: tagsObj,
+    publicKey: kp.PublicKey,
   };
 }
 
@@ -430,13 +468,10 @@ export async function fetchLiveSecurityGroups(): Promise<{ securityGroups: Secur
   try {
     const res = await ec2.send(new DescribeSecurityGroupsCommand({}));
     const rawList = res.SecurityGroups || [];
-    if (rawList.length > 0) {
-      return { securityGroups: rawList.map(mapAwsSecurityGroupToModel), isLive: true };
-    }
-    return { securityGroups: [], isLive: true };
+    return { securityGroups: rawList.map(mapAwsSecurityGroupToModel), isLive: true };
   } catch (err: any) {
     console.warn("[EC2 Action] Failed to fetch live security groups:", err.message);
-    return { securityGroups: DEFAULT_SECURITY_GROUPS, isLive: false, error: err.message };
+    return { securityGroups: [], isLive: false, error: err.message };
   }
 }
 
@@ -625,24 +660,24 @@ export async function fetchLiveKeyPairs(): Promise<{ keyPairs: KeyPair[]; isLive
   try {
     const res = await ec2.send(new DescribeKeyPairsCommand({}));
     const rawList = res.KeyPairs || [];
-    if (rawList.length > 0) {
-      return { keyPairs: rawList.map(mapAwsKeyPairToModel), isLive: true };
-    }
-    return { keyPairs: [], isLive: true };
+    return { keyPairs: rawList.map(mapAwsKeyPairToModel), isLive: true };
   } catch (err: any) {
     console.warn("[EC2 Action] Failed to fetch live key pairs:", err.message);
-    return { keyPairs: DEFAULT_KEY_PAIRS, isLive: false, error: err.message };
+    return { keyPairs: [], isLive: false, error: err.message };
   }
 }
 
 export async function createLiveKeyPair(
-  keyName: string
+  keyName: string,
+  keyType: "rsa" | "ed25519" = "rsa",
+  keyFormat: "pem" | "ppk" = "pem"
 ): Promise<{ success: boolean; keyPair?: KeyPair; keyMaterial?: string; error?: string }> {
   try {
     const res = await ec2.send(
       new CreateKeyPairCommand({
         KeyName: keyName,
-        KeyType: "rsa",
+        KeyType: keyType === "ed25519" ? "ed25519" : "rsa",
+        KeyFormat: keyFormat === "ppk" ? "ppk" : "pem",
       })
     );
     revalidatePath("/ec2/key-pairs");
@@ -650,12 +685,44 @@ export async function createLiveKeyPair(
       success: true,
       keyMaterial: res.KeyMaterial,
       keyPair: {
-        id: res.KeyPairId || keyName,
+        id: res.KeyPairId || res.KeyName || keyName,
         name: keyName,
+        type: keyType === "ed25519" ? "ED25519" : "RSA",
+        format: keyFormat,
+        fingerprint: res.KeyFingerprint || "—",
+        createTime: "Just now",
+        arn: `arn:aws:ec2:us-east-1:000000000000:key-pair/${keyName}`,
+        tags: {},
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function importLiveKeyPair(params: {
+  keyName: string;
+  publicKeyMaterial: string;
+}): Promise<{ success: boolean; keyPair?: KeyPair; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new ImportKeyPairCommand({
+        KeyName: params.keyName,
+        PublicKeyMaterial: Buffer.from(params.publicKeyMaterial.trim()),
+      })
+    );
+    revalidatePath("/ec2/key-pairs");
+    return {
+      success: true,
+      keyPair: {
+        id: res.KeyPairId || params.keyName,
+        name: res.KeyName || params.keyName,
         type: "RSA",
         format: "pem",
         fingerprint: res.KeyFingerprint || "—",
-        createTime: "Just now",
+        createTime: new Date().toLocaleDateString(),
+        arn: `arn:aws:ec2:us-east-1:000000000000:key-pair/${params.keyName}`,
+        tags: {},
       },
     };
   } catch (err: any) {
@@ -681,17 +748,29 @@ export async function fetchLiveElasticIps(): Promise<{ elasticIps: ElasticIp[]; 
   try {
     const res = await ec2.send(new DescribeAddressesCommand({}));
     const rawList = res.Addresses || [];
-    const mapped: ElasticIp[] = rawList.map((a) => ({
-      allocationId: a.AllocationId || a.PublicIp || "eipalloc-0",
-      publicIp: a.PublicIp || "",
-      associatedInstanceId: a.InstanceId,
-      networkInterfaceId: a.NetworkInterfaceId,
-      domain: "vpc",
-    }));
+    const mapped: ElasticIp[] = rawList.map((a) => {
+      const tagsObj: Record<string, string> = {};
+      (a.Tags || []).forEach((t: any) => {
+        if (t.Key && t.Value) tagsObj[t.Key] = t.Value;
+      });
+
+      return {
+        allocationId: a.AllocationId || a.PublicIp || "eipalloc-0",
+        publicIp: a.PublicIp || "",
+        associatedInstanceId: a.InstanceId,
+        associationId: a.AssociationId,
+        networkInterfaceId: a.NetworkInterfaceId,
+        privateIpAddress: a.PrivateIpAddress,
+        networkBorderGroup: a.NetworkBorderGroup || "us-east-1",
+        domain: (a.Domain as any) || "vpc",
+        arn: `arn:aws:ec2:us-east-1:000000000000:elastic-ip/${a.AllocationId || a.PublicIp}`,
+        tags: tagsObj,
+      };
+    });
     return { elasticIps: mapped, isLive: true };
   } catch (err: any) {
     console.warn("[EC2 Action] Failed to fetch live Elastic IPs:", err.message);
-    return { elasticIps: DEFAULT_ELASTIC_IPS, isLive: false, error: err.message };
+    return { elasticIps: [], isLive: false, error: err.message };
   }
 }
 
@@ -705,8 +784,50 @@ export async function allocateLiveElasticIp(): Promise<{ success: boolean; elast
         allocationId: res.AllocationId || "eipalloc-new",
         publicIp: res.PublicIp || "",
         domain: "vpc",
+        networkBorderGroup: res.NetworkBorderGroup || "us-east-1",
+        arn: `arn:aws:ec2:us-east-1:000000000000:elastic-ip/${res.AllocationId}`,
       },
     };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function associateLiveElasticIp(params: {
+  allocationId: string;
+  instanceId?: string;
+  networkInterfaceId?: string;
+  privateIpAddress?: string;
+  allowReassociation?: boolean;
+}): Promise<{ success: boolean; associationId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new AssociateAddressCommand({
+        AllocationId: params.allocationId,
+        InstanceId: params.instanceId && params.instanceId !== "" ? params.instanceId : undefined,
+        NetworkInterfaceId: params.networkInterfaceId && params.networkInterfaceId !== "" ? params.networkInterfaceId : undefined,
+        PrivateIpAddress: params.privateIpAddress && params.privateIpAddress !== "" ? params.privateIpAddress : undefined,
+        AllowReassociation: params.allowReassociation ?? true,
+      })
+    );
+    revalidatePath("/ec2/elastic-ips");
+    revalidatePath("/ec2/instances");
+    return { success: true, associationId: res.AssociationId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function disassociateLiveElasticIp(associationId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(
+      new DisassociateAddressCommand({
+        AssociationId: associationId,
+      })
+    );
+    revalidatePath("/ec2/elastic-ips");
+    revalidatePath("/ec2/instances");
+    return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -728,55 +849,66 @@ export async function releaseLiveElasticIp(allocationId: string): Promise<{ succ
 
 export interface EBSVolume {
   id: string;
+  name?: string;
   sizeGb: number;
   volumeType: string;
   iops?: number;
+  throughput?: number;
   snapshotId?: string;
   availabilityZone: string;
   state: string;
   createTime: string;
   attachmentInstanceId?: string;
   attachmentDevice?: string;
+  attachmentState?: string;
+  attachmentTime?: string;
   encrypted: boolean;
+  multiAttachEnabled?: boolean;
+  fastSnapshotRestore?: boolean;
+  arn?: string;
+  tags?: Record<string, string>;
 }
 
 export async function fetchLiveVolumes(): Promise<{ volumes: EBSVolume[]; isLive: boolean; error?: string }> {
   try {
     const res = await ec2.send(new DescribeVolumesCommand({}));
     const rawList = res.Volumes || [];
-    const mapped: EBSVolume[] = rawList.map((v) => ({
-      id: v.VolumeId || "vol-unknown",
-      sizeGb: v.Size || 20,
-      volumeType: v.VolumeType || "gp3",
-      iops: v.Iops || 3000,
-      snapshotId: v.SnapshotId || "—",
-      availabilityZone: v.AvailabilityZone || "us-east-1a",
-      state: v.State || "available",
-      createTime: v.CreateTime ? new Date(v.CreateTime).toLocaleString() : new Date().toLocaleString(),
-      attachmentInstanceId: v.Attachments?.[0]?.InstanceId,
-      attachmentDevice: v.Attachments?.[0]?.Device,
-      encrypted: Boolean(v.Encrypted),
-    }));
+    const mapped: EBSVolume[] = rawList.map((v) => {
+      const tagsObj: Record<string, string> = {};
+      (v.Tags || []).forEach((t) => {
+        if (t.Key && t.Value) tagsObj[t.Key] = t.Value;
+      });
+      const name = tagsObj["Name"] || "—";
+      const att = v.Attachments?.[0];
+
+      return {
+        id: v.VolumeId || "vol-unknown",
+        name,
+        sizeGb: v.Size || 20,
+        volumeType: v.VolumeType || "gp3",
+        iops: v.Iops || (v.VolumeType === "gp3" ? 3000 : undefined),
+        throughput: v.Throughput || (v.VolumeType === "gp3" ? 125 : undefined),
+        snapshotId: v.SnapshotId || "—",
+        availabilityZone: v.AvailabilityZone || "us-east-1a",
+        state: v.State || "available",
+        createTime: v.CreateTime ? new Date(v.CreateTime).toLocaleString() : new Date().toLocaleString(),
+        attachmentInstanceId: att?.InstanceId,
+        attachmentDevice: att?.Device,
+        attachmentState: att?.State,
+        attachmentTime: att?.AttachTime ? new Date(att.AttachTime).toLocaleString() : undefined,
+        encrypted: Boolean(v.Encrypted),
+        multiAttachEnabled: Boolean(v.MultiAttachEnabled),
+        fastSnapshotRestore: Boolean(v.FastRestored),
+        arn: `arn:aws:ec2:us-east-1:000000000000:volume/${v.VolumeId}`,
+        tags: tagsObj,
+      };
+    });
 
     return { volumes: mapped, isLive: true };
   } catch (err: any) {
     console.warn("[EC2 Action] Failed to fetch live volumes:", err.message);
     return {
-      volumes: [
-        {
-          id: "vol-0000000000000008e",
-          sizeGb: 20,
-          volumeType: "gp3",
-          iops: 3000,
-          snapshotId: "—",
-          availabilityZone: "us-east-1a",
-          state: "in-use",
-          createTime: new Date().toLocaleString(),
-          attachmentInstanceId: "i-00000000000000001",
-          attachmentDevice: "/dev/xvda",
-          encrypted: false,
-        },
-      ],
+      volumes: [],
       isLive: false,
       error: err.message,
     };
@@ -787,29 +919,97 @@ export async function createLiveVolume(params: {
   sizeGb: number;
   availabilityZone: string;
   volumeType?: string;
+  iops?: number;
+  throughput?: number;
+  snapshotId?: string;
+  encrypted?: boolean;
+  name?: string;
 }): Promise<{ success: boolean; volume?: EBSVolume; error?: string }> {
   try {
-    const res = await ec2.send(
-      new CreateVolumeCommand({
-        Size: params.sizeGb || 20,
-        AvailabilityZone: params.availabilityZone || "us-east-1a",
-        VolumeType: (params.volumeType as any) || "gp3",
-      })
-    );
+    const input: any = {
+      Size: params.sizeGb || 20,
+      AvailabilityZone: params.availabilityZone || "us-east-1a",
+      VolumeType: (params.volumeType as any) || "gp3",
+      Encrypted: params.encrypted ?? false,
+    };
 
+    if (params.snapshotId && params.snapshotId.trim() !== "" && params.snapshotId !== "—") {
+      input.SnapshotId = params.snapshotId.trim();
+    }
+    if (params.iops && (params.volumeType === "gp3" || params.volumeType === "io1" || params.volumeType === "io2")) {
+      input.Iops = params.iops;
+    }
+    if (params.throughput && params.volumeType === "gp3") {
+      input.Throughput = params.throughput;
+    }
+    if (params.name && params.name.trim() !== "") {
+      input.TagSpecifications = [
+        {
+          ResourceType: "volume",
+          Tags: [{ Key: "Name", Value: params.name.trim() }],
+        },
+      ];
+    }
+
+    const res = await ec2.send(new CreateVolumeCommand(input));
     revalidatePath("/ec2/volumes");
     return {
       success: true,
       volume: {
         id: res.VolumeId || "vol-new",
+        name: params.name || "—",
         sizeGb: res.Size || params.sizeGb,
-        volumeType: res.VolumeType || "gp3",
+        volumeType: res.VolumeType || params.volumeType || "gp3",
+        iops: res.Iops || params.iops || 3000,
+        throughput: res.Throughput || params.throughput || 125,
         availabilityZone: res.AvailabilityZone || params.availabilityZone,
-        state: res.State || "creating",
+        state: res.State || "available",
         createTime: new Date().toLocaleString(),
         encrypted: Boolean(res.Encrypted),
+        snapshotId: res.SnapshotId || params.snapshotId || "—",
+        arn: `arn:aws:ec2:us-east-1:000000000000:volume/${res.VolumeId}`,
       },
     };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function attachLiveVolume(params: {
+  volumeId: string;
+  instanceId: string;
+  device?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(
+      new AttachVolumeCommand({
+        VolumeId: params.volumeId,
+        InstanceId: params.instanceId,
+        Device: params.device || "/dev/xvdf",
+      })
+    );
+    revalidatePath("/ec2/volumes");
+    revalidatePath("/ec2/instances");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function detachLiveVolume(params: {
+  volumeId: string;
+  force?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(
+      new DetachVolumeCommand({
+        VolumeId: params.volumeId,
+        Force: params.force ?? false,
+      })
+    );
+    revalidatePath("/ec2/volumes");
+    revalidatePath("/ec2/instances");
+    return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -831,6 +1031,7 @@ export async function deleteLiveVolume(volumeId: string): Promise<{ success: boo
 
 export interface NetworkInterfaceModel {
   id: string;
+  name?: string;
   subnetId: string;
   vpcId: string;
   status: string;
@@ -838,7 +1039,13 @@ export interface NetworkInterfaceModel {
   publicIp?: string;
   macAddress: string;
   instanceId?: string;
+  deviceIndex?: number;
+  attachmentId?: string;
+  attachmentTime?: string;
   description?: string;
+  securityGroups?: Array<{ id: string; name: string }>;
+  arn?: string;
+  tags?: Record<string, string>;
 }
 
 export async function fetchLiveNetworkInterfaces(): Promise<{
@@ -849,17 +1056,35 @@ export async function fetchLiveNetworkInterfaces(): Promise<{
   try {
     const res = await ec2.send(new DescribeNetworkInterfacesCommand({}));
     const rawList = res.NetworkInterfaces || [];
-    const mapped: NetworkInterfaceModel[] = rawList.map((eni) => ({
-      id: eni.NetworkInterfaceId || "eni-unknown",
-      subnetId: eni.SubnetId || "",
-      vpcId: eni.VpcId || "",
-      status: eni.Status || "in-use",
-      privateIp: eni.PrivateIpAddress || "—",
-      publicIp: eni.Association?.PublicIp,
-      macAddress: eni.MacAddress || "—",
-      instanceId: eni.Attachment?.InstanceId,
-      description: eni.Description || "Primary network interface",
-    }));
+    const mapped: NetworkInterfaceModel[] = rawList.map((eni) => {
+      const tagsObj: Record<string, string> = {};
+      (eni.TagSet || (eni as any).Tags || []).forEach((t: any) => {
+        if (t.Key && t.Value) tagsObj[t.Key] = t.Value;
+      });
+      const sgs = (eni.Groups || []).map((g: any) => ({
+        id: g.GroupId || "",
+        name: g.GroupName || "",
+      }));
+
+      return {
+        id: eni.NetworkInterfaceId || "eni-unknown",
+        name: tagsObj["Name"] || "—",
+        subnetId: eni.SubnetId || "subnet-00000000000000001",
+        vpcId: eni.VpcId || "vpc-00000000000000001",
+        status: eni.Status || "available",
+        privateIp: eni.PrivateIpAddress || "—",
+        publicIp: eni.Association?.PublicIp,
+        macAddress: eni.MacAddress || "02:42:ac:11:00:02",
+        instanceId: eni.Attachment?.InstanceId,
+        deviceIndex: eni.Attachment?.DeviceIndex ?? 0,
+        attachmentId: eni.Attachment?.AttachmentId,
+        attachmentTime: eni.Attachment?.AttachTime ? new Date(eni.Attachment.AttachTime).toLocaleString() : undefined,
+        description: eni.Description || tagsObj["Name"] || "Elastic Network Interface",
+        securityGroups: sgs,
+        arn: `arn:aws:ec2:us-east-1:000000000000:network-interface/${eni.NetworkInterfaceId}`,
+        tags: tagsObj,
+      };
+    });
 
     return { interfaces: mapped, isLive: true };
   } catch (err: any) {
@@ -869,6 +1094,46 @@ export async function fetchLiveNetworkInterfaces(): Promise<{
       isLive: false,
       error: err.message,
     };
+  }
+}
+
+export async function attachLiveNetworkInterface(params: {
+  networkInterfaceId: string;
+  instanceId: string;
+  deviceIndex?: number;
+}): Promise<{ success: boolean; attachmentId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new AttachNetworkInterfaceCommand({
+        NetworkInterfaceId: params.networkInterfaceId,
+        InstanceId: params.instanceId,
+        DeviceIndex: params.deviceIndex ?? 1,
+      })
+    );
+    revalidatePath("/ec2/network-interfaces");
+    revalidatePath("/ec2/instances");
+    return { success: true, attachmentId: res.AttachmentId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function detachLiveNetworkInterface(params: {
+  attachmentId: string;
+  force?: boolean;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(
+      new DetachNetworkInterfaceCommand({
+        AttachmentId: params.attachmentId,
+        Force: params.force ?? false,
+      })
+    );
+    revalidatePath("/ec2/network-interfaces");
+    revalidatePath("/ec2/instances");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
 }
 
@@ -1108,56 +1373,103 @@ export async function fetchLiveLaunchTemplateVersions(templateId: string): Promi
   }
 }
 
-export async function fetchLiveSnapshots(): Promise<{
-  snapshots: Array<{
-    id: string;
-    volumeId: string;
-    sizeGb: number;
-    state: string;
-    progress: string;
-    startTime: string;
-    description: string;
-  }>;
+export interface EBSSnapshot {
+  id: string;
+  name: string;
+  volumeId: string;
+  sizeGb: number;
+  state: string;
+  progress: string;
+  startTime: string;
+  description: string;
+  encrypted: boolean;
+  kmsKeyId?: string;
+  ownerId: string;
+  storageTier: string;
+  arn: string;
+  tags?: Record<string, string>;
+}
+
+export async function fetchLiveSnapshots(scope: "self" | "all" | "public" = "self"): Promise<{
+  snapshots: EBSSnapshot[];
   isLive: boolean;
   error?: string;
 }> {
   try {
-    const res = await ec2.send(new DescribeSnapshotsCommand({ OwnerIds: ["self"] }));
+    const params: any = {};
+    if (scope === "self") {
+      params.OwnerIds = ["self"];
+    } else if (scope === "public") {
+      params.RestorableByUserIds = ["all"];
+    }
+    const res = await ec2.send(new DescribeSnapshotsCommand(params));
     const raw = res.Snapshots || [];
-    const mapped = raw.map((s) => ({
-      id: s.SnapshotId || "snap-unknown",
-      volumeId: s.VolumeId || "—",
-      sizeGb: s.VolumeSize || 0,
-      state: s.State || "completed",
-      progress: s.Progress || "100%",
-      startTime: s.StartTime ? new Date(s.StartTime).toLocaleString() : "—",
-      description: s.Description || "—",
-    }));
+    const mapped: EBSSnapshot[] = raw.map((s) => {
+      const tagsObj: Record<string, string> = {};
+      (s.Tags || []).forEach((t) => {
+        if (t.Key && t.Value) tagsObj[t.Key] = t.Value;
+      });
+      const name = tagsObj["Name"] || "—";
+
+      return {
+        id: s.SnapshotId || "snap-unknown",
+        name,
+        volumeId: s.VolumeId || "—",
+        sizeGb: s.VolumeSize || 0,
+        state: s.State || "completed",
+        progress: s.Progress || "100%",
+        startTime: s.StartTime ? new Date(s.StartTime).toLocaleString() : "—",
+        description: s.Description || "—",
+        encrypted: Boolean(s.Encrypted),
+        kmsKeyId: s.KmsKeyId || "—",
+        ownerId: s.OwnerId || "000000000000",
+        storageTier: (s.StorageTier as string) || "standard",
+        arn: `arn:aws:ec2:us-east-1:${s.OwnerId || "000000000000"}:snapshot/${s.SnapshotId}`,
+        tags: tagsObj,
+      };
+    });
     return { snapshots: mapped, isLive: true };
   } catch (err: any) {
     return { snapshots: [], isLive: false, error: err.message };
   }
 }
 
+export interface PlacementGroupModel {
+  groupName: string;
+  strategy: string;
+  state: string;
+  groupId: string;
+  partitionCount?: number;
+  spreadLevel?: string;
+  arn: string;
+  tags?: Record<string, string>;
+}
+
 export async function fetchLivePlacementGroups(): Promise<{
-  placementGroups: Array<{
-    groupName: string;
-    strategy: string;
-    state: string;
-    groupId: string;
-  }>;
+  placementGroups: PlacementGroupModel[];
   isLive: boolean;
   error?: string;
 }> {
   try {
     const res = await ec2.send(new DescribePlacementGroupsCommand({}));
     const raw = res.PlacementGroups || [];
-    const mapped = raw.map((pg) => ({
-      groupName: pg.GroupName || "pg-default",
-      strategy: pg.Strategy || "cluster",
-      state: pg.State || "available",
-      groupId: pg.GroupId || "—",
-    }));
+    const mapped: PlacementGroupModel[] = raw.map((pg) => {
+      const tagsObj: Record<string, string> = {};
+      (pg.Tags || []).forEach((t: any) => {
+        if (t.Key && t.Value) tagsObj[t.Key] = t.Value;
+      });
+
+      return {
+        groupName: pg.GroupName || "pg-default",
+        strategy: pg.Strategy || "cluster",
+        state: pg.State || "available",
+        groupId: pg.GroupId || `pg-${Math.random().toString(16).substring(2, 10)}`,
+        partitionCount: pg.PartitionCount,
+        spreadLevel: pg.SpreadLevel || "rack",
+        arn: pg.GroupArn || `arn:aws:ec2:us-east-1:000000000000:placement-group/${pg.GroupName}`,
+        tags: tagsObj,
+      };
+    });
     return { placementGroups: mapped, isLive: true };
   } catch (err: any) {
     return { placementGroups: [], isLive: false, error: err.message };
@@ -1330,15 +1642,23 @@ export async function fetchLiveCapacityReservations(): Promise<{
 
 export async function createLiveSnapshot(
   volumeId: string,
-  description?: string
+  description?: string,
+  name?: string
 ): Promise<{ success: boolean; snapshotId?: string; error?: string }> {
   try {
-    const res = await ec2.send(
-      new CreateSnapshotCommand({
-        VolumeId: volumeId,
-        Description: description || "Created via AWS Console UI",
-      })
-    );
+    const input: any = {
+      VolumeId: volumeId,
+      Description: description || "Created via AWS Console UI",
+    };
+    if (name && name.trim()) {
+      input.TagSpecifications = [
+        {
+          ResourceType: "snapshot",
+          Tags: [{ Key: "Name", Value: name.trim() }],
+        },
+      ];
+    }
+    const res = await ec2.send(new CreateSnapshotCommand(input));
     revalidatePath("/ec2/snapshots");
     return { success: true, snapshotId: res.SnapshotId };
   } catch (err: any) {
@@ -1520,17 +1840,24 @@ export async function deleteLiveLaunchTemplate(templateId: string): Promise<{ su
 
 export async function createLivePlacementGroup(
   groupName: string,
-  strategy: string = "cluster"
-): Promise<{ success: boolean; error?: string }> {
+  strategy: string = "cluster",
+  partitionCount?: number,
+  spreadLevel?: string
+): Promise<{ success: boolean; groupId?: string; error?: string }> {
   try {
-    await ec2.send(
-      new CreatePlacementGroupCommand({
-        GroupName: groupName,
-        Strategy: strategy as any,
-      })
-    );
+    const input: any = {
+      GroupName: groupName,
+      Strategy: strategy as any,
+    };
+    if (strategy === "partition" && partitionCount) {
+      input.PartitionCount = partitionCount;
+    }
+    if (strategy === "spread" && spreadLevel) {
+      input.SpreadLevel = spreadLevel as any;
+    }
+    const res = await ec2.send(new CreatePlacementGroupCommand(input));
     revalidatePath("/ec2/placement-groups");
-    return { success: true };
+    return { success: true, groupId: res.PlacementGroup?.GroupId };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -1547,16 +1874,53 @@ export async function deleteLivePlacementGroup(groupName: string): Promise<{ suc
 }
 
 export async function createLiveNetworkInterface(
-  subnetId: string,
-  description?: string
+  paramsOrSubnetId: {
+    subnetId?: string;
+    description?: string;
+    privateIpAddress?: string;
+    groups?: string[];
+    name?: string;
+  } | string,
+  descFallback?: string
 ): Promise<{ success: boolean; interfaceId?: string; error?: string }> {
   try {
-    const res = await ec2.send(
-      new CreateNetworkInterfaceCommand({
-        SubnetId: subnetId,
-        Description: description || "Created via AWS Console UI",
-      })
-    );
+    let subnetId = "subnet-00000000000000001";
+    let description = "Created via AWS Console UI";
+    let privateIpAddress: string | undefined = undefined;
+    let groups: string[] | undefined = undefined;
+    let name: string | undefined = undefined;
+
+    if (typeof paramsOrSubnetId === "string") {
+      subnetId = paramsOrSubnetId;
+      if (descFallback) description = descFallback;
+    } else {
+      if (paramsOrSubnetId.subnetId) subnetId = paramsOrSubnetId.subnetId;
+      if (paramsOrSubnetId.description) description = paramsOrSubnetId.description;
+      if (paramsOrSubnetId.privateIpAddress) privateIpAddress = paramsOrSubnetId.privateIpAddress;
+      if (paramsOrSubnetId.groups && paramsOrSubnetId.groups.length > 0) groups = paramsOrSubnetId.groups;
+      if (paramsOrSubnetId.name) name = paramsOrSubnetId.name;
+    }
+
+    const input: any = {
+      SubnetId: subnetId,
+      Description: description,
+    };
+    if (privateIpAddress && privateIpAddress.trim()) {
+      input.PrivateIpAddress = privateIpAddress.trim();
+    }
+    if (groups && groups.length > 0) {
+      input.Groups = groups;
+    }
+    if (name && name.trim()) {
+      input.TagSpecifications = [
+        {
+          ResourceType: "network-interface",
+          Tags: [{ Key: "Name", Value: name.trim() }],
+        },
+      ];
+    }
+
+    const res = await ec2.send(new CreateNetworkInterfaceCommand(input));
     revalidatePath("/ec2/network-interfaces");
     return { success: true, interfaceId: res.NetworkInterface?.NetworkInterfaceId };
   } catch (err: any) {
@@ -1798,3 +2162,466 @@ export async function purchaseLiveSavingsPlan(params: {
   revalidatePath("/ec2/savings-plans");
   return { success: true, plan: newPlan };
 }
+
+// -------------------------------------------------------------
+// Amazon Data Lifecycle Manager (DLM): In-Memory Actions
+// -------------------------------------------------------------
+
+export interface LifecyclePolicyModel {
+  policyId: string;
+  description: string;
+  policyType: "EBS_SNAPSHOT_MANAGEMENT" | "IMAGE_MANAGEMENT";
+  resourceTypes: ("VOLUME" | "INSTANCE")[];
+  targetTags: Array<{ key: string; value: string }>;
+  state: "ENABLED" | "DISABLED" | "ERROR";
+  scheduleName: string;
+  frequencyHours: number;
+  startingAt: string;
+  retainCount: number;
+  executionRoleArn: string;
+  dateCreated: string;
+  dateModified: string;
+  tags: Record<string, string>;
+}
+
+// Global in-memory storage, starts completely empty per zero dummy data rule
+const IN_MEMORY_LIFECYCLE_POLICIES: LifecyclePolicyModel[] = [];
+
+export async function fetchLiveLifecyclePolicies(): Promise<{
+  policies: LifecyclePolicyModel[];
+  isLive: boolean;
+}> {
+  return {
+    policies: [...IN_MEMORY_LIFECYCLE_POLICIES],
+    isLive: true,
+  };
+}
+
+export async function createLiveLifecyclePolicy(params: {
+  description: string;
+  policyType?: "EBS_SNAPSHOT_MANAGEMENT" | "IMAGE_MANAGEMENT";
+  resourceTypes?: ("VOLUME" | "INSTANCE")[];
+  targetTags?: Array<{ key: string; value: string }>;
+  scheduleName?: string;
+  frequencyHours?: number;
+  startingAt?: string;
+  retainCount?: number;
+  state?: "ENABLED" | "DISABLED";
+  tags?: Record<string, string>;
+}): Promise<{ success: boolean; policy?: LifecyclePolicyModel; error?: string }> {
+  try {
+    const idHex = Math.random().toString(16).substring(2, 14);
+    const policyId = `policy-${idHex}`;
+    const now = new Date().toLocaleString();
+    const newPolicy: LifecyclePolicyModel = {
+      policyId,
+      description: params.description || "Automated snapshot lifecycle policy",
+      policyType: params.policyType || "EBS_SNAPSHOT_MANAGEMENT",
+      resourceTypes: params.resourceTypes && params.resourceTypes.length > 0 ? params.resourceTypes : ["VOLUME"],
+      targetTags: params.targetTags && params.targetTags.length > 0 ? params.targetTags : [{ key: "Environment", value: "production" }],
+      state: params.state || "ENABLED",
+      scheduleName: params.scheduleName || "DailySchedule",
+      frequencyHours: params.frequencyHours || 24,
+      startingAt: params.startingAt || "09:00 UTC",
+      retainCount: params.retainCount || 7,
+      executionRoleArn: "arn:aws:iam::000000000000:role/AWSDataLifecycleManagerDefaultRole",
+      dateCreated: now,
+      dateModified: now,
+      tags: params.tags || { ManagedBy: "DataLifecycleManager" },
+    };
+    IN_MEMORY_LIFECYCLE_POLICIES.unshift(newPolicy);
+    revalidatePath("/ec2/lifecycle-manager");
+    return { success: true, policy: newPolicy };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function toggleLiveLifecyclePolicyState(
+  policyId: string
+): Promise<{ success: boolean; newState?: string; error?: string }> {
+  const policy = IN_MEMORY_LIFECYCLE_POLICIES.find((p) => p.policyId === policyId);
+  if (!policy) {
+    return { success: false, error: `Policy ${policyId} not found` };
+  }
+  policy.state = policy.state === "ENABLED" ? "DISABLED" : "ENABLED";
+  policy.dateModified = new Date().toLocaleString();
+  revalidatePath("/ec2/lifecycle-manager");
+  return { success: true, newState: policy.state };
+}
+
+export async function deleteLiveLifecyclePolicy(
+  policyId: string
+): Promise<{ success: boolean; error?: string }> {
+  const idx = IN_MEMORY_LIFECYCLE_POLICIES.findIndex((p) => p.policyId === policyId);
+  if (idx === -1) {
+    return { success: false, error: `Policy ${policyId} not found` };
+  }
+  IN_MEMORY_LIFECYCLE_POLICIES.splice(idx, 1);
+  revalidatePath("/ec2/lifecycle-manager");
+  return { success: true };
+}
+
+// -------------------------------------------------------------
+// Elastic Load Balancing (ELBv2) Actions
+// -------------------------------------------------------------
+
+export interface LoadBalancerModel {
+  arn: string;
+  name: string;
+  dnsName: string;
+  state: string;
+  type: string;
+  scheme: string;
+  vpcId: string;
+  availabilityZones: string[];
+  securityGroups: string[];
+  createdTime?: string;
+  ipAddressType?: string;
+}
+
+export async function fetchLiveLoadBalancers(): Promise<{
+  loadBalancers: LoadBalancerModel[];
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await elbv2.send(new DescribeLoadBalancersCommand({}));
+    const raw = res.LoadBalancers || [];
+    const mapped: LoadBalancerModel[] = raw.map((lb) => ({
+      arn: lb.LoadBalancerArn || "",
+      name: lb.LoadBalancerName || "",
+      dnsName: lb.DNSName || "",
+      state: lb.State?.Code || "active",
+      type: lb.Type || "application",
+      scheme: lb.Scheme || "internet-facing",
+      vpcId: lb.VpcId || "",
+      availabilityZones: (lb.AvailabilityZones || []).map((az) => az.ZoneName || ""),
+      securityGroups: lb.SecurityGroups || [],
+      createdTime: lb.CreatedTime ? new Date(lb.CreatedTime).toLocaleString() : undefined,
+      ipAddressType: lb.IpAddressType || "ipv4",
+    }));
+    return { loadBalancers: mapped, isLive: true };
+  } catch (err: any) {
+    return { loadBalancers: [], isLive: false, error: err.message };
+  }
+}
+
+export async function createLiveLoadBalancer(params: {
+  name: string;
+  type?: "application" | "network" | "gateway";
+  scheme?: "internet-facing" | "internal";
+  subnets: string[];
+  securityGroups?: string[];
+}): Promise<{ success: boolean; loadBalancerArn?: string; error?: string }> {
+  try {
+    const input: any = {
+      Name: params.name,
+      Type: params.type || "application",
+      Scheme: params.scheme || "internet-facing",
+      Subnets: params.subnets,
+    };
+    if (params.securityGroups && params.securityGroups.length > 0) {
+      input.SecurityGroups = params.securityGroups;
+    }
+    const res = await elbv2.send(new CreateLoadBalancerCommand(input));
+    revalidatePath("/ec2/load-balancers");
+    return { success: true, loadBalancerArn: res.LoadBalancers?.[0]?.LoadBalancerArn };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveLoadBalancer(
+  loadBalancerArn: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await elbv2.send(new DeleteLoadBalancerCommand({ LoadBalancerArn: loadBalancerArn }));
+    revalidatePath("/ec2/load-balancers");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Target Groups Actions
+// -------------------------------------------------------------
+
+export interface TargetGroupModel {
+  arn: string;
+  name: string;
+  protocol: string;
+  port: number;
+  targetType: string;
+  vpcId: string;
+  healthCheckProtocol?: string;
+  healthCheckPort?: string;
+  healthCheckPath?: string;
+  healthCheckIntervalSeconds?: number;
+  healthCheckTimeoutSeconds?: number;
+  healthyThresholdCount?: number;
+  unhealthyThresholdCount?: number;
+  loadBalancerArns?: string[];
+}
+
+export async function fetchLiveTargetGroups(): Promise<{
+  targetGroups: TargetGroupModel[];
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await elbv2.send(new DescribeTargetGroupsCommand({}));
+    const raw = res.TargetGroups || [];
+    const mapped: TargetGroupModel[] = raw.map((tg) => ({
+      arn: tg.TargetGroupArn || "",
+      name: tg.TargetGroupName || "",
+      protocol: tg.Protocol || "HTTP",
+      port: tg.Port || 80,
+      targetType: tg.TargetType || "instance",
+      vpcId: tg.VpcId || "",
+      healthCheckProtocol: tg.HealthCheckProtocol || "HTTP",
+      healthCheckPort: tg.HealthCheckPort || "traffic-port",
+      healthCheckPath: tg.HealthCheckPath || "/",
+      healthCheckIntervalSeconds: tg.HealthCheckIntervalSeconds || 30,
+      healthCheckTimeoutSeconds: tg.HealthCheckTimeoutSeconds || 5,
+      healthyThresholdCount: tg.HealthyThresholdCount || 5,
+      unhealthyThresholdCount: tg.UnhealthyThresholdCount || 2,
+      loadBalancerArns: tg.LoadBalancerArns || [],
+    }));
+    return { targetGroups: mapped, isLive: true };
+  } catch (err: any) {
+    return { targetGroups: [], isLive: false, error: err.message };
+  }
+}
+
+export async function createLiveTargetGroup(params: {
+  name: string;
+  protocol?: string;
+  port?: number;
+  vpcId: string;
+  targetType?: string;
+  healthCheckPath?: string;
+}): Promise<{ success: boolean; targetGroupArn?: string; error?: string }> {
+  try {
+    const res = await elbv2.send(
+      new CreateTargetGroupCommand({
+        Name: params.name,
+        Protocol: (params.protocol || "HTTP") as any,
+        Port: params.port || 80,
+        VpcId: params.vpcId,
+        TargetType: (params.targetType || "instance") as any,
+        HealthCheckPath: params.healthCheckPath || "/",
+      })
+    );
+    revalidatePath("/ec2/target-groups");
+    return { success: true, targetGroupArn: res.TargetGroups?.[0]?.TargetGroupArn };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveTargetGroup(
+  targetGroupArn: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await elbv2.send(new DeleteTargetGroupCommand({ TargetGroupArn: targetGroupArn }));
+    revalidatePath("/ec2/target-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Auto Scaling Groups Actions
+// -------------------------------------------------------------
+
+export interface AutoScalingGroupModel {
+  name: string;
+  arn: string;
+  minSize: number;
+  maxSize: number;
+  desiredCapacity: number;
+  defaultCooldown: number;
+  availabilityZones: string[];
+  healthCheckType: string;
+  healthCheckGracePeriod: number;
+  createdTime: string;
+  launchTemplateName?: string;
+  launchTemplateId?: string;
+  launchTemplateVersion?: string;
+  launchConfigurationName?: string;
+  vpcZoneIdentifier?: string;
+  instances: Array<{
+    instanceId: string;
+    availabilityZone: string;
+    lifecycleState: string;
+    healthStatus: string;
+    instanceType?: string;
+  }>;
+  status?: string;
+}
+
+export async function fetchLiveAutoScalingGroups(): Promise<{
+  autoScalingGroups: AutoScalingGroupModel[];
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await autoScaling.send(new DescribeAutoScalingGroupsCommand({}));
+    const raw = res.AutoScalingGroups || [];
+    const mapped: AutoScalingGroupModel[] = raw.map((asg) => ({
+      name: asg.AutoScalingGroupName || "",
+      arn: asg.AutoScalingGroupARN || "",
+      minSize: asg.MinSize ?? 0,
+      maxSize: asg.MaxSize ?? 0,
+      desiredCapacity: asg.DesiredCapacity ?? 0,
+      defaultCooldown: asg.DefaultCooldown ?? 300,
+      availabilityZones: asg.AvailabilityZones || [],
+      healthCheckType: asg.HealthCheckType || "EC2",
+      healthCheckGracePeriod: asg.HealthCheckGracePeriod ?? 0,
+      createdTime: asg.CreatedTime ? new Date(asg.CreatedTime).toLocaleString() : "Just now",
+      launchTemplateName: asg.LaunchTemplate?.LaunchTemplateName,
+      launchTemplateId: asg.LaunchTemplate?.LaunchTemplateId,
+      launchTemplateVersion: asg.LaunchTemplate?.Version || "$Default",
+      launchConfigurationName: asg.LaunchConfigurationName,
+      vpcZoneIdentifier: asg.VPCZoneIdentifier,
+      instances: (asg.Instances || []).map((i) => ({
+        instanceId: i.InstanceId || "",
+        availabilityZone: i.AvailabilityZone || "",
+        lifecycleState: i.LifecycleState || "InService",
+        healthStatus: i.HealthStatus || "Healthy",
+        instanceType: i.InstanceType,
+      })),
+      status: asg.Status || "Active",
+    }));
+    return { autoScalingGroups: mapped, isLive: true };
+  } catch (err: any) {
+    return { autoScalingGroups: [], isLive: false, error: err.message };
+  }
+}
+
+export async function createLiveAutoScalingGroup(params: {
+  name: string;
+  launchTemplateId: string;
+  minSize: number;
+  maxSize: number;
+  desiredCapacity: number;
+  subnetIds?: string[];
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    const input: any = {
+      AutoScalingGroupName: params.name,
+      LaunchTemplate: {
+        LaunchTemplateId: params.launchTemplateId,
+        Version: "$Default",
+      },
+      MinSize: params.minSize,
+      MaxSize: params.maxSize,
+      DesiredCapacity: params.desiredCapacity,
+    };
+    if (params.subnetIds && params.subnetIds.length > 0) {
+      input.VPCZoneIdentifier = params.subnetIds.join(",");
+    }
+    await autoScaling.send(new CreateAutoScalingGroupCommand(input));
+    revalidatePath("/ec2/auto-scaling-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function updateLiveAutoScalingGroup(params: {
+  name: string;
+  minSize?: number;
+  maxSize?: number;
+  desiredCapacity?: number;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    await autoScaling.send(
+      new UpdateAutoScalingGroupCommand({
+        AutoScalingGroupName: params.name,
+        MinSize: params.minSize,
+        MaxSize: params.maxSize,
+        DesiredCapacity: params.desiredCapacity,
+      })
+    );
+    revalidatePath("/ec2/auto-scaling-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveAutoScalingGroup(
+  name: string,
+  forceDelete: boolean = true
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await autoScaling.send(
+      new DeleteAutoScalingGroupCommand({
+        AutoScalingGroupName: name,
+        ForceDelete: forceDelete,
+      })
+    );
+    revalidatePath("/ec2/auto-scaling-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Launch Configurations Actions
+// -------------------------------------------------------------
+
+export interface LaunchConfigurationModel {
+  name: string;
+  arn: string;
+  imageId: string;
+  instanceType: string;
+  createdTime: string;
+  keyName?: string;
+  securityGroups?: string[];
+}
+
+export async function fetchLiveLaunchConfigurations(): Promise<{
+  launchConfigurations: LaunchConfigurationModel[];
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await autoScaling.send(new DescribeLaunchConfigurationsCommand({}));
+    const raw = res.LaunchConfigurations || [];
+    const mapped: LaunchConfigurationModel[] = raw.map((lc) => ({
+      name: lc.LaunchConfigurationName || "",
+      arn: lc.LaunchConfigurationARN || "",
+      imageId: lc.ImageId || "",
+      instanceType: lc.InstanceType || "t3.micro",
+      createdTime: lc.CreatedTime ? new Date(lc.CreatedTime).toLocaleString() : "Just now",
+      keyName: lc.KeyName,
+      securityGroups: lc.SecurityGroups || [],
+    }));
+    return { launchConfigurations: mapped, isLive: true };
+  } catch (err: any) {
+    return { launchConfigurations: [], isLive: false, error: err.message };
+  }
+}
+
+export async function deleteLiveLaunchConfiguration(
+  name: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await autoScaling.send(
+      new DeleteLaunchConfigurationCommand({
+        LaunchConfigurationName: name,
+      })
+    );
+    revalidatePath("/ec2/launch-configurations");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+

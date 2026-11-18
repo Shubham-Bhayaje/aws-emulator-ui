@@ -13,7 +13,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { DEFAULT_INSTANCES, EC2Instance } from "@/lib/ec2-data";
+import { EC2Instance } from "@/lib/ec2-data";
 import EC2TerminalModal from "./EC2TerminalModal";
 import {
   fetchLiveEC2Instances,
@@ -30,7 +30,7 @@ interface InstancesClientProps {
 }
 
 export default function InstancesClient({
-  initialInstances = DEFAULT_INSTANCES,
+  initialInstances = [],
   isLive = true,
   liveError,
 }: InstancesClientProps) {
@@ -214,7 +214,8 @@ export default function InstancesClient({
           <button
             onClick={refreshInstances}
             disabled={isPending}
-            className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-normal transition-colors flex items-center gap-1.5 disabled:opacity-50"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="px-3 border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] text-[13px] font-bold whitespace-nowrap inline-flex items-center justify-center transition-colors gap-1.5 disabled:opacity-50"
             title="Refresh from AWS Emulator"
           >
             <svg
@@ -235,7 +236,8 @@ export default function InstancesClient({
           <button
             onClick={() => setShowConnectModal(true)}
             disabled={!selectedInstance || selectedInstance.state !== "running"}
-            className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-normal disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="px-3 border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] text-[13px] font-bold whitespace-nowrap inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Connect
           </button>
@@ -245,7 +247,8 @@ export default function InstancesClient({
             <button
               onClick={() => setShowStateMenu(!showStateMenu)}
               disabled={!selectedInstance}
-              className="px-3 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-normal disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1"
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="px-3 border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] text-[13px] font-bold whitespace-nowrap inline-flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed transition-colors gap-1"
             >
               Instance state
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -296,7 +299,8 @@ export default function InstancesClient({
           {/* Launch instance button */}
           <Link
             href="/ec2/launch"
-            className="px-4 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="px-4 bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] text-[13px] font-bold whitespace-nowrap inline-flex items-center justify-center transition-colors"
           >
             Launch instances
           </Link>
@@ -726,7 +730,8 @@ export default function InstancesClient({
                 <div className="pt-2 flex justify-end gap-2">
                   <button
                     onClick={() => setShowConnectModal(false)}
-                    className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px] text-[#16191f] hover:bg-[#f2f3f3]"
+                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                    className="px-4 border border-[#545b64] rounded-sm text-[13px] font-bold text-[#16191f] hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
                   >
                     Cancel
                   </button>
@@ -735,7 +740,8 @@ export default function InstancesClient({
                       setShowConnectModal(false);
                       setShowTerminalModal(true);
                     }}
-                    className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07]"
+                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                    className="px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors"
                   >
                     Start session
                   </button>
@@ -759,13 +765,15 @@ export default function InstancesClient({
             <div className="pt-2 flex justify-end gap-2">
               <button
                 onClick={() => setShowTerminateModal(false)}
-                className="px-4 py-1.5 border border-[#545b64] rounded-sm text-[13px] text-[#16191f] hover:bg-[#f2f3f3]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 border border-[#545b64] rounded-sm text-[13px] font-bold text-[#16191f] hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleTerminateInstance}
-                className="px-4 py-1.5 bg-[#d13212] text-white rounded-sm text-[13px] font-medium hover:bg-[#b0280e]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 bg-[#d13212] text-white rounded-sm text-[13px] font-bold hover:bg-[#b0280e] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Terminate
               </button>

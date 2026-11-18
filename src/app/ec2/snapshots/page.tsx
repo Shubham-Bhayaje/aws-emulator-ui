@@ -12,18 +12,20 @@ export const dynamic = "force-dynamic";
 
 export default async function SnapshotsPage() {
   const [snapRes, volRes] = await Promise.all([
-    fetchLiveSnapshots(),
+    fetchLiveSnapshots("self"),
     fetchLiveVolumes(),
   ]);
 
-  const volumeIds = volRes.volumes.map((v) => v.id);
+  const volumes = volRes?.volumes || [];
+  const volumeIds = volumes.map((v) => v.id);
 
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
       <SnapshotsClient
-        initialSnapshots={snapRes.snapshots}
+        initialSnapshots={snapRes?.snapshots || []}
+        volumes={volumes}
         availableVolumeIds={volumeIds}
-        isLive={snapRes.isLive}
+        isLive={Boolean(snapRes?.isLive)}
       />
     </ServiceLayout>
   );

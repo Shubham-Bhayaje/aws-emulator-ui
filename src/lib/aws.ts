@@ -19,6 +19,8 @@ import { IAMClient } from "@aws-sdk/client-iam";
 import { STSClient } from "@aws-sdk/client-sts";
 import { EC2Client } from "@aws-sdk/client-ec2";
 import { LambdaClient } from "@aws-sdk/client-lambda";
+import { ElasticLoadBalancingV2Client } from "@aws-sdk/client-elastic-load-balancing-v2";
+import { AutoScalingClient } from "@aws-sdk/client-auto-scaling";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -26,6 +28,18 @@ const DEFAULT_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION 
 
 // --- EC2 ---
 export const ec2 = new EC2Client({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- ELB v2 (Elastic Load Balancing) ---
+export const elbv2 = new ElasticLoadBalancingV2Client({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- Auto Scaling ---
+export const autoScaling = new AutoScalingClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });
