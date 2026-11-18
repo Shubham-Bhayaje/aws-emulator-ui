@@ -27,6 +27,10 @@ import {
   DescribeAddressesCommand,
   AllocateAddressCommand,
   ReleaseAddressCommand,
+  DescribeVolumesCommand,
+  CreateVolumeCommand,
+  DeleteVolumeCommand,
+  DescribeNetworkInterfacesCommand,
 } from "@aws-sdk/client-ec2";
 import { revalidatePath } from "next/cache";
 import {
@@ -649,5 +653,167 @@ export async function releaseLiveElasticIp(allocationId: string): Promise<{ succ
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// EBS Volumes: Real Emulator Actions
+// -------------------------------------------------------------
+
+export interface EBSVolume {
+  id: string;
+  sizeGb: number;
+  volumeType: string;
+  iops?: number;
+  snapshotId?: string;
+  availabilityZone: string;
+  state: string;
+  createTime: string;
+  attachmentInstanceId?: string;
+  attachmentDevice?: string;
+  encrypted: boolean;
+}
+
+export async function fetchLiveVolumes(): Promise<{ volumes: EBSVolume[]; isLive: boolean; error?: string }> {
+  try {
+    const res = await ec2.send(new DescribeVolumesCommand({}));
+    const rawList = res.Volumes || [];
+    const mapped: EBSVolume[] = rawList.map((v) => ({
+      id: v.VolumeId || "vol-unknown",
+      sizeGb: v.Size || 20,
+      volumeType: v.VolumeType || "gp3",
+      iops: v.Iops || 3000,
+      snapshotId: v.SnapshotId || "—",
+      availabilityZone: v.AvailabilityZone || "us-east-1a",
+      state: v.State || "available",
+      createTime: v.CreateTime ? new Date(v.CreateTime).toLocaleString() : new Date().toLocaleString(),
+      attachmentInstanceId: v.Attachments?.[0]?.InstanceId,
+      attachmentDevice: v.Attachments?.[0]?.Device,
+      encrypted: Boolean(v.Encrypted),
+    }));
+
+    return { volumes: mapped, isLive: true };
+  } catch (err: any) {
+    console.warn("[EC2 Action] Failed to fetch live volumes:", err.message);
+    return {
+      volumes: [
+        {
+          id: "vol-0000000000000008e",
+          sizeGb: 20,
+          volumeType: "gp3",
+          iops: 3000,
+          snapshotId: "—",
+          availabilityZone: "us-east-1a",
+          state: "in-use",
+          createTime: new Date().toLocaleString(),
+          attachmentInstanceId: "i-00000000000000001",
+          attachmentDevice: "/dev/xvda",
+          encrypted: false,
+        },
+      ],
+      isLive: false,
+      error: err.message,
+    };
+  }
+}
+
+export async function createLiveVolume(params: {
+  sizeGb: number;
+  availabilityZone: string;
+  volumeType?: string;
+}): Promise<{ success: boolean; volume?: EBSVolume; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new CreateVolumeCommand({
+        Size: params.sizeGb || 20,
+        AvailabilityZone: params.availabilityZone || "us-east-1a",
+        VolumeType: (params.volumeType as any) || "gp3",
+      })
+    );
+
+    revalidatePath("/ec2/volumes");
+    return {
+      success: true,
+      volume: {
+        id: res.VolumeId || "vol-new",
+        sizeGb: res.Size || params.sizeGb,
+        volumeType: res.VolumeType || "gp3",
+        availabilityZone: res.AvailabilityZone || params.availabilityZone,
+        state: res.State || "creating",
+        createTime: new Date().toLocaleString(),
+        encrypted: Boolean(res.Encrypted),
+      },
+    };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveVolume(volumeId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new DeleteVolumeCommand({ VolumeId: volumeId }));
+    revalidatePath("/ec2/volumes");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Network Interfaces: Real Emulator Actions
+// -------------------------------------------------------------
+
+export interface NetworkInterfaceModel {
+  id: string;
+  subnetId: string;
+  vpcId: string;
+  status: string;
+  privateIp: string;
+  publicIp?: string;
+  macAddress: string;
+  instanceId?: string;
+  description?: string;
+}
+
+export async function fetchLiveNetworkInterfaces(): Promise<{
+  interfaces: NetworkInterfaceModel[];
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeNetworkInterfacesCommand({}));
+    const rawList = res.NetworkInterfaces || [];
+    const mapped: NetworkInterfaceModel[] = rawList.map((eni) => ({
+      id: eni.NetworkInterfaceId || "eni-unknown",
+      subnetId: eni.SubnetId || "",
+      vpcId: eni.VpcId || "",
+      status: eni.Status || "in-use",
+      privateIp: eni.PrivateIpAddress || "—",
+      publicIp: eni.Association?.PublicIp,
+      macAddress: eni.MacAddress || "—",
+      instanceId: eni.Attachment?.InstanceId,
+      description: eni.Description || "Primary network interface",
+    }));
+
+    return { interfaces: mapped, isLive: true };
+  } catch (err: any) {
+    console.warn("[EC2 Action] Failed to fetch live ENIs:", err.message);
+    return {
+      interfaces: [
+        {
+          id: "eni-00000000000000090",
+          subnetId: "subnet-00000000000000007",
+          vpcId: "vpc-00000000000000001",
+          status: "in-use",
+          privateIp: "172.31.8.4",
+          publicIp: "54.0.0.2",
+          macAddress: "02:00:00:00:00:90",
+          instanceId: "i-00000000000000001",
+          description: "Primary network interface",
+        },
+      ],
+      isLive: false,
+      error: err.message,
+    };
   }
 }

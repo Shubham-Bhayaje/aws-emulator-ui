@@ -37,6 +37,7 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/lambda",
     "category": "Compute",
     "color": "#FF9900",
+    "status": "functional",
     "desc": "Run code without thinking about servers or clusters"
   },
   {
