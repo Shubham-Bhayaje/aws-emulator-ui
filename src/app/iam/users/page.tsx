@@ -1,6 +1,6 @@
 /**
  * IAM Users list page – Server component.
- * Lists all users with attached policy counts.
+ * Lists all users with attached policy counts and checks active identity permissions.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
@@ -11,10 +11,13 @@ import {
 } from "@aws-sdk/client-iam";
 import { UserActions, UserSummary } from "./UserActions";
 import { iamNav } from "../page";
+import { getActiveIdentity } from "@/lib/identity";
+import { evaluatePermissions } from "@/lib/permissions";
 
 export default async function IAMUsersPage() {
   let users: UserSummary[] = [];
   let error: string | null = null;
+  const identity = await getActiveIdentity();
 
   try {
     const res = await iam.send(new ListUsersCommand({}));
@@ -46,6 +49,9 @@ export default async function IAMUsersPage() {
     error = err instanceof Error ? err.message : String(err);
   }
 
+  const canCreateUser = evaluatePermissions(identity, "iam:CreateUser").allowed;
+  const canDeleteUser = evaluatePermissions(identity, "iam:DeleteUser").allowed;
+
   return (
     <ServiceLayout serviceName="IAM" serviceColor="#BD0816" navItems={iamNav}>
       <div>
@@ -60,7 +66,13 @@ export default async function IAMUsersPage() {
             Error: {error}
           </div>
         ) : (
-          <UserActions users={users} />
+          <UserActions
+            users={users}
+            canCreateUser={canCreateUser}
+            canDeleteUser={canDeleteUser}
+            activeIdentityName={identity.name}
+            activeIdentityType={identity.type}
+          />
         )}
       </div>
     </ServiceLayout>

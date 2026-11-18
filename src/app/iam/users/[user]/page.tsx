@@ -1,6 +1,6 @@
 /**
  * IAM User detail page – Server component.
- * Loads user details and attached policies.
+ * Loads user details, attached policies, and evaluates active identity permissions.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
@@ -12,6 +12,8 @@ import {
 } from "@aws-sdk/client-iam";
 import { UserDetail, UserDetailMeta } from "./UserDetail";
 import { iamNav } from "../../page";
+import { getActiveIdentity } from "@/lib/identity";
+import { evaluatePermissions } from "@/lib/permissions";
 
 interface PageProps {
   params: Promise<{ user: string }>;
@@ -24,6 +26,7 @@ export default async function UserDetailPage({ params }: PageProps) {
   let userMeta: UserDetailMeta | null = null;
   let allPolicies: { name: string; arn: string }[] = [];
   let error: string | null = null;
+  const identity = await getActiveIdentity();
 
   try {
     const userRes = await iam.send(new GetUserCommand({ UserName: userName }));
@@ -63,6 +66,10 @@ export default async function UserDetailPage({ params }: PageProps) {
     error = err instanceof Error ? err.message : String(err);
   }
 
+  const userArn = userMeta?.arn ?? `arn:aws:iam::${identity.accountId}:user/${userName}`;
+  const canAttachPolicy = evaluatePermissions(identity, "iam:AttachUserPolicy", userArn).allowed;
+  const canDetachPolicy = evaluatePermissions(identity, "iam:DetachUserPolicy", userArn).allowed;
+
   return (
     <ServiceLayout serviceName="IAM" serviceColor="#BD0816" navItems={iamNav}>
       {error ? (
@@ -70,7 +77,14 @@ export default async function UserDetailPage({ params }: PageProps) {
           Error: {error}
         </div>
       ) : userMeta ? (
-        <UserDetail user={userMeta} allPolicies={allPolicies} />
+        <UserDetail
+          user={userMeta}
+          allPolicies={allPolicies}
+          canAttachPolicy={canAttachPolicy}
+          canDetachPolicy={canDetachPolicy}
+          activeIdentityName={identity.name}
+          activeIdentityType={identity.type}
+        />
       ) : (
         <div className="text-[13px] text-[#545b64]">User not found.</div>
       )}

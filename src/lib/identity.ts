@@ -13,9 +13,13 @@ import {
   ListUsersCommand,
   ListRolesCommand,
   ListAttachedUserPoliciesCommand,
+  ListUserPoliciesCommand,
+  GetUserPolicyCommand,
   GetPolicyCommand,
   GetPolicyVersionCommand,
   ListAttachedRolePoliciesCommand,
+  ListRolePoliciesCommand,
+  GetRolePolicyCommand,
 } from "@aws-sdk/client-iam";
 import { ActiveIdentity, PolicyDocument } from "./permissions";
 
@@ -37,27 +41,68 @@ const DEFAULT_ADMIN: ActiveIdentity = {
 };
 
 /**
- * Returns the currently active identity from cookies, defaulting to Administrator.
+ * Helper to safely parse policy document whether raw JSON string, URL-encoded string, or object.
+ */
+function parsePolicyDocument(docRaw: unknown): PolicyDocument | undefined {
+  if (!docRaw) return undefined;
+  if (typeof docRaw === "object") return docRaw as PolicyDocument;
+  if (typeof docRaw === "string") {
+    try {
+      return JSON.parse(decodeURIComponent(docRaw)) as PolicyDocument;
+    } catch {
+      try {
+        return JSON.parse(docRaw) as PolicyDocument;
+      } catch {
+        return undefined;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Returns the currently active identity, always retrieving live policy documents
+ * from the emulator so permission changes take effect immediately.
  */
 export async function getActiveIdentity(): Promise<ActiveIdentity> {
   try {
     const cookieStore = await cookies();
     const raw = cookieStore.get(COOKIE_NAME)?.value;
     if (!raw) return DEFAULT_ADMIN;
-    return JSON.parse(raw) as ActiveIdentity;
+    const parsed = JSON.parse(raw) as ActiveIdentity;
+    if (parsed.type === "admin" || parsed.name === "emulator") {
+      return DEFAULT_ADMIN;
+    }
+
+    // Always fetch live policy documents for the active user or role
+    let freshPolicies: { name: string; document?: PolicyDocument }[] = [];
+    if (parsed.type === "user") {
+      freshPolicies = await fetchUserPolicyDocuments(parsed.name);
+    } else if (parsed.type === "role") {
+      freshPolicies = await fetchRolePolicyDocuments(parsed.name);
+    }
+
+    return {
+      type: parsed.type,
+      name: parsed.name,
+      accountId: parsed.accountId || "000000000000",
+      policies: freshPolicies,
+    };
   } catch {
     return DEFAULT_ADMIN;
   }
 }
 
 /**
- * Loads all policy documents for a given IAM User.
+ * Loads all policy documents for a given IAM User (attached managed + inline policies).
  */
 async function fetchUserPolicyDocuments(userName: string): Promise<{ name: string; document?: PolicyDocument }[]> {
   try {
+    const results: { name: string; document?: PolicyDocument }[] = [];
+
+    // 1. Attached managed policies
     const attachedRes = await iam.send(new ListAttachedUserPoliciesCommand({ UserName: userName }));
     const attached = attachedRes.AttachedPolicies || [];
-    const results: { name: string; document?: PolicyDocument }[] = [];
 
     for (const p of attached) {
       if (!p.PolicyArn) continue;
@@ -69,15 +114,28 @@ async function fetchUserPolicyDocuments(userName: string): Promise<{ name: strin
         const verRes = await iam.send(
           new GetPolicyVersionCommand({ PolicyArn: p.PolicyArn, VersionId: defaultVerId })
         );
-        const docStr = verRes.PolicyVersion?.Document;
-        if (docStr) {
-          const parsed = JSON.parse(decodeURIComponent(docStr)) as PolicyDocument;
+        const parsed = parsePolicyDocument(verRes.PolicyVersion?.Document);
+        if (parsed) {
           results.push({ name: p.PolicyName || p.PolicyArn, document: parsed });
         }
       } catch (err) {
         console.warn(`Failed to load policy document for ${p.PolicyArn}:`, err);
       }
     }
+
+    // 2. Inline user policies
+    try {
+      const inlineRes = await iam.send(new ListUserPoliciesCommand({ UserName: userName }));
+      for (const polName of inlineRes.PolicyNames || []) {
+        try {
+          const polRes = await iam.send(new GetUserPolicyCommand({ UserName: userName, PolicyName: polName }));
+          const parsed = parsePolicyDocument(polRes.PolicyDocument);
+          if (parsed) {
+            results.push({ name: polName, document: parsed });
+          }
+        } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
 
     return results;
   } catch (e) {
@@ -87,13 +145,15 @@ async function fetchUserPolicyDocuments(userName: string): Promise<{ name: strin
 }
 
 /**
- * Loads all policy documents for a given IAM Role.
+ * Loads all policy documents for a given IAM Role (attached managed + inline policies).
  */
 async function fetchRolePolicyDocuments(roleName: string): Promise<{ name: string; document?: PolicyDocument }[]> {
   try {
+    const results: { name: string; document?: PolicyDocument }[] = [];
+
+    // 1. Attached managed policies
     const attachedRes = await iam.send(new ListAttachedRolePoliciesCommand({ RoleName: roleName }));
     const attached = attachedRes.AttachedPolicies || [];
-    const results: { name: string; document?: PolicyDocument }[] = [];
 
     for (const p of attached) {
       if (!p.PolicyArn) continue;
@@ -105,15 +165,28 @@ async function fetchRolePolicyDocuments(roleName: string): Promise<{ name: strin
         const verRes = await iam.send(
           new GetPolicyVersionCommand({ PolicyArn: p.PolicyArn, VersionId: defaultVerId })
         );
-        const docStr = verRes.PolicyVersion?.Document;
-        if (docStr) {
-          const parsed = JSON.parse(decodeURIComponent(docStr)) as PolicyDocument;
+        const parsed = parsePolicyDocument(verRes.PolicyVersion?.Document);
+        if (parsed) {
           results.push({ name: p.PolicyName || p.PolicyArn, document: parsed });
         }
       } catch (err) {
         console.warn(`Failed to load policy document for ${p.PolicyArn}:`, err);
       }
     }
+
+    // 2. Inline role policies
+    try {
+      const inlineRes = await iam.send(new ListRolePoliciesCommand({ RoleName: roleName }));
+      for (const polName of inlineRes.PolicyNames || []) {
+        try {
+          const polRes = await iam.send(new GetRolePolicyCommand({ RoleName: roleName, PolicyName: polName }));
+          const parsed = parsePolicyDocument(polRes.PolicyDocument);
+          if (parsed) {
+            results.push({ name: polName, document: parsed });
+          }
+        } catch { /* ignore */ }
+      }
+    } catch { /* ignore */ }
 
     return results;
   } catch (e) {
@@ -129,13 +202,21 @@ export async function switchIdentityAction(type: "admin" | "user" | "role", name
   const cookieStore = await cookies();
 
   if (type === "admin" || name === "emulator") {
-    cookieStore.set(COOKIE_NAME, JSON.stringify(DEFAULT_ADMIN), {
-      path: "/",
-      maxAge: 60 * 60 * 24 * 30, // 30 days
-      sameSite: "lax",
-    });
+    cookieStore.delete(COOKIE_NAME);
     return DEFAULT_ADMIN;
   }
+
+  const identityPayload = {
+    type,
+    name,
+    accountId: "000000000000",
+  };
+
+  cookieStore.set(COOKIE_NAME, JSON.stringify(identityPayload), {
+    path: "/",
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+    sameSite: "lax",
+  });
 
   let policies: { name: string; document?: PolicyDocument }[] = [];
   if (type === "user") {
@@ -144,20 +225,10 @@ export async function switchIdentityAction(type: "admin" | "user" | "role", name
     policies = await fetchRolePolicyDocuments(name);
   }
 
-  const identity: ActiveIdentity = {
-    type,
-    name,
-    accountId: "000000000000",
+  return {
+    ...identityPayload,
     policies,
   };
-
-  cookieStore.set(COOKIE_NAME, JSON.stringify(identity), {
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
-    sameSite: "lax",
-  });
-
-  return identity;
 }
 
 /**

@@ -56,10 +56,11 @@ export function evaluatePermissions(
   }
 
   const policies = identity.policies || [];
+  const principalType = identity.type === "role" ? "role" : "user";
   if (policies.length === 0) {
     return {
       allowed: false,
-      reason: `User arn:aws:iam::${identity.accountId}:user/${identity.name} has no attached policies (Implicit Deny).`,
+      reason: `User arn:aws:iam::${identity.accountId}:${principalType}/${identity.name} has no attached policies (Implicit Deny).`,
     };
   }
 
@@ -72,15 +73,26 @@ export function evaluatePermissions(
       : [pol.document.Statement];
 
     for (const stmt of statements) {
-      const actions = Array.isArray(stmt.Action) ? stmt.Action : [stmt.Action];
+      const actions = Array.isArray(stmt.Action) ? stmt.Action : stmt.Action ? [stmt.Action] : [];
       const resources = stmt.Resource
         ? Array.isArray(stmt.Resource)
           ? stmt.Resource
           : [stmt.Resource]
         : ["*"];
 
-      const actionMatches = actions.some((actPattern) => matchesWildcard(actPattern, action));
-      const resourceMatches = resources.some((resPattern) => matchesWildcard(resPattern, resource));
+      let actionMatches = actions.some((actPattern) => matchesWildcard(actPattern, action));
+      if (!actionMatches && (stmt as any).NotAction) {
+        const notActions = Array.isArray((stmt as any).NotAction) ? (stmt as any).NotAction : [(stmt as any).NotAction];
+        const notMatches = notActions.some((pat: string) => matchesWildcard(pat, action));
+        if (!notMatches) actionMatches = true;
+      }
+
+      let resourceMatches = resources.some((resPattern) => matchesWildcard(resPattern, resource));
+      if (!resourceMatches && (stmt as any).NotResource) {
+        const notResources = Array.isArray((stmt as any).NotResource) ? (stmt as any).NotResource : [(stmt as any).NotResource];
+        const notMatches = notResources.some((pat: string) => matchesWildcard(pat, resource));
+        if (!notMatches) resourceMatches = true;
+      }
 
       if (actionMatches && resourceMatches) {
         // Explicit Deny always wins
@@ -103,7 +115,7 @@ export function evaluatePermissions(
 
   return {
     allowed: false,
-    reason: `User arn:aws:iam::${identity.accountId}:user/${identity.name} is not authorized to perform: ${action} on resource: ${resource} (no matching Allow statement).`,
+    reason: `User arn:aws:iam::${identity.accountId}:${principalType}/${identity.name} is not authorized to perform: ${action} on resource: ${resource} (no matching Allow statement).`,
   };
 }
 

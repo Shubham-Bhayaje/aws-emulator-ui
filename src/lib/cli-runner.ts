@@ -2,8 +2,7 @@
  * lib/cli-runner.ts – Server Action to execute CLI commands against the local AWS Emulator
  *
  * Automatically wires emulator credentials, TLS ca.pem, and environment variables.
- * Supports executing via native `aws` CLI, with an intelligent AWS SDK v3 fallback
- * so commands always work out-of-the-box.
+ * Enforces active identity permissions so read-only users or limited roles are restricted.
  */
 
 "use server";
@@ -18,6 +17,8 @@ import { ListQueuesCommand } from "@aws-sdk/client-sqs";
 import { ListTablesCommand } from "@aws-sdk/client-dynamodb";
 import { ListUsersCommand, ListRolesCommand } from "@aws-sdk/client-iam";
 import { GetCallerIdentityCommand } from "@aws-sdk/client-sts";
+import { getActiveIdentity } from "./identity";
+import { evaluatePermissions, ActiveIdentity } from "./permissions";
 
 export type CliResult = {
   command: string;
@@ -61,11 +62,22 @@ function getEmulatorConfig() {
 /**
  * Fallback command handler using AWS SDK v3 when aws CLI is not installed or errors
  */
-async function fallbackSdkExecution(cmd: string): Promise<string | null> {
+async function fallbackSdkExecution(cmd: string, identity: ActiveIdentity): Promise<string | null> {
   const lower = cmd.trim().toLowerCase();
 
   // STS caller identity
   if (lower.includes("sts get-caller-identity")) {
+    if (identity.type !== "admin" && identity.name !== "emulator") {
+      return JSON.stringify(
+        {
+          UserId: `AIDA${identity.name.toUpperCase()}MOCK`,
+          Account: identity.accountId || "000000000000",
+          Arn: `arn:aws:iam::${identity.accountId || "000000000000"}:${identity.type === "role" ? "role" : "user"}/${identity.name}`,
+        },
+        null,
+        2
+      );
+    }
     const res = await sts.send(new GetCallerIdentityCommand({}));
     return JSON.stringify(
       {
@@ -131,6 +143,102 @@ async function fallbackSdkExecution(cmd: string): Promise<string | null> {
 }
 
 /**
+ * Checks if active identity is authorized for an AWS CLI command.
+ */
+function checkCliPermissions(cmd: string, identity: ActiveIdentity): { allowed: boolean; errorMsg?: string } {
+  if (identity.type === "admin" || identity.name === "emulator") {
+    return { allowed: true };
+  }
+
+  const lower = cmd.trim().toLowerCase();
+  const principalArn = `arn:aws:iam::${identity.accountId}:${identity.type === "role" ? "role" : "user"}/${identity.name}`;
+
+  let requiredAction: string | null = null;
+  let resource: string = "*";
+  let opName = "Unknown";
+
+  if (lower.includes("s3 mb") || lower.includes("s3api create-bucket")) {
+    requiredAction = "s3:CreateBucket";
+    opName = "CreateBucket";
+  } else if (lower.includes("s3 rb") || lower.includes("s3api delete-bucket")) {
+    requiredAction = "s3:DeleteBucket";
+    opName = "DeleteBucket";
+  } else if (lower.includes("s3 cp") || lower.includes("s3 sync") || lower.includes("s3api put-object")) {
+    requiredAction = "s3:PutObject";
+    opName = "PutObject";
+  } else if (lower.includes("s3 rm") || lower.includes("s3api delete-object")) {
+    requiredAction = "s3:DeleteObject";
+    opName = "DeleteObject";
+  } else if (lower.includes("s3 ls") || lower.includes("s3api list-buckets")) {
+    requiredAction = "s3:ListAllMyBuckets";
+    opName = "ListBuckets";
+  } else if (lower.includes("sqs create-queue")) {
+    requiredAction = "sqs:CreateQueue";
+    opName = "CreateQueue";
+  } else if (lower.includes("sqs delete-queue")) {
+    requiredAction = "sqs:DeleteQueue";
+    opName = "DeleteQueue";
+  } else if (lower.includes("sqs send-message")) {
+    requiredAction = "sqs:SendMessage";
+    opName = "SendMessage";
+  } else if (lower.includes("sqs list-queues")) {
+    requiredAction = "sqs:ListQueues";
+    opName = "ListQueues";
+  } else if (lower.includes("dynamodb create-table")) {
+    requiredAction = "dynamodb:CreateTable";
+    opName = "CreateTable";
+  } else if (lower.includes("dynamodb delete-table")) {
+    requiredAction = "dynamodb:DeleteTable";
+    opName = "DeleteTable";
+  } else if (lower.includes("dynamodb list-tables")) {
+    requiredAction = "dynamodb:ListTables";
+    opName = "ListTables";
+  } else if (lower.includes("iam create-user")) {
+    requiredAction = "iam:CreateUser";
+    opName = "CreateUser";
+  } else if (lower.includes("iam delete-user")) {
+    requiredAction = "iam:DeleteUser";
+    opName = "DeleteUser";
+  } else if (lower.includes("iam attach-user-policy")) {
+    requiredAction = "iam:AttachUserPolicy";
+    opName = "AttachUserPolicy";
+  } else if (lower.includes("iam detach-user-policy")) {
+    requiredAction = "iam:DetachUserPolicy";
+    opName = "DetachUserPolicy";
+  } else if (lower.includes("iam create-role")) {
+    requiredAction = "iam:CreateRole";
+    opName = "CreateRole";
+  } else if (lower.includes("iam delete-role")) {
+    requiredAction = "iam:DeleteRole";
+    opName = "DeleteRole";
+  } else if (lower.includes("iam attach-role-policy")) {
+    requiredAction = "iam:AttachRolePolicy";
+    opName = "AttachRolePolicy";
+  } else if (lower.includes("iam detach-role-policy")) {
+    requiredAction = "iam:DetachRolePolicy";
+    opName = "DetachRolePolicy";
+  } else if (lower.includes("iam list-users")) {
+    requiredAction = "iam:ListUsers";
+    opName = "ListUsers";
+  } else if (lower.includes("iam list-roles")) {
+    requiredAction = "iam:ListRoles";
+    opName = "ListRoles";
+  }
+
+  if (requiredAction) {
+    const evalRes = evaluatePermissions(identity, requiredAction, resource);
+    if (!evalRes.allowed) {
+      return {
+        allowed: false,
+        errorMsg: `An error occurred (AccessDenied) when calling the ${opName} operation: User: ${principalArn} is not authorized to perform: ${requiredAction} on resource: ${resource} with an explicit/implicit deny.`,
+      };
+    }
+  }
+
+  return { allowed: true };
+}
+
+/**
  * Executes a CloudShell terminal command against the local AWS Emulator.
  */
 export async function executeTerminalCommand(input: string): Promise<CliResult> {
@@ -165,6 +273,8 @@ Available commands:
     };
   }
 
+  const identity = await getActiveIdentity();
+
   // Normalize command if user omitted 'aws'
   let normalizedCmd = raw;
   if (!normalizedCmd.startsWith("aws ") && !normalizedCmd.startsWith("aws.exe ")) {
@@ -177,6 +287,36 @@ Available commands:
     ) {
       normalizedCmd = `aws ${normalizedCmd}`;
     }
+  }
+
+  // Intercept sts get-caller-identity when switched to non-admin identity
+  if (normalizedCmd.includes("sts get-caller-identity") && identity.type !== "admin" && identity.name !== "emulator") {
+    const callerIdJson = JSON.stringify(
+      {
+        UserId: `AIDA${identity.name.toUpperCase()}MOCK`,
+        Account: identity.accountId || "000000000000",
+        Arn: `arn:aws:iam::${identity.accountId || "000000000000"}:${identity.type === "role" ? "role" : "user"}/${identity.name}`,
+      },
+      null,
+      2
+    );
+    return {
+      command: raw,
+      output: callerIdJson,
+      exitCode: 0,
+      durationMs: Date.now() - startTime,
+    };
+  }
+
+  // Permission boundary check
+  const permCheck = checkCliPermissions(normalizedCmd, identity);
+  if (!permCheck.allowed) {
+    return {
+      command: raw,
+      output: permCheck.errorMsg || "An error occurred (AccessDenied): Action denied by IAM policy.",
+      exitCode: 254,
+      durationMs: Date.now() - startTime,
+    };
   }
 
   const { caCert, credentialsFile, configFile } = getEmulatorConfig();
@@ -213,22 +353,29 @@ Available commands:
 
         // If native CLI had an issue, attempt SDK fallback
         try {
-          const fallbackOutput = await fallbackSdkExecution(raw);
+          const fallbackOutput = await fallbackSdkExecution(raw, identity);
           if (fallbackOutput !== null) {
             resolve({
               command: raw,
               output: fallbackOutput,
               exitCode: 0,
-              durationMs: Date.now() - startTime,
+              durationMs,
             });
             return;
           }
-        } catch { /* fallback failed */ }
+        } catch (fallbackErr: any) {
+          resolve({
+            command: raw,
+            output: fallbackErr.message || String(fallbackErr),
+            exitCode: 1,
+            durationMs,
+          });
+          return;
+        }
 
-        const errorOutput = stderr.trim() || stdout.trim() || error.message;
         resolve({
           command: raw,
-          output: errorOutput,
+          output: (stderr.trim() || stdout.trim() || error.message).trim(),
           exitCode: error.code || 1,
           durationMs,
         });

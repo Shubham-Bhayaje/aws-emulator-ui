@@ -1,6 +1,6 @@
 /**
  * IAM Roles list page – Server component.
- * Lists all IAM roles with their trusted entities.
+ * Lists all IAM roles with their trusted entities and checks active identity permissions.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
@@ -8,6 +8,8 @@ import { iam } from "@/lib/aws";
 import { ListRolesCommand } from "@aws-sdk/client-iam";
 import { RoleActions, RoleSummary } from "./RoleActions";
 import { iamNav } from "../page";
+import { getActiveIdentity } from "@/lib/identity";
+import { evaluatePermissions } from "@/lib/permissions";
 
 function extractTrustedEntity(docStr?: string): string {
   if (!docStr) return "AWS Service";
@@ -31,6 +33,7 @@ function extractTrustedEntity(docStr?: string): string {
 export default async function IAMRolesPage() {
   let roles: RoleSummary[] = [];
   let error: string | null = null;
+  const identity = await getActiveIdentity();
 
   try {
     const res = await iam.send(new ListRolesCommand({}));
@@ -48,6 +51,9 @@ export default async function IAMRolesPage() {
     error = err instanceof Error ? err.message : String(err);
   }
 
+  const canCreateRole = evaluatePermissions(identity, "iam:CreateRole").allowed;
+  const canDeleteRole = evaluatePermissions(identity, "iam:DeleteRole").allowed;
+
   return (
     <ServiceLayout serviceName="IAM" serviceColor="#BD0816" navItems={iamNav}>
       <div>
@@ -62,7 +68,13 @@ export default async function IAMRolesPage() {
             Error: {error}
           </div>
         ) : (
-          <RoleActions roles={roles} />
+          <RoleActions
+            roles={roles}
+            canCreateRole={canCreateRole}
+            canDeleteRole={canDeleteRole}
+            activeIdentityName={identity.name}
+            activeIdentityType={identity.type}
+          />
         )}
       </div>
     </ServiceLayout>

@@ -1,6 +1,7 @@
 /**
  * UserDetail – Client component for viewing user details, permissions,
  * and inspecting attached policy documents.
+ * Enforces IAM permission boundaries with authentic AWS AccessDenied messaging.
  */
 
 "use client";
@@ -11,7 +12,6 @@ import { useRouter } from "next/navigation";
 import {
   attachUserPolicy,
   detachUserPolicy,
-  deleteUser,
   inspectPolicy,
 } from "../../actions";
 
@@ -31,9 +31,20 @@ export interface UserDetailMeta {
 interface UserDetailProps {
   user: UserDetailMeta;
   allPolicies: { name: string; arn: string }[];
+  canAttachPolicy?: boolean;
+  canDetachPolicy?: boolean;
+  activeIdentityName?: string;
+  activeIdentityType?: string;
 }
 
-export function UserDetail({ user, allPolicies }: UserDetailProps) {
+export function UserDetail({
+  user,
+  allPolicies,
+  canAttachPolicy = true,
+  canDetachPolicy = true,
+  activeIdentityName = "Administrator",
+  activeIdentityType = "admin",
+}: UserDetailProps) {
   const [activeTab, setActiveTab] = useState<"permissions" | "details">("permissions");
   const [showAttachModal, setShowAttachModal] = useState(false);
   const [selectedPolicyArn, setSelectedPolicyArn] = useState("");
@@ -68,6 +79,7 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
   // Attach policy
   function handleAttach() {
     if (!selectedPolicyArn) return;
+    setError(null);
     startTransition(async () => {
       const res = await attachUserPolicy(user.userName, selectedPolicyArn);
       if (res.error) {
@@ -82,6 +94,7 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
 
   // Detach policy
   function handleDetach(policyArn: string) {
+    setError(null);
     startTransition(async () => {
       const res = await detachUserPolicy(user.userName, policyArn);
       if (res.error) {
@@ -119,9 +132,55 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
         </div>
       </div>
 
+      {/* Permission Boundary Alert Banner */}
+      {!canAttachPolicy && activeIdentityType !== "admin" && (
+        <div className="p-3.5 bg-[#f2f8fd] border border-[#0073bb] rounded text-[13px] text-[#16191f] flex items-start justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="#0073bb"
+              strokeWidth="2"
+              className="shrink-0 mt-0.5"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <div>
+              <span className="font-semibold text-[#0073bb]">Read-only permission boundary active:</span>
+              <span className="ml-1 text-[#545b64]">
+                Active identity <strong>{activeIdentityName}</strong> has read-only access. Attempting to attach or detach policies will be denied by IAM.
+              </span>
+            </div>
+          </div>
+          <span className="text-[11px] font-mono text-[#0073bb] bg-white px-2 py-0.5 rounded border border-[#0073bb]/30 shrink-0">
+            iam:AttachUserPolicy denied
+          </span>
+        </div>
+      )}
+
       {error && (
-        <div className="p-4 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212]">
-          {error}
+        <div className="p-4 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#d13212"
+            strokeWidth="2"
+            className="shrink-0 mt-0.5"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div>
+            <div className="font-bold">Access Denied</div>
+            <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+          </div>
         </div>
       )}
 
@@ -158,7 +217,10 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
                 Attached policies ({user.attachedPolicies.length})
               </h2>
               <button
-                onClick={() => setShowAttachModal(true)}
+                onClick={() => {
+                  setError(null);
+                  setShowAttachModal(true);
+                }}
                 className="px-3 py-1.5 text-[12px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07]"
               >
                 + Add permissions
@@ -206,8 +268,13 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
                           </button>
                           <button
                             onClick={() => handleDetach(p.arn)}
-                            disabled={isPending}
-                            className="text-[12px] text-[#d13212] hover:underline disabled:opacity-50"
+                            disabled={isPending || !canDetachPolicy}
+                            title={!canDetachPolicy ? "Missing iam:DetachUserPolicy permission" : undefined}
+                            className={`text-[12px] font-normal ${
+                              canDetachPolicy && !isPending
+                                ? "text-[#d13212] hover:underline"
+                                : "text-[#aab7b8] cursor-not-allowed opacity-50"
+                            }`}
                           >
                             Detach
                           </button>
@@ -321,7 +388,10 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
                 Attach policy to {user.userName}
               </h3>
               <button
-                onClick={() => setShowAttachModal(false)}
+                onClick={() => {
+                  setShowAttachModal(false);
+                  setError(null);
+                }}
                 className="text-[#879596] hover:text-[#16191f] p-1"
                 title="Close"
               >
@@ -333,6 +403,54 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
             </div>
 
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
+              {/* Inside Modal Error Alert */}
+              {error && (
+                <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#d13212"
+                    strokeWidth="2"
+                    className="shrink-0 mt-0.5"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <div>
+                    <div className="font-bold">Access Denied</div>
+                    <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Inside Modal Permission Denied Notice */}
+              {!canAttachPolicy && !error && (
+                <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="#d13212"
+                    strokeWidth="2"
+                    className="shrink-0 mt-0.5"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <div>
+                    <div className="font-bold">Access Denied</div>
+                    <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">
+                      User <strong>{activeIdentityName}</strong> is not authorized to perform: <code>iam:AttachUserPolicy</code> on resource: <code>{user.arn}</code>.
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <input
                 type="text"
                 placeholder="Search policies..."
@@ -376,7 +494,10 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
             <div className="px-6 py-3 border-t border-[#eaeded] flex justify-end gap-2 bg-[#fafafa]">
               <button
                 type="button"
-                onClick={() => setShowAttachModal(false)}
+                onClick={() => {
+                  setShowAttachModal(false);
+                  setError(null);
+                }}
                 className="px-4 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3]"
               >
                 Cancel
@@ -384,8 +505,9 @@ export function UserDetail({ user, allPolicies }: UserDetailProps) {
               <button
                 type="button"
                 onClick={handleAttach}
-                disabled={!selectedPolicyArn || isPending}
-                className="px-5 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07] disabled:opacity-50"
+                disabled={!selectedPolicyArn || isPending || !canAttachPolicy}
+                title={!canAttachPolicy ? "Missing iam:AttachUserPolicy permission" : undefined}
+                className="px-5 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07] disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isPending ? "Attaching..." : "Attach policy"}
               </button>

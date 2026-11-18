@@ -2,6 +2,7 @@
  * PolicyActions – Client component for IAM Policies list.
  * Filter by AWS Managed / Customer Managed, search, create policy,
  * delete policy, and inspect policy modal.
+ * Enforces IAM permission boundaries with authentic AWS AccessDenied messaging.
  */
 
 "use client";
@@ -23,9 +24,19 @@ export interface PolicySummary {
 
 interface PolicyActionsProps {
   policies: PolicySummary[];
+  canCreatePolicy?: boolean;
+  canDeletePolicy?: boolean;
+  activeIdentityName?: string;
+  activeIdentityType?: string;
 }
 
-export function PolicyActions({ policies }: PolicyActionsProps) {
+export function PolicyActions({
+  policies,
+  canCreatePolicy = true,
+  canDeletePolicy = true,
+  activeIdentityName = "Administrator",
+  activeIdentityType = "admin",
+}: PolicyActionsProps) {
   const [filterType, setFilterType] = useState<"all" | "customer" | "aws">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedPolicyArn, setSelectedPolicyArn] = useState<string | null>(null);
@@ -70,7 +81,7 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
 
   function handleDelete() {
     if (!selectedPolicy || confirmInput !== selectedPolicy.policyName) return;
-
+    setError(null);
     startTransition(async () => {
       const res = await deletePolicy(selectedPolicy.arn);
       if (res && res.error) {
@@ -155,26 +166,69 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
           {selectedPolicy && !selectedPolicy.isAWSManaged && (
             <button
               onClick={() => {
+                setError(null);
                 setConfirmInput("");
                 setShowDeleteModal(true);
               }}
-              className="px-3 py-[4px] text-[13px] border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] rounded-sm font-normal"
+              disabled={!canDeletePolicy || isPending}
+              title={!canDeletePolicy ? "Missing iam:DeletePolicy permission" : undefined}
+              className={`px-3 py-[4px] text-[13px] border rounded-sm font-normal ${
+                canDeletePolicy && !isPending
+                  ? "border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3]"
+                  : "border-[#d5dbdb] text-[#aab7b8] cursor-not-allowed opacity-60"
+              }`}
             >
               Delete
             </button>
           )}
-          <Link
-            href="/iam/policies/create"
-            className="px-3 py-[4px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
-          >
-            Create policy
-          </Link>
+          {canCreatePolicy ? (
+            <Link
+              href="/iam/policies/create"
+              className="px-3 py-[4px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
+            >
+              Create policy
+            </Link>
+          ) : (
+            <span
+              title="Missing iam:CreatePolicy permission"
+              className="px-3 py-[4px] text-[13px] bg-[#eaeded] text-[#879596] rounded-sm font-medium cursor-not-allowed"
+            >
+              Create policy
+            </span>
+          )}
         </div>
       </div>
 
+      {/* Permission boundary notice if restricted */}
+      {!canCreatePolicy && activeIdentityType !== "admin" && (
+        <div className="mx-4 mt-3 p-3 bg-[#f2f8fd] border border-[#0073bb] rounded text-[12px] text-[#16191f] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0073bb" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>
+              Read-only mode active: Identity <strong>{activeIdentityName}</strong> cannot create or delete IAM policies.
+            </span>
+          </div>
+          <span className="font-mono text-[11px] text-[#0073bb] bg-white px-2 py-0.5 rounded border border-[#0073bb]/30">
+            iam:CreatePolicy / iam:DeletePolicy restricted
+          </span>
+        </div>
+      )}
+
       {error && (
-        <div className="m-4 p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212]">
-          {error}
+        <div className="m-4 p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div>
+            <div className="font-bold">Access Denied</div>
+            <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+          </div>
         </div>
       )}
 
@@ -220,10 +274,7 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
                   <td className="px-4 py-3 font-medium">
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleInspect(p.arn, p.policyName);
-                      }}
+                      onClick={() => handleInspect(p.arn, p.policyName)}
                       className="text-[#0073bb] hover:text-[#ec7211] hover:underline text-left font-medium"
                     >
                       {p.policyName}
@@ -234,24 +285,26 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
                       className={`text-[11px] px-2 py-0.5 rounded ${
                         p.isAWSManaged
                           ? "bg-[#f2f3f3] text-[#545b64]"
-                          : "bg-[#f2f8fd] text-[#0073bb] border border-[#cbe2f2]"
+                          : "bg-[#e8f2fc] text-[#0073bb] font-medium"
                       }`}
                     >
                       {p.isAWSManaged ? "AWS managed" : "Customer managed"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-[12px] text-[#16191f]">
-                    {p.attachmentCount}
+                  <td className="px-4 py-3 text-[#16191f]">
+                    <span className="font-mono text-[11px] bg-[#f2f3f3] px-2 py-0.5 rounded text-[#545b64]">
+                      {p.attachmentCount}
+                    </span>
                   </td>
                   <td className="px-4 py-3 text-[#545b64] max-w-[280px] truncate">
-                    {p.description || "—"}
+                    {p.description}
                   </td>
-                  <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => handleInspect(p.arn, p.policyName)}
-                      className="text-[12px] text-[#0073bb] hover:text-[#ec7211] hover:underline font-medium"
+                      className="text-[12px] text-[#0073bb] hover:underline"
                     >
-                      Inspect permissions
+                      Inspect
                     </button>
                   </td>
                 </tr>
@@ -261,7 +314,9 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
             {filteredPolicies.length === 0 && (
               <tr>
                 <td colSpan={6} className="px-4 py-8 text-center text-[#545b64]">
-                  No policies match your search.
+                  {policies.length === 0
+                    ? "No policies found."
+                    : `No policies match "${searchQuery}".`}
                 </td>
               </tr>
             )}
@@ -300,22 +355,10 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
 
             <div className="p-6 overflow-y-auto flex-1 space-y-4">
               <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-[12px] font-bold text-[#16191f]">
-                    Policy Document (JSON)
-                  </label>
-                  <button
-                    onClick={() => {
-                      navigator.clipboard.writeText(
-                        JSON.stringify(inspectedPolicy.document, null, 2)
-                      );
-                    }}
-                    className="text-[11px] text-[#0073bb] hover:underline"
-                  >
-                    Copy JSON
-                  </button>
-                </div>
-                <pre className="bg-[#000716] text-[#69f0ae] font-mono text-[12px] p-4 rounded overflow-x-auto leading-relaxed max-h-[400px]">
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                  Policy Document (JSON)
+                </label>
+                <pre className="bg-[#000716] text-[#69f0ae] font-mono text-[12px] p-4 rounded overflow-x-auto leading-relaxed">
                   {JSON.stringify(inspectedPolicy.document, null, 2)}
                 </pre>
               </div>
@@ -341,6 +384,37 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
             <h3 className="text-[18px] font-bold text-[#16191f]">
               Delete policy: {selectedPolicy.policyName}
             </h3>
+
+            {error && (
+              <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <div className="font-bold">Access Denied</div>
+                  <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+                </div>
+              </div>
+            )}
+
+            {!canDeletePolicy && !error && (
+              <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <div className="font-bold">Access Denied</div>
+                  <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">
+                    Identity <strong>{activeIdentityName}</strong> is not authorized to perform: <code>iam:DeletePolicy</code> on resource: <code>{selectedPolicy.arn}</code>.
+                  </div>
+                </div>
+              </div>
+            )}
+
             <p className="text-[13px] text-[#545b64] leading-relaxed">
               Are you sure you want to delete policy <strong>{selectedPolicy.policyName}</strong>?
               This policy will be permanently deleted from your AWS account.
@@ -360,7 +434,10 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
             <div className="flex justify-end gap-2 pt-2 border-t border-[#eaeded]">
               <button
                 type="button"
-                onClick={() => setShowDeleteModal(false)}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setError(null);
+                }}
                 className="px-4 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3]"
               >
                 Cancel
@@ -368,9 +445,10 @@ export function PolicyActions({ policies }: PolicyActionsProps) {
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={confirmInput !== selectedPolicy.policyName || isPending}
+                disabled={confirmInput !== selectedPolicy.policyName || isPending || !canDeletePolicy}
+                title={!canDeletePolicy ? "Missing iam:DeletePolicy permission" : undefined}
                 className={`px-4 py-1.5 text-[13px] text-white rounded-sm font-medium ${
-                  confirmInput === selectedPolicy.policyName && !isPending
+                  confirmInput === selectedPolicy.policyName && !isPending && canDeletePolicy
                     ? "bg-[#d13212] hover:bg-[#b02a0f]"
                     : "bg-[#eaeded] text-[#aab7b8] cursor-not-allowed"
                 }`}

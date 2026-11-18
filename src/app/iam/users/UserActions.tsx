@@ -1,6 +1,7 @@
 /**
  * UserActions – Client component for IAM Users list.
  * Search, select, delete user modal, and links to user details.
+ * Enforces IAM permission boundaries with authentic AWS AccessDenied messaging.
  */
 
 "use client";
@@ -20,9 +21,19 @@ export interface UserSummary {
 
 interface UserActionsProps {
   users: UserSummary[];
+  canCreateUser?: boolean;
+  canDeleteUser?: boolean;
+  activeIdentityName?: string;
+  activeIdentityType?: string;
 }
 
-export function UserActions({ users }: UserActionsProps) {
+export function UserActions({
+  users,
+  canCreateUser = true,
+  canDeleteUser = true,
+  activeIdentityName = "Administrator",
+  activeIdentityType = "admin",
+}: UserActionsProps) {
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -37,7 +48,7 @@ export function UserActions({ users }: UserActionsProps) {
 
   function handleDelete() {
     if (!selectedUser || confirmInput !== selectedUser) return;
-
+    setError(null);
     startTransition(async () => {
       const res = await deleteUser(selectedUser);
       if (res && res.error) {
@@ -100,30 +111,68 @@ export function UserActions({ users }: UserActionsProps) {
           </button>
           <button
             onClick={() => {
+              setError(null);
               setConfirmInput("");
               setShowDeleteModal(true);
             }}
-            disabled={!selectedUser || isPending}
+            disabled={!selectedUser || isPending || !canDeleteUser}
+            title={!canDeleteUser ? "Missing iam:DeleteUser permission" : undefined}
             className={`px-3 py-[4px] text-[13px] rounded-sm border font-normal ${
-              selectedUser && !isPending
+              selectedUser && !isPending && canDeleteUser
                 ? "border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3]"
-                : "border-[#d5dbdb] text-[#aab7b8] cursor-not-allowed"
+                : "border-[#d5dbdb] text-[#aab7b8] cursor-not-allowed opacity-60"
             }`}
           >
             Delete user
           </button>
-          <Link
-            href="/iam/users/create"
-            className="px-3 py-[4px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
-          >
-            Add users
-          </Link>
+          {canCreateUser ? (
+            <Link
+              href="/iam/users/create"
+              className="px-3 py-[4px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
+            >
+              Add users
+            </Link>
+          ) : (
+            <span
+              title="Missing iam:CreateUser permission"
+              className="px-3 py-[4px] text-[13px] bg-[#eaeded] text-[#879596] rounded-sm font-medium cursor-not-allowed"
+            >
+              Add users
+            </span>
+          )}
         </div>
       </div>
 
+      {/* Permission boundary notice if restricted */}
+      {!canDeleteUser && activeIdentityType !== "admin" && (
+        <div className="mx-4 mt-3 p-3 bg-[#f2f8fd] border border-[#0073bb] rounded text-[12px] text-[#16191f] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0073bb" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>
+              Read-only mode active: Identity <strong>{activeIdentityName}</strong> cannot create or delete users.
+            </span>
+          </div>
+          <span className="font-mono text-[11px] text-[#0073bb] bg-white px-2 py-0.5 rounded border border-[#0073bb]/30">
+            iam:CreateUser / iam:DeleteUser restricted
+          </span>
+        </div>
+      )}
+
       {error && (
-        <div className="m-4 p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212]">
-          {error}
+        <div className="m-4 p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div>
+            <div className="font-bold">Access Denied</div>
+            <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+          </div>
         </div>
       )}
 
@@ -211,6 +260,37 @@ export function UserActions({ users }: UserActionsProps) {
             <h3 className="text-[18px] font-bold text-[#16191f]">
               Delete user: {selectedUser}
             </h3>
+
+            {error && (
+              <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <div className="font-bold">Access Denied</div>
+                  <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+                </div>
+              </div>
+            )}
+
+            {!canDeleteUser && !error && (
+              <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <div className="font-bold">Access Denied</div>
+                  <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">
+                    User <strong>{activeIdentityName}</strong> is not authorized to perform: <code>iam:DeleteUser</code> on resource: <code>arn:aws:iam:::user/{selectedUser}</code>.
+                  </div>
+                </div>
+              </div>
+            )}
+
             <p className="text-[13px] text-[#545b64] leading-relaxed">
               Are you sure you want to delete user <strong>{selectedUser}</strong>? Any
               access keys and permissions attached to this user will be revoked immediately.
@@ -230,7 +310,10 @@ export function UserActions({ users }: UserActionsProps) {
             <div className="flex justify-end gap-2 pt-2 border-t border-[#eaeded]">
               <button
                 type="button"
-                onClick={() => setShowDeleteModal(false)}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setError(null);
+                }}
                 className="px-4 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3]"
               >
                 Cancel
@@ -238,9 +321,10 @@ export function UserActions({ users }: UserActionsProps) {
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={confirmInput !== selectedUser || isPending}
+                disabled={confirmInput !== selectedUser || isPending || !canDeleteUser}
+                title={!canDeleteUser ? "Missing iam:DeleteUser permission" : undefined}
                 className={`px-4 py-1.5 text-[13px] text-white rounded-sm font-medium ${
-                  confirmInput === selectedUser && !isPending
+                  confirmInput === selectedUser && !isPending && canDeleteUser
                     ? "bg-[#d13212] hover:bg-[#b02a0f]"
                     : "bg-[#eaeded] text-[#aab7b8] cursor-not-allowed"
                 }`}

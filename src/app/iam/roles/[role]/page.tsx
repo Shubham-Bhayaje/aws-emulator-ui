@@ -1,6 +1,6 @@
 /**
  * IAM Role detail page – Server component.
- * Loads role details, assume-role policy, and attached policies.
+ * Loads role details, assume-role policy, and evaluates active identity permissions.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
@@ -12,6 +12,8 @@ import {
 } from "@aws-sdk/client-iam";
 import { RoleDetail, RoleDetailMeta } from "./RoleDetail";
 import { iamNav } from "../../page";
+import { getActiveIdentity } from "@/lib/identity";
+import { evaluatePermissions } from "@/lib/permissions";
 
 interface PageProps {
   params: Promise<{ role: string }>;
@@ -24,6 +26,7 @@ export default async function RoleDetailPage({ params }: PageProps) {
   let roleMeta: RoleDetailMeta | null = null;
   let allPolicies: { name: string; arn: string }[] = [];
   let error: string | null = null;
+  const identity = await getActiveIdentity();
 
   try {
     const roleRes = await iam.send(new GetRoleCommand({ RoleName: roleName }));
@@ -74,6 +77,10 @@ export default async function RoleDetailPage({ params }: PageProps) {
     error = err instanceof Error ? err.message : String(err);
   }
 
+  const roleArn = roleMeta?.arn ?? `arn:aws:iam::${identity.accountId}:role/${roleName}`;
+  const canAttachPolicy = evaluatePermissions(identity, "iam:AttachRolePolicy", roleArn).allowed;
+  const canDetachPolicy = evaluatePermissions(identity, "iam:DetachRolePolicy", roleArn).allowed;
+
   return (
     <ServiceLayout serviceName="IAM" serviceColor="#BD0816" navItems={iamNav}>
       {error ? (
@@ -81,7 +88,14 @@ export default async function RoleDetailPage({ params }: PageProps) {
           Error: {error}
         </div>
       ) : roleMeta ? (
-        <RoleDetail role={roleMeta} allPolicies={allPolicies} />
+        <RoleDetail
+          role={roleMeta}
+          allPolicies={allPolicies}
+          canAttachPolicy={canAttachPolicy}
+          canDetachPolicy={canDetachPolicy}
+          activeIdentityName={identity.name}
+          activeIdentityType={identity.type}
+        />
       ) : (
         <div className="text-[13px] text-[#545b64]">Role not found.</div>
       )}

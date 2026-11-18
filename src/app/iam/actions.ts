@@ -1,5 +1,6 @@
 /**
  * IAM server actions – manage Users, Roles, Policies, and attachments.
+ * Strictly enforced against the active identity session via local IAM Policy Engine.
  */
 
 "use server";
@@ -23,6 +24,8 @@ import {
 } from "@aws-sdk/client-iam";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getActiveIdentity } from "@/lib/identity";
+import { assertPermission } from "@/lib/permissions";
 
 // Create a new IAM User
 export async function createUser(formData: FormData) {
@@ -34,6 +37,21 @@ export async function createUser(formData: FormData) {
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:CreateUser",
+      `arn:aws:iam::${identity.accountId}:user/${userName}`
+    );
+
+    if (policyArn) {
+      assertPermission(
+        identity,
+        "iam:AttachUserPolicy",
+        `arn:aws:iam::${identity.accountId}:user/${userName}`
+      );
+    }
+
     await iam.send(new CreateUserCommand({ UserName: userName }));
 
     if (policyArn) {
@@ -57,12 +75,24 @@ export async function createUser(formData: FormData) {
 // Delete an IAM User (detaches attached policies first)
 export async function deleteUser(userName: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:DeleteUser",
+      `arn:aws:iam::${identity.accountId}:user/${userName}`
+    );
+
     // Detach all attached policies first
     const attached = await iam.send(
       new ListAttachedUserPoliciesCommand({ UserName: userName })
     );
     for (const p of attached.AttachedPolicies ?? []) {
       if (p.PolicyArn) {
+        assertPermission(
+          identity,
+          "iam:DetachUserPolicy",
+          `arn:aws:iam::${identity.accountId}:user/${userName}`
+        );
         await iam.send(
           new DetachUserPolicyCommand({
             UserName: userName,
@@ -86,6 +116,13 @@ export async function deleteUser(userName: string) {
 // Attach a policy to a user
 export async function attachUserPolicy(userName: string, policyArn: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:AttachUserPolicy",
+      `arn:aws:iam::${identity.accountId}:user/${userName}`
+    );
+
     await iam.send(
       new AttachUserPolicyCommand({
         UserName: userName,
@@ -104,6 +141,13 @@ export async function attachUserPolicy(userName: string, policyArn: string) {
 // Detach a policy from a user
 export async function detachUserPolicy(userName: string, policyArn: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:DetachUserPolicy",
+      `arn:aws:iam::${identity.accountId}:user/${userName}`
+    );
+
     await iam.send(
       new DetachUserPolicyCommand({
         UserName: userName,
@@ -131,38 +175,53 @@ export async function createRole(formData: FormData) {
     return { error: "Role name is required." };
   }
 
-  let assumeRoleDoc: string;
-
-  if (serviceType === "custom" && customTrustJson) {
-    try {
-      JSON.parse(customTrustJson);
-      assumeRoleDoc = customTrustJson;
-    } catch {
-      return { error: "Custom trust policy must be valid JSON." };
-    }
-  } else {
-    const serviceDomain =
-      serviceType === "ec2"
-        ? "ec2.amazonaws.com"
-        : serviceType === "ecs"
-        ? "ecs-tasks.amazonaws.com"
-        : serviceType === "apigateway"
-        ? "apigateway.amazonaws.com"
-        : "lambda.amazonaws.com";
-
-    assumeRoleDoc = JSON.stringify({
-      Version: "2012-10-17",
-      Statement: [
-        {
-          Effect: "Allow",
-          Principal: { Service: serviceDomain },
-          Action: "sts:AssumeRole",
-        },
-      ],
-    });
-  }
-
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:CreateRole",
+      `arn:aws:iam::${identity.accountId}:role/${roleName}`
+    );
+
+    if (policyArn) {
+      assertPermission(
+        identity,
+        "iam:AttachRolePolicy",
+        `arn:aws:iam::${identity.accountId}:role/${roleName}`
+      );
+    }
+
+    let assumeRoleDoc: string;
+
+    if (serviceType === "custom" && customTrustJson) {
+      try {
+        JSON.parse(customTrustJson);
+        assumeRoleDoc = customTrustJson;
+      } catch {
+        return { error: "Custom trust policy must be valid JSON." };
+      }
+    } else {
+      const serviceDomain =
+        serviceType === "ec2"
+          ? "ec2.amazonaws.com"
+          : serviceType === "ecs"
+          ? "ecs-tasks.amazonaws.com"
+          : serviceType === "apigateway"
+          ? "apigateway.amazonaws.com"
+          : "lambda.amazonaws.com";
+
+      assumeRoleDoc = JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: serviceDomain },
+            Action: "sts:AssumeRole",
+          },
+        ],
+      });
+    }
+
     await iam.send(
       new CreateRoleCommand({
         RoleName: roleName,
@@ -192,11 +251,23 @@ export async function createRole(formData: FormData) {
 // Delete an IAM Role (detaches policies first)
 export async function deleteRole(roleName: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:DeleteRole",
+      `arn:aws:iam::${identity.accountId}:role/${roleName}`
+    );
+
     const attached = await iam.send(
       new ListAttachedRolePoliciesCommand({ RoleName: roleName })
     );
     for (const p of attached.AttachedPolicies ?? []) {
       if (p.PolicyArn) {
+        assertPermission(
+          identity,
+          "iam:DetachRolePolicy",
+          `arn:aws:iam::${identity.accountId}:role/${roleName}`
+        );
         await iam.send(
           new DetachRolePolicyCommand({
             RoleName: roleName,
@@ -220,6 +291,13 @@ export async function deleteRole(roleName: string) {
 // Attach a policy to a role
 export async function attachRolePolicy(roleName: string, policyArn: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:AttachRolePolicy",
+      `arn:aws:iam::${identity.accountId}:role/${roleName}`
+    );
+
     await iam.send(
       new AttachRolePolicyCommand({
         RoleName: roleName,
@@ -238,6 +316,13 @@ export async function attachRolePolicy(roleName: string, policyArn: string) {
 // Detach a policy from a role
 export async function detachRolePolicy(roleName: string, policyArn: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:DetachRolePolicy",
+      `arn:aws:iam::${identity.accountId}:role/${roleName}`
+    );
+
     await iam.send(
       new DetachRolePolicyCommand({
         RoleName: roleName,
@@ -273,6 +358,13 @@ export async function createPolicy(formData: FormData) {
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(
+      identity,
+      "iam:CreatePolicy",
+      `arn:aws:iam::${identity.accountId}:policy/${policyName}`
+    );
+
     await iam.send(
       new CreatePolicyCommand({
         PolicyName: policyName,
@@ -293,6 +385,9 @@ export async function createPolicy(formData: FormData) {
 // Delete a Customer Managed IAM Policy
 export async function deletePolicy(policyArn: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "iam:DeletePolicy", policyArn);
+
     await iam.send(new DeletePolicyCommand({ PolicyArn: policyArn }));
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -307,6 +402,10 @@ export async function deletePolicy(policyArn: string) {
 // Inspect a Policy: fetch metadata and current policy version document
 export async function inspectPolicy(policyArn: string) {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "iam:GetPolicy", policyArn);
+    assertPermission(identity, "iam:GetPolicyVersion", policyArn);
+
     const policyRes = await iam.send(new GetPolicyCommand({ PolicyArn: policyArn }));
     const policy = policyRes.Policy;
     const versionId = policy?.DefaultVersionId || "v1";

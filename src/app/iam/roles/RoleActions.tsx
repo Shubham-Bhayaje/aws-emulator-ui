@@ -1,6 +1,7 @@
 /**
  * RoleActions – Client component for IAM Roles list.
  * Search, select, delete role modal, and link to role details.
+ * Enforces IAM permission boundaries with authentic AWS AccessDenied messaging.
  */
 
 "use client";
@@ -21,9 +22,19 @@ export interface RoleSummary {
 
 interface RoleActionsProps {
   roles: RoleSummary[];
+  canCreateRole?: boolean;
+  canDeleteRole?: boolean;
+  activeIdentityName?: string;
+  activeIdentityType?: string;
 }
 
-export function RoleActions({ roles }: RoleActionsProps) {
+export function RoleActions({
+  roles,
+  canCreateRole = true,
+  canDeleteRole = true,
+  activeIdentityName = "Administrator",
+  activeIdentityType = "admin",
+}: RoleActionsProps) {
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -38,7 +49,7 @@ export function RoleActions({ roles }: RoleActionsProps) {
 
   function handleDelete() {
     if (!selectedRole || confirmInput !== selectedRole) return;
-
+    setError(null);
     startTransition(async () => {
       const res = await deleteRole(selectedRole);
       if (res && res.error) {
@@ -101,30 +112,68 @@ export function RoleActions({ roles }: RoleActionsProps) {
           </button>
           <button
             onClick={() => {
+              setError(null);
               setConfirmInput("");
               setShowDeleteModal(true);
             }}
-            disabled={!selectedRole || isPending}
+            disabled={!selectedRole || isPending || !canDeleteRole}
+            title={!canDeleteRole ? "Missing iam:DeleteRole permission" : undefined}
             className={`px-3 py-[4px] text-[13px] rounded-sm border font-normal ${
-              selectedRole && !isPending
+              selectedRole && !isPending && canDeleteRole
                 ? "border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3]"
-                : "border-[#d5dbdb] text-[#aab7b8] cursor-not-allowed"
+                : "border-[#d5dbdb] text-[#aab7b8] cursor-not-allowed opacity-60"
             }`}
           >
             Delete role
           </button>
-          <Link
-            href="/iam/roles/create"
-            className="px-3 py-[4px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
-          >
-            Create role
-          </Link>
+          {canCreateRole ? (
+            <Link
+              href="/iam/roles/create"
+              className="px-3 py-[4px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
+            >
+              Create role
+            </Link>
+          ) : (
+            <span
+              title="Missing iam:CreateRole permission"
+              className="px-3 py-[4px] text-[13px] bg-[#eaeded] text-[#879596] rounded-sm font-medium cursor-not-allowed"
+            >
+              Create role
+            </span>
+          )}
         </div>
       </div>
 
+      {/* Permission boundary notice if restricted */}
+      {!canDeleteRole && activeIdentityType !== "admin" && (
+        <div className="mx-4 mt-3 p-3 bg-[#f2f8fd] border border-[#0073bb] rounded text-[12px] text-[#16191f] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#0073bb" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>
+              Read-only mode active: Identity <strong>{activeIdentityName}</strong> cannot create or delete IAM roles.
+            </span>
+          </div>
+          <span className="font-mono text-[11px] text-[#0073bb] bg-white px-2 py-0.5 rounded border border-[#0073bb]/30">
+            iam:CreateRole / iam:DeleteRole restricted
+          </span>
+        </div>
+      )}
+
       {error && (
-        <div className="m-4 p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212]">
-          {error}
+        <div className="m-4 p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <div>
+            <div className="font-bold">Access Denied</div>
+            <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+          </div>
         </div>
       )}
 
@@ -212,6 +261,37 @@ export function RoleActions({ roles }: RoleActionsProps) {
             <h3 className="text-[18px] font-bold text-[#16191f]">
               Delete role: {selectedRole}
             </h3>
+
+            {error && (
+              <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <div className="font-bold">Access Denied</div>
+                  <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">{error}</div>
+                </div>
+              </div>
+            )}
+
+            {!canDeleteRole && !error && (
+              <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded text-[13px] text-[#d13212] flex items-start gap-2.5">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#d13212" strokeWidth="2" className="shrink-0 mt-0.5">
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="12" y1="8" x2="12" y2="12" />
+                  <line x1="12" y1="16" x2="12.01" y2="16" />
+                </svg>
+                <div>
+                  <div className="font-bold">Access Denied</div>
+                  <div className="text-[12px] text-[#545b64] mt-0.5 leading-relaxed">
+                    Role/User <strong>{activeIdentityName}</strong> is not authorized to perform: <code>iam:DeleteRole</code> on resource: <code>arn:aws:iam:::role/{selectedRole}</code>.
+                  </div>
+                </div>
+              </div>
+            )}
+
             <p className="text-[13px] text-[#545b64] leading-relaxed">
               Are you sure you want to delete role <strong>{selectedRole}</strong>?
               Services or applications assuming this role will immediately lose access.
@@ -231,7 +311,10 @@ export function RoleActions({ roles }: RoleActionsProps) {
             <div className="flex justify-end gap-2 pt-2 border-t border-[#eaeded]">
               <button
                 type="button"
-                onClick={() => setShowDeleteModal(false)}
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setError(null);
+                }}
                 className="px-4 py-1.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3]"
               >
                 Cancel
@@ -239,9 +322,10 @@ export function RoleActions({ roles }: RoleActionsProps) {
               <button
                 type="button"
                 onClick={handleDelete}
-                disabled={confirmInput !== selectedRole || isPending}
+                disabled={confirmInput !== selectedRole || isPending || !canDeleteRole}
+                title={!canDeleteRole ? "Missing iam:DeleteRole permission" : undefined}
                 className={`px-4 py-1.5 text-[13px] text-white rounded-sm font-medium ${
-                  confirmInput === selectedRole && !isPending
+                  confirmInput === selectedRole && !isPending && canDeleteRole
                     ? "bg-[#d13212] hover:bg-[#b02a0f]"
                     : "bg-[#eaeded] text-[#aab7b8] cursor-not-allowed"
                 }`}

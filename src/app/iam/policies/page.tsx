@@ -1,6 +1,6 @@
 /**
  * IAM Policies list page – Server component.
- * Lists all IAM policies (AWS managed & Customer managed).
+ * Lists all IAM policies (AWS managed & Customer managed) and checks active identity permissions.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
@@ -8,10 +8,13 @@ import { iam } from "@/lib/aws";
 import { ListPoliciesCommand } from "@aws-sdk/client-iam";
 import { PolicyActions, PolicySummary } from "./PolicyActions";
 import { iamNav } from "../page";
+import { getActiveIdentity } from "@/lib/identity";
+import { evaluatePermissions } from "@/lib/permissions";
 
 export default async function IAMPoliciesPage() {
   let policies: PolicySummary[] = [];
   let error: string | null = null;
+  const identity = await getActiveIdentity();
 
   try {
     const res = await iam.send(
@@ -36,6 +39,9 @@ export default async function IAMPoliciesPage() {
     error = err instanceof Error ? err.message : String(err);
   }
 
+  const canCreatePolicy = evaluatePermissions(identity, "iam:CreatePolicy").allowed;
+  const canDeletePolicy = evaluatePermissions(identity, "iam:DeletePolicy").allowed;
+
   return (
     <ServiceLayout serviceName="IAM" serviceColor="#BD0816" navItems={iamNav}>
       <div>
@@ -50,7 +56,13 @@ export default async function IAMPoliciesPage() {
             Error: {error}
           </div>
         ) : (
-          <PolicyActions policies={policies} />
+          <PolicyActions
+            policies={policies}
+            canCreatePolicy={canCreatePolicy}
+            canDeletePolicy={canDeletePolicy}
+            activeIdentityName={identity.name}
+            activeIdentityType={identity.type}
+          />
         )}
       </div>
     </ServiceLayout>
