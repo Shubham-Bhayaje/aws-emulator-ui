@@ -51,6 +51,15 @@ import {
 } from "@aws-sdk/client-ec2";
 import { revalidatePath } from "next/cache";
 import {
+  ensureInstanceContainer,
+  executeContainerCommand,
+  readContainerFile,
+  writeContainerFile,
+  stopInstanceContainer,
+  startInstanceContainer,
+  terminateInstanceContainer,
+} from "@/lib/ec2-docker";
+import {
   EC2Instance,
   SecurityGroup,
   KeyPair,
@@ -291,6 +300,7 @@ export async function fetchLiveInstanceDetail(instanceId: string): Promise<{
 export async function startLiveInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
   try {
     await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
+    await startInstanceContainer(instanceId);
     revalidatePath("/ec2");
     revalidatePath("/ec2/instances");
     revalidatePath(`/ec2/instances/${instanceId}`);
@@ -303,6 +313,7 @@ export async function startLiveInstance(instanceId: string): Promise<{ success: 
 export async function stopLiveInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
   try {
     await ec2.send(new StopInstancesCommand({ InstanceIds: [instanceId] }));
+    await stopInstanceContainer(instanceId);
     revalidatePath("/ec2");
     revalidatePath("/ec2/instances");
     revalidatePath(`/ec2/instances/${instanceId}`);
@@ -327,6 +338,7 @@ export async function rebootLiveInstance(instanceId: string): Promise<{ success:
 export async function terminateLiveInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
   try {
     await ec2.send(new TerminateInstancesCommand({ InstanceIds: [instanceId] }));
+    await terminateInstanceContainer(instanceId);
     revalidatePath("/ec2");
     revalidatePath("/ec2/instances");
     revalidatePath(`/ec2/instances/${instanceId}`);
@@ -334,6 +346,30 @@ export async function terminateLiveInstance(instanceId: string): Promise<{ succe
   } catch (err: any) {
     return { success: false, error: err.message };
   }
+}
+
+// -------------------------------------------------------------
+// Real EC2 Docker Container Terminal Actions
+// -------------------------------------------------------------
+
+export async function ensureEC2ContainerAction(instance: {
+  id: string;
+  privateIp?: string;
+  publicIp?: string;
+}) {
+  return await ensureInstanceContainer(instance);
+}
+
+export async function executeEC2TerminalCommandAction(instanceId: string, command: string) {
+  return await executeContainerCommand(instanceId, command);
+}
+
+export async function readEC2ContainerFileAction(instanceId: string, filePath: string) {
+  return await readContainerFile(instanceId, filePath);
+}
+
+export async function writeEC2ContainerFileAction(instanceId: string, filePath: string, content: string) {
+  return await writeContainerFile(instanceId, filePath, content);
 }
 
 export async function launchLiveInstance(params: {

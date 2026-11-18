@@ -1,0 +1,25 @@
+FROM public.ecr.aws/amazonlinux/amazonlinux:2023
+
+# Install standard EC2 tools
+RUN dnf install -y --setopt=install_weak_deps=False \
+    procps-ng \
+    iproute \
+    nano \
+    vim-enhanced \
+    which \
+    sudo \
+    shadow-utils \
+    && dnf clean all
+
+# Create ec2-user with passwordless sudo (AWS standard)
+RUN useradd -m -s /bin/bash ec2-user && \
+    echo "ec2-user ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/90-cloud-init-users && \
+    chmod 0440 /etc/sudoers.d/90-cloud-init-users
+
+# Set up ec2-user home
+USER ec2-user
+WORKDIR /home/ec2-user
+
+RUN echo "Welcome to your Amazon EC2 instance running Amazon Linux 2023." > /home/ec2-user/readme.txt
+
+CMD ["tail", "-f", "/dev/null"]

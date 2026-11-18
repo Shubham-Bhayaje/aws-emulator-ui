@@ -14,6 +14,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { DEFAULT_INSTANCES, EC2Instance } from "@/lib/ec2-data";
+import EC2TerminalModal from "./EC2TerminalModal";
 import {
   fetchLiveEC2Instances,
   startLiveInstance,
@@ -43,6 +44,7 @@ export default function InstancesClient({
   // Modals & dropdowns
   const [showStateMenu, setShowStateMenu] = useState(false);
   const [showConnectModal, setShowConnectModal] = useState(false);
+  const [showTerminalModal, setShowTerminalModal] = useState(false);
   const [showTerminateModal, setShowTerminateModal] = useState(false);
   const [activeConnectTab, setActiveConnectTab] = useState<"instance-connect" | "ssh" | "session-manager">("instance-connect");
   const [copiedSsh, setCopiedSsh] = useState(false);
@@ -662,8 +664,8 @@ export default function InstancesClient({
                   </button>
                   <button
                     onClick={() => {
-                      alert(`Initiating EC2 Instance Connect session to ${selectedInstance.id} (ec2-user@${selectedInstance.publicIp})...`);
                       setShowConnectModal(false);
+                      setShowTerminalModal(true);
                     }}
                     className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07]"
                   >
@@ -730,8 +732,8 @@ export default function InstancesClient({
                   </button>
                   <button
                     onClick={() => {
-                      alert(`Starting Session Manager session to ${selectedInstance.id}...`);
                       setShowConnectModal(false);
+                      setShowTerminalModal(true);
                     }}
                     className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07]"
                   >
@@ -770,6 +772,15 @@ export default function InstancesClient({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Interactive EC2 Terminal Modal */}
+      {showTerminalModal && selectedInstance && (
+        <EC2TerminalModal
+          isOpen={showTerminalModal}
+          onClose={() => setShowTerminalModal(false)}
+          instance={selectedInstance}
+        />
       )}
     </div>
   );

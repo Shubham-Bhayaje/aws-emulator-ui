@@ -10,6 +10,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { EC2Instance } from "@/lib/ec2-data";
+import EC2TerminalModal from "./EC2TerminalModal";
 import {
   LiveInstanceDetail,
   startLiveInstance,
@@ -37,6 +38,7 @@ export default function InstanceDetailClient({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<string | null>(null);
+  const [showTerminalModal, setShowTerminalModal] = useState(false);
 
   const [instance, setInstanceState] = useState<LiveInstanceDetail | null>(liveDetail || null);
 
@@ -140,6 +142,15 @@ export default function InstanceDetailClient({
           </div>
 
           <div className="flex items-center gap-2">
+            {instance.state === "running" && (
+              <button
+                onClick={() => setShowTerminalModal(true)}
+                className="px-3 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07]"
+              >
+                Connect
+              </button>
+            )}
+
             {instance.state === "running" ? (
               <button
                 onClick={() => handleStateChange("stopped")}
@@ -504,6 +515,15 @@ export default function InstanceDetailClient({
           </div>
         )}
       </div>
+
+      {/* Interactive EC2 Terminal Modal */}
+      {showTerminalModal && (
+        <EC2TerminalModal
+          isOpen={showTerminalModal}
+          onClose={() => setShowTerminalModal(false)}
+          instance={instance}
+        />
+      )}
     </div>
   );
 }
