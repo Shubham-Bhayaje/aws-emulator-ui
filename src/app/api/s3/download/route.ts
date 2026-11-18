@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const bytes = await body.transformToByteArray();
     const fileName = key.split("/").pop() || "download";
 
-    return new NextResponse(bytes, {
+    return new NextResponse(Buffer.from(bytes), {
       headers: {
         "Content-Type": res.ContentType || "application/octet-stream",
         "Content-Disposition": `attachment; filename="${fileName}"`,

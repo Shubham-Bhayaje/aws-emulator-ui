@@ -72,6 +72,13 @@ This web UI connects directly to your local emulator over HTTPS and provides ded
   - Instant live filter and search with category counts and quick jump links.
   - Universal dynamic service routing (`/[service]`): any service in the catalog opens in an authentic Cloudscape console layout with documentation links.
 
+- **AWS Management Console Home & Interactive Widgets**:
+  - **Cost and Usage & AWS Budgets**: Month-to-date spending, end-of-month forecasted spend, 6-month stacked bar chart, interactive service and usage type filtering, and real-time AWS Budgets tracking with customizable alert thresholds.
+  - **Security Hub Posture**: Live compliance posture score, failed controls auditing against local emulator resources (IAM, S3, SQS), interactive findings remediation, and findings suppression.
+  - **AWS Health Dashboard**: Live connection latency diagnostics for local emulator services (S3, DynamoDB, SQS, IAM, STS), scheduled maintenance tracking, and operational advisories.
+  - **Recently Visited Services**: 2-column launcher with authentic vector icons, automatic activity tracking, and history management.
+  - **Console Layout Customization**: Add, remove, and reset console home widgets with persistent local state.
+
 - **Cross-Platform Dev Runner (`scripts/dev.js`)**:
   - Automatically locates the emulator TLS certificate (`ca.pem`) on Windows (`%USERPROFILE%`), macOS, or Linux/WSL.
   - Injects `NODE_EXTRA_CA_CERTS` and credentials so the UI communicates with the emulator securely without disabling TLS checks.
@@ -91,7 +98,7 @@ This web UI connects directly to your local emulator over HTTPS and provides ded
 ## Screenshots
 
 ### AWS Management Console Dashboard
-![AWS Emulator UI Console Home Dashboard showing service shortcuts, recent services, and welcome banner](docs/images/console-home.png)
+![AWS Emulator UI Console Home Dashboard featuring Cost & Usage, AWS Budgets, Security Hub, AWS Health, and Recently Visited widgets](docs/images/console-home.png)
 
 ---
 

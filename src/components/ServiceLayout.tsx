@@ -34,10 +34,19 @@ export default function ServiceLayout({
   // Track recently visited
   useEffect(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem("recentServices") || "[]");
-      const filtered = stored.filter((s: { name: string }) => s.name !== serviceName);
-      filtered.unshift({ name: serviceName, href: `/${serviceName.toLowerCase().replace(/\s/g, "")}`, visitedAt: Date.now() });
-      localStorage.setItem("recentServices", JSON.stringify(filtered.slice(0, 10)));
+      const stored: Array<{ name: string; href: string; visitedAt?: number }> = JSON.parse(
+        localStorage.getItem("recentServices") || "[]"
+      );
+      const targetHref = `/${serviceName.toLowerCase().replace(/\s+/g, "")}`;
+      const filtered = stored.filter(
+        (s) =>
+          s &&
+          s.href &&
+          s.href.toLowerCase().trim() !== targetHref.toLowerCase().trim() &&
+          s.name.toLowerCase().trim() !== serviceName.toLowerCase().trim()
+      );
+      filtered.unshift({ name: serviceName, href: targetHref, visitedAt: Date.now() });
+      localStorage.setItem("recentServices", JSON.stringify(filtered.slice(0, 16)));
     } catch { /* ignore */ }
   }, [serviceName]);
 

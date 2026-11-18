@@ -57,7 +57,7 @@ export default async function UserDetailPage({ params }: PageProps) {
       allPolicies = (policiesRes.Policies ?? [])
         .map((p) => ({
           name: p.PolicyName ?? "",
-          arn: p.Arn ?? p.PolicyArn ?? "",
+          arn: p.Arn ?? "",
         }))
         .filter((p) => p.name && p.arn)
         .sort((a, b) => a.name.localeCompare(b.name));

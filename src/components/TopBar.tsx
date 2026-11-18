@@ -136,10 +136,18 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
 
   function handleServiceClick(name: string, href: string) {
     try {
-      const stored = JSON.parse(localStorage.getItem("recentServices") || "[]");
-      const filtered = stored.filter((s: { name: string }) => s.name !== name);
+      const stored: Array<{ name: string; href: string; visitedAt?: number }> = JSON.parse(
+        localStorage.getItem("recentServices") || "[]"
+      );
+      const filtered = stored.filter(
+        (s) =>
+          s &&
+          s.href &&
+          s.href.toLowerCase().trim() !== href.toLowerCase().trim() &&
+          s.name.toLowerCase().trim() !== name.toLowerCase().trim()
+      );
       filtered.unshift({ name, href, visitedAt: Date.now() });
-      localStorage.setItem("recentServices", JSON.stringify(filtered.slice(0, 10)));
+      localStorage.setItem("recentServices", JSON.stringify(filtered.slice(0, 16)));
     } catch { /* ignore */ }
     closeAllDropdowns();
     setServicesSearchQuery("");

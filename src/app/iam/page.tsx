@@ -5,12 +5,11 @@
 
 import Link from "next/link";
 import ServiceLayout from "@/components/ServiceLayout";
-import { iam, sts } from "@/lib/aws";
+import { iam } from "@/lib/aws";
 import {
   ListUsersCommand,
   ListRolesCommand,
   ListPoliciesCommand,
-  GetCallerIdentityCommand,
 } from "@aws-sdk/client-iam";
 
 export const iamNav = [
