@@ -18,6 +18,7 @@ import { DynamoDBClient } from "@aws-sdk/client-dynamodb";
 import { IAMClient } from "@aws-sdk/client-iam";
 import { STSClient } from "@aws-sdk/client-sts";
 import { EC2Client } from "@aws-sdk/client-ec2";
+import { LambdaClient } from "@aws-sdk/client-lambda";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -59,3 +60,10 @@ export const sts = new STSClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });
+
+// --- Lambda ---
+export const lambda = new LambdaClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
