@@ -5,9 +5,14 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useTransition } from "react";
 import Link from "next/link";
-import { NetworkInterfaceModel } from "@/app/ec2/actions";
+import {
+  NetworkInterfaceModel,
+  createLiveNetworkInterface,
+  deleteLiveNetworkInterface,
+  fetchLiveNetworkInterfaces,
+} from "@/app/ec2/actions";
 
 interface Props {
   initialInterfaces: NetworkInterfaceModel[];
@@ -15,8 +20,48 @@ interface Props {
 }
 
 export default function NetworkInterfacesClient({ initialInterfaces, isLive }: Props) {
-  const [interfaces] = useState<NetworkInterfaceModel[]>(initialInterfaces);
+  const [interfaces, setInterfaces] = useState<NetworkInterfaceModel[]>(initialInterfaces);
   const [searchQuery, setSearchQuery] = useState("");
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [selectedEniId, setSelectedEniId] = useState<string | null>(null);
+
+  // Form
+  const [subnetId, setSubnetId] = useState("subnet-00000000000000007");
+  const [desc, setDesc] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  function handleCreate(e: React.FormEvent) {
+    e.preventDefault();
+    if (!subnetId.trim()) return;
+
+    startTransition(async () => {
+      const res = await createLiveNetworkInterface(subnetId.trim(), desc.trim());
+      if (res.success) {
+        const fresh = await fetchLiveNetworkInterfaces();
+        setInterfaces(fresh.interfaces);
+        setShowCreateModal(false);
+        setDesc("");
+      } else {
+        alert("Failed to create network interface: " + res.error);
+      }
+    });
+  }
+
+  function handleDelete() {
+    if (!selectedEniId) return;
+    const targetId = selectedEniId;
+    setShowDeleteModal(false);
+    setSelectedEniId(null);
+
+    setInterfaces(interfaces.filter((e) => e.id !== targetId));
+
+    startTransition(async () => {
+      await deleteLiveNetworkInterface(targetId);
+      const fresh = await fetchLiveNetworkInterfaces();
+      setInterfaces(fresh.interfaces);
+    });
+  }
 
   const filteredEnis = interfaces.filter(
     (eni) =>
@@ -55,6 +100,13 @@ export default function NetworkInterfacesClient({ initialInterfaces, isLive }: P
               An Elastic Network Interface (ENI) represents a virtual network interface card in your VPC.
             </p>
           </div>
+
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-1.5 bg-[#ec7211] text-white rounded-sm text-[13px] font-medium hover:bg-[#eb5f07]"
+          >
+            Create network interface
+          </button>
         </div>
 
         {/* Filter bar */}
@@ -80,13 +132,14 @@ export default function NetworkInterfacesClient({ initialInterfaces, isLive }: P
                 <th className="py-2.5 px-3">Instance ID</th>
                 <th className="py-2.5 px-3">VPC ID</th>
                 <th className="py-2.5 px-3">Subnet ID</th>
+                <th className="py-2.5 px-3 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#eaeded] text-[#16191f]">
               {filteredEnis.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-8 text-center text-[#545b64]">
-                    No network interfaces found.
+                  <td colSpan={9} className="py-8 text-center text-[#545b64]">
+                    No network interfaces found on the emulator.
                   </td>
                 </tr>
               ) : (
@@ -126,6 +179,17 @@ export default function NetworkInterfacesClient({ initialInterfaces, isLive }: P
                     <td className="py-3 px-3 font-mono text-[12px] text-[#545b64]">
                       {eni.subnetId}
                     </td>
+                    <td className="py-3 px-3 text-right">
+                      <button
+                        onClick={() => {
+                          setSelectedEniId(eni.id);
+                          setShowDeleteModal(true);
+                        }}
+                        className="text-[#d13212] hover:underline text-[12px]"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -133,6 +197,88 @@ export default function NetworkInterfacesClient({ initialInterfaces, isLive }: P
           </table>
         </div>
       </div>
+
+      {/* Create Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+          <form
+            onSubmit={handleCreate}
+            className="bg-white rounded-sm border border-[#d5dbdb] awsui-shadow w-full max-w-md p-6 space-y-4"
+          >
+            <h3 className="text-[17px] font-bold text-[#16191f]">Create network interface</h3>
+
+            <div>
+              <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                Subnet ID <span className="text-[#d13212]">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={subnetId}
+                onChange={(e) => setSubnetId(e.target.value)}
+                className="w-full px-3 py-1.5 border border-[#aab7b8] rounded font-mono text-[13px]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                Description
+              </label>
+              <input
+                type="text"
+                placeholder="Optional description"
+                value={desc}
+                onChange={(e) => setDesc(e.target.value)}
+                className="w-full px-3 py-1.5 border border-[#aab7b8] rounded text-[13px]"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#eaeded]">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-4 py-1.5 border border-[#545b64] rounded text-[13px]"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isPending}
+                className="px-4 py-1.5 bg-[#ec7211] text-white rounded text-[13px] font-medium hover:bg-[#eb5f07]"
+              >
+                {isPending ? "Creating..." : "Create network interface"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Delete Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+          <div className="bg-white rounded-sm border border-[#d5dbdb] awsui-shadow w-full max-w-md p-6">
+            <h3 className="text-[17px] font-bold text-[#16191f]">Delete network interface</h3>
+            <p className="text-[13px] text-[#545b64] mt-2">
+              Are you sure you want to delete network interface{" "}
+              <strong className="text-[#16191f] font-mono">{selectedEniId}</strong>?
+            </p>
+            <div className="flex items-center justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-1.5 border border-[#545b64] rounded text-[13px]"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-1.5 bg-[#d13212] text-white rounded text-[13px] font-medium hover:bg-[#b02008]"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 /**
  * src/components/ec2/InstanceTypesClient.tsx – Instance Types Catalog Client.
+ * Displays real instance types queried from AWS emulator.
  * Zero emojis, Cloudscape enterprise styling.
  */
 
@@ -10,46 +11,48 @@ import Link from "next/link";
 
 interface InstanceTypeSpec {
   name: string;
-  family: string;
   vCpu: number;
   memoryGib: number;
-  arch: "x86_64" | "arm64" | "both";
-  storage: string;
+  arch: string;
   networkPerf: string;
-  ebsOptimized: boolean;
-  freeTier: boolean;
+  currentGeneration: boolean;
 }
 
-const INSTANCE_TYPES: InstanceTypeSpec[] = [
-  { name: "t3.nano", family: "General Purpose", vCpu: 2, memoryGib: 0.5, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "t3.micro", family: "General Purpose", vCpu: 2, memoryGib: 1.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: true },
-  { name: "t3.small", family: "General Purpose", vCpu: 2, memoryGib: 2.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "t3.medium", family: "General Purpose", vCpu: 2, memoryGib: 4.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "t3.large", family: "General Purpose", vCpu: 2, memoryGib: 8.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "t3.xlarge", family: "General Purpose", vCpu: 4, memoryGib: 16.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "t4g.nano", family: "General Purpose", vCpu: 2, memoryGib: 0.5, arch: "arm64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "t4g.micro", family: "General Purpose", vCpu: 2, memoryGib: 1.0, arch: "arm64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: true },
-  { name: "t4g.small", family: "General Purpose", vCpu: 2, memoryGib: 2.0, arch: "arm64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "t4g.medium", family: "General Purpose", vCpu: 2, memoryGib: 4.0, arch: "arm64", storage: "EBS only", networkPerf: "Up to 5 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "m5.large", family: "General Purpose", vCpu: 2, memoryGib: 8.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 10 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "m5.xlarge", family: "General Purpose", vCpu: 4, memoryGib: 16.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 10 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "c5.large", family: "Compute Optimized", vCpu: 2, memoryGib: 4.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 10 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "c5.xlarge", family: "Compute Optimized", vCpu: 4, memoryGib: 8.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 10 Gbps", ebsOptimized: true, freeTier: false },
-  { name: "r5.large", family: "Memory Optimized", vCpu: 2, memoryGib: 16.0, arch: "x86_64", storage: "EBS only", networkPerf: "Up to 10 Gbps", ebsOptimized: true, freeTier: false },
-];
+interface Props {
+  types: InstanceTypeSpec[];
+  isLive: boolean;
+}
 
-export default function InstanceTypesClient() {
+export default function InstanceTypesClient({ types, isLive }: Props) {
   const [search, setSearch] = useState("");
-  const [familyFilter, setFamilyFilter] = useState("all");
 
-  const filtered = INSTANCE_TYPES.filter((t) => {
-    const matchSearch = t.name.toLowerCase().includes(search.toLowerCase());
-    const matchFamily = familyFilter === "all" || t.family === familyFilter;
-    return matchSearch && matchFamily;
-  });
+  const filtered = types.filter((t) =>
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    t.arch.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <div className="space-y-6">
+      {/* Live Badge */}
+      <div className="flex items-center justify-between bg-white border border-[#d5dbdb] px-4 py-2.5 rounded-sm awsui-shadow">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block w-2.5 h-2.5 rounded-full ${
+                isLive ? "bg-[#1d8102]" : "bg-[#ec7211]"
+              }`}
+            />
+            <span className="text-[12px] font-semibold text-[#16191f]">
+              {isLive ? "Live Instance Types (AWS Emulator)" : "Mock Mode"}
+            </span>
+          </div>
+          <span className="text-[#95a5a6] text-[12px]">|</span>
+          <span className="text-[12px] font-mono text-[#545b64]">
+            Total supported: {types.length} types
+          </span>
+        </div>
+      </div>
+
       <div className="bg-white border border-[#eaeded] rounded-sm awsui-shadow">
         <div className="p-4 border-b border-[#eaeded] flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
@@ -67,7 +70,7 @@ export default function InstanceTypesClient() {
         </div>
 
         {/* Filter Bar */}
-        <div className="p-3 border-b border-[#eaeded] bg-[#fafafa] flex flex-wrap items-center gap-3">
+        <div className="p-3 border-b border-[#eaeded] bg-[#fafafa]">
           <input
             type="text"
             placeholder="Search instance type name (e.g. t3.micro)..."
@@ -75,16 +78,6 @@ export default function InstanceTypesClient() {
             onChange={(e) => setSearch(e.target.value)}
             className="w-full max-w-sm px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white"
           />
-          <select
-            value={familyFilter}
-            onChange={(e) => setFamilyFilter(e.target.value)}
-            className="px-2.5 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white"
-          >
-            <option value="all">All families</option>
-            <option value="General Purpose">General Purpose</option>
-            <option value="Compute Optimized">Compute Optimized</option>
-            <option value="Memory Optimized">Memory Optimized</option>
-          </select>
         </div>
 
         <div className="overflow-x-auto">
@@ -92,33 +85,25 @@ export default function InstanceTypesClient() {
             <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64] text-[11px] font-semibold uppercase tracking-wider">
               <tr>
                 <th className="py-2.5 px-4">Instance type</th>
-                <th className="py-2.5 px-3">Family</th>
                 <th className="py-2.5 px-3">vCPUs</th>
                 <th className="py-2.5 px-3">Memory (GiB)</th>
                 <th className="py-2.5 px-3">Architecture</th>
-                <th className="py-2.5 px-3">Storage</th>
                 <th className="py-2.5 px-3">Network performance</th>
-                <th className="py-2.5 px-3">Free tier eligible</th>
+                <th className="py-2.5 px-3">Generation</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#eaeded] text-[#16191f]">
               {filtered.map((t) => (
                 <tr key={t.name} className="hover:bg-[#f2f8fd]">
                   <td className="py-3 px-4 font-mono font-bold text-[#0073bb]">{t.name}</td>
-                  <td className="py-3 px-3 text-[#545b64]">{t.family}</td>
                   <td className="py-3 px-3 font-mono font-semibold">{t.vCpu}</td>
                   <td className="py-3 px-3 font-mono">{t.memoryGib} GiB</td>
                   <td className="py-3 px-3 font-mono text-[12px]">{t.arch}</td>
-                  <td className="py-3 px-3 text-[#545b64]">{t.storage}</td>
                   <td className="py-3 px-3 text-[#545b64]">{t.networkPerf}</td>
                   <td className="py-3 px-3">
-                    {t.freeTier ? (
-                      <span className="inline-block px-2 py-0.5 rounded text-[11px] font-semibold bg-[#e6f4ea] text-[#137333]">
-                        Free tier eligible
-                      </span>
-                    ) : (
-                      <span className="text-[#545b64]">—</span>
-                    )}
+                    <span className="inline-block px-2 py-0.5 rounded text-[11px] font-medium bg-[#f2f3f3] text-[#16191f]">
+                      {t.currentGeneration ? "Current gen" : "Previous gen"}
+                    </span>
                   </td>
                 </tr>
               ))}

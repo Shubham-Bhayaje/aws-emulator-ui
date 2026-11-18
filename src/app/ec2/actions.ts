@@ -31,6 +31,23 @@ import {
   CreateVolumeCommand,
   DeleteVolumeCommand,
   DescribeNetworkInterfacesCommand,
+  DescribeImagesCommand,
+  DescribeInstanceTypesCommand,
+  DescribeLaunchTemplatesCommand,
+  DescribeSnapshotsCommand,
+  DescribePlacementGroupsCommand,
+  DescribeSpotInstanceRequestsCommand,
+  DescribeReservedInstancesCommand,
+  DescribeHostsCommand,
+  DescribeCapacityReservationsCommand,
+  CreateSnapshotCommand,
+  DeleteSnapshotCommand,
+  CreatePlacementGroupCommand,
+  DeletePlacementGroupCommand,
+  CreateLaunchTemplateCommand,
+  DeleteLaunchTemplateCommand,
+  CreateNetworkInterfaceCommand,
+  DeleteNetworkInterfaceCommand,
 } from "@aws-sdk/client-ec2";
 import { revalidatePath } from "next/cache";
 import {
@@ -799,21 +816,396 @@ export async function fetchLiveNetworkInterfaces(): Promise<{
   } catch (err: any) {
     console.warn("[EC2 Action] Failed to fetch live ENIs:", err.message);
     return {
-      interfaces: [
-        {
-          id: "eni-00000000000000090",
-          subnetId: "subnet-00000000000000007",
-          vpcId: "vpc-00000000000000001",
-          status: "in-use",
-          privateIp: "172.31.8.4",
-          publicIp: "54.0.0.2",
-          macAddress: "02:00:00:00:00:90",
-          instanceId: "i-00000000000000001",
-          description: "Primary network interface",
-        },
-      ],
+      interfaces: [],
       isLive: false,
       error: err.message,
     };
+  }
+}
+
+// -------------------------------------------------------------
+// Live Emulator Queries: AMIs, Launch Templates, Types, Snapshots, etc.
+// -------------------------------------------------------------
+
+export async function fetchLiveAmis(): Promise<{
+  amis: Array<{
+    id: string;
+    name: string;
+    owner: string;
+    state: string;
+    platform: string;
+    architecture: string;
+    creationDate: string;
+    description: string;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeImagesCommand({ Owners: ["self"] }));
+    const raw = res.Images || [];
+    const mapped = raw.map((img) => ({
+      id: img.ImageId || "ami-unknown",
+      name: img.Name || "Unnamed AMI",
+      owner: img.OwnerId || "self",
+      state: img.State || "available",
+      platform: img.PlatformDetails || "Linux/UNIX",
+      architecture: img.Architecture || "x86_64",
+      creationDate: img.CreationDate ? new Date(img.CreationDate).toLocaleDateString() : "—",
+      description: img.Description || "—",
+    }));
+    return { amis: mapped, isLive: true };
+  } catch (err: any) {
+    return { amis: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLiveInstanceTypes(): Promise<{
+  types: Array<{
+    name: string;
+    vCpu: number;
+    memoryGib: number;
+    arch: string;
+    networkPerf: string;
+    currentGeneration: boolean;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeInstanceTypesCommand({ MaxResults: 100 }));
+    const raw = res.InstanceTypes || [];
+    const mapped = raw.map((t) => ({
+      name: t.InstanceType || "t3.micro",
+      vCpu: t.VCpuInfo?.DefaultVCpus || 1,
+      memoryGib: ((t.MemoryInfo?.SizeInMiB || 1024) / 1024),
+      arch: t.ProcessorInfo?.SupportedArchitectures?.join(", ") || "x86_64",
+      networkPerf: t.NetworkInfo?.NetworkPerformance || "Up to 5 Gbps",
+      currentGeneration: Boolean(t.CurrentGeneration),
+    }));
+    return { types: mapped, isLive: true };
+  } catch (err: any) {
+    return { types: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLiveLaunchTemplates(): Promise<{
+  templates: Array<{
+    id: string;
+    name: string;
+    defaultVersion: number;
+    latestVersion: number;
+    createTime: string;
+    createdBy: string;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeLaunchTemplatesCommand({}));
+    const raw = res.LaunchTemplates || [];
+    const mapped = raw.map((lt) => ({
+      id: lt.LaunchTemplateId || "lt-unknown",
+      name: lt.LaunchTemplateName || "Unnamed Template",
+      defaultVersion: lt.DefaultVersionNumber || 1,
+      latestVersion: lt.LatestVersionNumber || 1,
+      createTime: lt.CreateTime ? new Date(lt.CreateTime).toLocaleString() : "—",
+      createdBy: lt.CreatedBy || "arn:aws:iam::000000000000:root",
+    }));
+    return { templates: mapped, isLive: true };
+  } catch (err: any) {
+    return { templates: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLiveSnapshots(): Promise<{
+  snapshots: Array<{
+    id: string;
+    volumeId: string;
+    sizeGb: number;
+    state: string;
+    progress: string;
+    startTime: string;
+    description: string;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeSnapshotsCommand({ OwnerIds: ["self"] }));
+    const raw = res.Snapshots || [];
+    const mapped = raw.map((s) => ({
+      id: s.SnapshotId || "snap-unknown",
+      volumeId: s.VolumeId || "—",
+      sizeGb: s.VolumeSize || 0,
+      state: s.State || "completed",
+      progress: s.Progress || "100%",
+      startTime: s.StartTime ? new Date(s.StartTime).toLocaleString() : "—",
+      description: s.Description || "—",
+    }));
+    return { snapshots: mapped, isLive: true };
+  } catch (err: any) {
+    return { snapshots: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLivePlacementGroups(): Promise<{
+  placementGroups: Array<{
+    groupName: string;
+    strategy: string;
+    state: string;
+    groupId: string;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribePlacementGroupsCommand({}));
+    const raw = res.PlacementGroups || [];
+    const mapped = raw.map((pg) => ({
+      groupName: pg.GroupName || "pg-default",
+      strategy: pg.Strategy || "cluster",
+      state: pg.State || "available",
+      groupId: pg.GroupId || "—",
+    }));
+    return { placementGroups: mapped, isLive: true };
+  } catch (err: any) {
+    return { placementGroups: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLiveSpotRequests(): Promise<{
+  spotRequests: Array<{
+    id: string;
+    type: string;
+    status: string;
+    instanceType: string;
+    createTime: string;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeSpotInstanceRequestsCommand({}));
+    const raw = res.SpotInstanceRequests || [];
+    const mapped = raw.map((sr) => ({
+      id: sr.SpotInstanceRequestId || "sir-unknown",
+      type: sr.Type || "one-time",
+      status: sr.Status?.Code || "pending-evaluation",
+      instanceType: sr.LaunchSpecification?.InstanceType || "t3.micro",
+      createTime: sr.CreateTime ? new Date(sr.CreateTime).toLocaleString() : "—",
+    }));
+    return { spotRequests: mapped, isLive: true };
+  } catch (err: any) {
+    return { spotRequests: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLiveReservedInstances(): Promise<{
+  reservedInstances: Array<{
+    id: string;
+    instanceType: string;
+    availabilityZone: string;
+    state: string;
+    instanceCount: number;
+    duration: number;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeReservedInstancesCommand({}));
+    const raw = res.ReservedInstances || [];
+    const mapped = raw.map((ri) => ({
+      id: ri.ReservedInstancesId || "ri-unknown",
+      instanceType: ri.InstanceType || "t3.micro",
+      availabilityZone: ri.AvailabilityZone || "us-east-1a",
+      state: ri.State || "active",
+      instanceCount: ri.InstanceCount || 1,
+      duration: ri.Duration || 31536000,
+    }));
+    return { reservedInstances: mapped, isLive: true };
+  } catch (err: any) {
+    return { reservedInstances: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLiveDedicatedHosts(): Promise<{
+  hosts: Array<{
+    hostId: string;
+    instanceType: string;
+    state: string;
+    availabilityZone: string;
+    cores: number;
+    totalVCpus: number;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeHostsCommand({}));
+    const raw = res.Hosts || [];
+    const mapped = raw.map((h) => ({
+      hostId: h.HostId || "h-unknown",
+      instanceType: h.HostProperties?.InstanceType || "m5.large",
+      state: h.State || "available",
+      availabilityZone: h.AvailabilityZone || "us-east-1a",
+      cores: h.HostProperties?.Cores || 48,
+      totalVCpus: h.HostProperties?.TotalVCpus || 96,
+    }));
+    return { hosts: mapped, isLive: true };
+  } catch (err: any) {
+    return { hosts: [], isLive: false, error: err.message };
+  }
+}
+
+export async function fetchLiveCapacityReservations(): Promise<{
+  reservations: Array<{
+    id: string;
+    instanceType: string;
+    availabilityZone: string;
+    totalInstanceCount: number;
+    availableInstanceCount: number;
+    state: string;
+  }>;
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeCapacityReservationsCommand({}));
+    const raw = res.CapacityReservations || [];
+    const mapped = raw.map((cr) => ({
+      id: cr.CapacityReservationId || "cr-unknown",
+      instanceType: cr.InstanceType || "t3.micro",
+      availabilityZone: cr.AvailabilityZone || "us-east-1a",
+      totalInstanceCount: cr.TotalInstanceCount || 1,
+      availableInstanceCount: cr.AvailableInstanceCount || 1,
+      state: cr.State || "active",
+    }));
+    return { reservations: mapped, isLive: true };
+  } catch (err: any) {
+    return { reservations: [], isLive: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Live CRUD: Snapshots, Launch Templates, Placement Groups, ENIs
+// -------------------------------------------------------------
+
+export async function createLiveSnapshot(
+  volumeId: string,
+  description?: string
+): Promise<{ success: boolean; snapshotId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new CreateSnapshotCommand({
+        VolumeId: volumeId,
+        Description: description || "Created via AWS Console UI",
+      })
+    );
+    revalidatePath("/ec2/snapshots");
+    return { success: true, snapshotId: res.SnapshotId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveSnapshot(snapshotId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new DeleteSnapshotCommand({ SnapshotId: snapshotId }));
+    revalidatePath("/ec2/snapshots");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function createLiveLaunchTemplate(params: {
+  name: string;
+  imageId: string;
+  instanceType: string;
+}): Promise<{ success: boolean; templateId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new CreateLaunchTemplateCommand({
+        LaunchTemplateName: params.name,
+        LaunchTemplateData: {
+          ImageId: params.imageId || "ami-0c7217cdde317cfec",
+          InstanceType: (params.instanceType as any) || "t3.micro",
+        },
+      })
+    );
+    revalidatePath("/ec2/launch-templates");
+    return { success: true, templateId: res.LaunchTemplate?.LaunchTemplateId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveLaunchTemplate(templateId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new DeleteLaunchTemplateCommand({ LaunchTemplateId: templateId }));
+    revalidatePath("/ec2/launch-templates");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function createLivePlacementGroup(
+  groupName: string,
+  strategy: string = "cluster"
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(
+      new CreatePlacementGroupCommand({
+        GroupName: groupName,
+        Strategy: strategy as any,
+      })
+    );
+    revalidatePath("/ec2/placement-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLivePlacementGroup(groupName: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new DeletePlacementGroupCommand({ GroupName: groupName }));
+    revalidatePath("/ec2/placement-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function createLiveNetworkInterface(
+  subnetId: string,
+  description?: string
+): Promise<{ success: boolean; interfaceId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new CreateNetworkInterfaceCommand({
+        SubnetId: subnetId,
+        Description: description || "Created via AWS Console UI",
+      })
+    );
+    revalidatePath("/ec2/network-interfaces");
+    return { success: true, interfaceId: res.NetworkInterface?.NetworkInterfaceId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveNetworkInterface(
+  networkInterfaceId: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new DeleteNetworkInterfaceCommand({ NetworkInterfaceId: networkInterfaceId }));
+    revalidatePath("/ec2/network-interfaces");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
 }
