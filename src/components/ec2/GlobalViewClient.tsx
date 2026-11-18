@@ -204,7 +204,7 @@ export default function GlobalViewClient({
               }`}
             />
             <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "Live AWS Emulator Connected" : "Local Mock Mode"} (127.0.0.1:9297)
+              {isLive ? "Live AWS Emulator Connected" : "Disconnected from AWS Emulator"} (127.0.0.1:9297)
             </span>
           </div>
           <span className="text-[#95a5a6] text-[12px]">|</span>

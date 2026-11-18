@@ -25,6 +25,21 @@ interface InstanceDetailClientProps {
   errorMessage?: string;
 }
 
+const CLOUDWATCH_METRICS = [
+  { name: "CPU utilization (Percent)", stat: "Average", period: "5 minutes" },
+  { name: "Status check failed: any (Count)", stat: "Maximum", period: "1 minute" },
+  { name: "Status check failed: instance (Count)", stat: "Maximum", period: "1 minute" },
+  { name: "Status check failed: system (Count)", stat: "Maximum", period: "1 minute" },
+  { name: "Network in (Bytes)", stat: "Sum", period: "5 minutes" },
+  { name: "Network out (Bytes)", stat: "Sum", period: "5 minutes" },
+  { name: "Network packets in (Count)", stat: "Sum", period: "5 minutes" },
+  { name: "Network packets out (Count)", stat: "Sum", period: "5 minutes" },
+  { name: "Disk read operations (Count)", stat: "Sum", period: "5 minutes" },
+  { name: "Disk write operations (Count)", stat: "Sum", period: "5 minutes" },
+  { name: "Disk read bytes (Bytes)", stat: "Sum", period: "5 minutes" },
+  { name: "Disk write bytes (Bytes)", stat: "Sum", period: "5 minutes" },
+];
+
 export default function InstanceDetailClient({
   instanceId,
   liveDetail,
@@ -41,6 +56,7 @@ export default function InstanceDetailClient({
   const [showTerminalModal, setShowTerminalModal] = useState(false);
 
   const [instance, setInstanceState] = useState<LiveInstanceDetail | null>(liveDetail || null);
+  const [monitoringTimeRange, setMonitoringTimeRange] = useState<"1h" | "3h" | "12h" | "1d" | "3d" | "1w">("1h");
 
   function copyText(txt: string, key: string) {
     navigator.clipboard.writeText(txt);
@@ -303,63 +319,115 @@ export default function InstanceDetailClient({
         )}
 
         {activeTab === "monitoring" && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <h2 className="text-[16px] font-bold text-[#16191f]">CloudWatch Metrics (Emulator Simulation)</h2>
-              <span className="text-[12px] text-[#545b64]">1-minute intervals</span>
+          <div className="space-y-4">
+            {/* Header & Description */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-[#eaeded]">
+              <div>
+                <h2 className="text-[16px] font-bold text-[#16191f]">CloudWatch metrics</h2>
+                <p className="text-[12px] text-[#545b64] mt-0.5">
+                  CloudWatch collects monitoring and operational data in the form of logs, metrics, and events. Basic monitoring (5-minute frequency) is enabled by default.
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  type="button"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="px-3 border border-[#879596] rounded text-[#16191f] text-[13px] font-bold hover:bg-[#fafafa] whitespace-nowrap inline-flex items-center justify-center transition-colors"
+                >
+                  Manage detailed monitoring
+                </button>
+                <button
+                  type="button"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="px-3 border border-[#879596] rounded text-[#16191f] text-[13px] font-bold hover:bg-[#fafafa] whitespace-nowrap inline-flex items-center justify-center transition-colors"
+                >
+                  Manage CloudWatch alarms
+                </button>
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* CPU Utilization Chart */}
-              <div className="p-4 border border-[#eaeded] rounded bg-[#fafafa] space-y-2">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="font-bold text-[#16191f]">CPUUtilization (%)</span>
-                  <span className="font-mono text-[#0073bb]">Avg: 3.2%</span>
-                </div>
-                <svg className="w-full h-28" viewBox="0 0 300 100">
-                  <polyline
-                    fill="none"
-                    stroke="#0073bb"
-                    strokeWidth="2"
-                    points="0,85 30,80 60,78 90,65 120,70 150,60 180,68 210,72 240,65 270,70 300,68"
-                  />
-                  <line x1="0" y1="95" x2="300" y2="95" stroke="#d5dbdb" strokeWidth="1" />
-                </svg>
+            {/* Status & Filter Toolbar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#f8f9fa] border border-[#eaeded] rounded text-[12px]">
+              <div className="flex items-center gap-3 text-[#545b64] flex-wrap">
+                <span>
+                  CloudWatch alarms: <strong className="text-[#16191f]">0 configured</strong>
+                </span>
+                <span className="text-[#d5dbdb]">&bull;</span>
+                <span>
+                  Monitoring: <strong className="text-[#16191f]">Basic (5-minute)</strong>
+                </span>
+                <span className="text-[#d5dbdb]">&bull;</span>
+                <span>
+                  Detailed monitoring: <strong className="text-[#16191f]">Disabled</strong>
+                </span>
               </div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[#545b64] font-medium mr-1">Time range:</span>
+                {(["1h", "3h", "12h", "1d", "3d", "1w"] as const).map((rng) => (
+                  <button
+                    key={rng}
+                    type="button"
+                    onClick={() => setMonitoringTimeRange(rng)}
+                    style={{ height: "26px", minHeight: "26px", maxHeight: "26px", whiteSpace: "nowrap" }}
+                    className={`px-2.5 rounded text-[11px] font-medium transition-colors ${
+                      monitoringTimeRange === rng
+                        ? "bg-[#0073bb] text-white"
+                        : "bg-white border border-[#d5dbdb] text-[#545b64] hover:bg-[#f2f3f3]"
+                    }`}
+                  >
+                    {rng}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-              {/* Network In Chart */}
-              <div className="p-4 border border-[#eaeded] rounded bg-[#fafafa] space-y-2">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="font-bold text-[#16191f]">NetworkIn (Bytes)</span>
-                  <span className="font-mono text-[#10b981]">128 KB</span>
-                </div>
-                <svg className="w-full h-28" viewBox="0 0 300 100">
-                  <polyline
-                    fill="none"
-                    stroke="#10b981"
-                    strokeWidth="2"
-                    points="0,90 30,85 60,60 90,40 120,75 150,80 180,30 210,65 240,50 270,80 300,75"
-                  />
-                  <line x1="0" y1="95" x2="300" y2="95" stroke="#d5dbdb" strokeWidth="1" />
-                </svg>
-              </div>
+            {/* CloudWatch Metric Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {CLOUDWATCH_METRICS.map((metric) => (
+                <div key={metric.name} className="border border-[#eaeded] rounded bg-white overflow-hidden shadow-xs flex flex-col">
+                  {/* Card Header */}
+                  <div className="p-3 border-b border-[#eaeded] flex items-center justify-between bg-[#fafafa]">
+                    <div className="truncate mr-2">
+                      <div className="text-[12px] font-bold text-[#16191f] truncate" title={metric.name}>
+                        {metric.name}
+                      </div>
+                      <div className="text-[11px] text-[#545b64]">
+                        {metric.stat}, {metric.period}
+                      </div>
+                    </div>
+                    <span className="text-[11px] text-[#0073bb] hover:underline cursor-pointer flex-shrink-0">
+                      View in metrics
+                    </span>
+                  </div>
 
-              {/* Disk Read/Write Chart */}
-              <div className="p-4 border border-[#eaeded] rounded bg-[#fafafa] space-y-2">
-                <div className="flex items-center justify-between text-[12px]">
-                  <span className="font-bold text-[#16191f]">DiskReadOps</span>
-                  <span className="font-mono text-[#8b5cf6]">10 IOPS</span>
+                  {/* Authentic AWS Empty Chart Area */}
+                  <div className="relative h-36 bg-white p-3 flex flex-col justify-between">
+                    {/* SVG Grid lines mimicking CloudWatch coordinate grid */}
+                    <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-40" preserveAspectRatio="none">
+                      <line x1="0" y1="25%" x2="100%" y2="25%" stroke="#eaeded" strokeDasharray="3 3" strokeWidth="1" />
+                      <line x1="0" y1="50%" x2="100%" y2="50%" stroke="#eaeded" strokeDasharray="3 3" strokeWidth="1" />
+                      <line x1="0" y1="75%" x2="100%" y2="75%" stroke="#eaeded" strokeDasharray="3 3" strokeWidth="1" />
+                      <line x1="0" y1="100%" x2="100%" y2="100%" stroke="#d5dbdb" strokeWidth="1" />
+                    </svg>
+
+                    {/* Centered Empty State */}
+                    <div className="relative z-10 my-auto text-center px-4">
+                      <div className="text-[12px] font-semibold text-[#545b64]">
+                        No data available
+                      </div>
+                      <div className="text-[11px] text-[#879596] mt-0.5">
+                        There is no metric data to display for this time range.
+                      </div>
+                    </div>
+
+                    {/* Footer timeline note */}
+                    <div className="relative z-10 flex justify-between items-center text-[10px] text-[#879596] pt-1">
+                      <span>-{monitoringTimeRange}</span>
+                      <span>Now</span>
+                    </div>
+                  </div>
                 </div>
-                <svg className="w-full h-28" viewBox="0 0 300 100">
-                  <polyline
-                    fill="none"
-                    stroke="#8b5cf6"
-                    strokeWidth="2"
-                    points="0,92 30,90 60,88 90,85 120,70 150,88 180,82 210,90 240,88 270,85 300,88"
-                  />
-                  <line x1="0" y1="95" x2="300" y2="95" stroke="#d5dbdb" strokeWidth="1" />
-                </svg>
-              </div>
+              ))}
             </div>
           </div>
         )}
@@ -375,7 +443,8 @@ export default function InstanceDetailClient({
               </div>
               <Link
                 href="/ec2/security-groups"
-                className="px-3 py-1.5 bg-[#ec7211] text-white rounded text-[12px] font-medium hover:bg-[#eb5f07] transition-colors"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-3 bg-[#ec7211] text-white rounded text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Edit inbound rules &rarr;
               </Link>

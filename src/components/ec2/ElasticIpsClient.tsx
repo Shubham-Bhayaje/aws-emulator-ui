@@ -169,7 +169,7 @@ export default function ElasticIpsClient({
               }`}
             />
             <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "Elastic IP Service Connected (AWS Emulator)" : "Mock Data Mode"}
+              {isLive ? "Elastic IP Service Connected (AWS Emulator)" : "Disconnected from AWS Emulator (127.0.0.1:9297)"}
             </span>
           </div>
           <span className="text-[#95a5a6] text-[12px]">|</span>

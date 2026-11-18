@@ -58,7 +58,7 @@ export default function AMICatalogClient({ catalogAmis, isLive }: Props) {
               }`}
             />
             <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "AMI Catalog Connected (AWS Emulator)" : "Mock Mode"}
+              {isLive ? "AMI Catalog Connected (AWS Emulator)" : "Disconnected from AWS Emulator (127.0.0.1:9297)"}
             </span>
           </div>
           <span className="text-[#95a5a6] text-[12px]">|</span>
