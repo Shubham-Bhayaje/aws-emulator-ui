@@ -1,18 +1,38 @@
+/**
+ * EC2 Dashboard – Authentic AWS EC2 Management Console Dashboard.
+ * Connected to live AWS Emulator via Server Actions.
+ * Zero emojis, Cloudscape enterprise styling.
+ */
+
 import ServiceLayout from "@/components/ServiceLayout";
-import ComingSoon from "@/components/ComingSoon";
+import { ec2Nav } from "@/components/ec2/EC2Nav";
+import EC2DashboardClient from "@/components/ec2/EC2DashboardClient";
+import {
+  fetchLiveEC2Instances,
+  fetchLiveSecurityGroups,
+  fetchLiveKeyPairs,
+  fetchLiveElasticIps,
+} from "./actions";
 
-const nav = [{ label: "Instances", href: "/ec2" }];
+export const dynamic = "force-dynamic";
 
-export default function EC2Page() {
+export default async function EC2DashboardPage() {
+  const [instRes, sgRes, kpRes, eipRes] = await Promise.all([
+    fetchLiveEC2Instances(),
+    fetchLiveSecurityGroups(),
+    fetchLiveKeyPairs(),
+    fetchLiveElasticIps(),
+  ]);
+
   return (
-    <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={nav}>
-      <h1 className="text-[22px] font-bold text-[#16191f] mb-1">Instances</h1>
-      <p className="text-[13px] text-[#545b64] mb-4">
-        Amazon EC2 provides scalable computing capacity in the AWS Cloud.
-      </p>
-      <ComingSoon
-        serviceName="EC2 Instances"
-        description="Launch and manage virtual servers (EC2 instances) in the cloud. Create, start, stop, and terminate instances with various configurations."
+    <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
+      <EC2DashboardClient
+        initialInstances={instRes.instances}
+        initialSecurityGroups={sgRes.securityGroups}
+        initialKeyPairs={kpRes.keyPairs}
+        initialElasticIps={eipRes.elasticIps}
+        isLive={instRes.isLive}
+        liveError={instRes.error}
       />
     </ServiceLayout>
   );

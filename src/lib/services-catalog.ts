@@ -27,6 +27,7 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/ec2",
     "category": "Compute",
     "color": "#FF9900",
+    "status": "functional",
     "desc": "Virtual servers in the cloud with scalable capacity"
   },
   {
