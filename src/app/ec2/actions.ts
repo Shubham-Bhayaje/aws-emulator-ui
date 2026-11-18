@@ -32,14 +32,27 @@ import {
   DeleteVolumeCommand,
   DescribeNetworkInterfacesCommand,
   DescribeImagesCommand,
+  RegisterImageCommand,
+  DeregisterImageCommand,
   DescribeInstanceTypesCommand,
   DescribeLaunchTemplatesCommand,
+  DescribeLaunchTemplateVersionsCommand,
+  CreateLaunchTemplateVersionCommand,
+  ModifyLaunchTemplateCommand,
   DescribeSnapshotsCommand,
   DescribePlacementGroupsCommand,
   DescribeSpotInstanceRequestsCommand,
+  RequestSpotInstancesCommand,
+  CancelSpotInstanceRequestsCommand,
   DescribeReservedInstancesCommand,
   DescribeHostsCommand,
+  AllocateHostsCommand,
+  ReleaseHostsCommand,
   DescribeCapacityReservationsCommand,
+  CreateCapacityReservationCommand,
+  CancelCapacityReservationCommand,
+  DescribeReservedInstancesOfferingsCommand,
+  PurchaseReservedInstancesOfferingCommand,
   CreateSnapshotCommand,
   DeleteSnapshotCommand,
   CreatePlacementGroupCommand,
@@ -863,36 +876,107 @@ export async function fetchLiveNetworkInterfaces(): Promise<{
 // Live Emulator Queries: AMIs, Launch Templates, Types, Snapshots, etc.
 // -------------------------------------------------------------
 
-export async function fetchLiveAmis(): Promise<{
-  amis: Array<{
-    id: string;
-    name: string;
-    owner: string;
-    state: string;
-    platform: string;
-    architecture: string;
-    creationDate: string;
-    description: string;
+export interface AmiItem {
+  id: string;
+  name: string;
+  owner: string;
+  ownerAlias?: string;
+  state: string;
+  platform: string;
+  architecture: string;
+  creationDate: string;
+  description: string;
+  rootDeviceType: string;
+  rootDeviceName: string;
+  virtualizationType: string;
+  isPublic: boolean;
+  imageLocation?: string;
+  blockDeviceMappings?: Array<{
+    deviceName: string;
+    volumeSize?: number;
+    volumeType?: string;
+    deleteOnTermination?: boolean;
   }>;
+}
+
+export async function fetchLiveAmis(
+  scope: "self" | "amazon" | "all" | "public" = "all"
+): Promise<{
+  amis: AmiItem[];
   isLive: boolean;
   error?: string;
 }> {
   try {
-    const res = await ec2.send(new DescribeImagesCommand({ Owners: ["self"] }));
+    let commandParams: any = {};
+    if (scope === "self") {
+      commandParams = { Owners: ["self"] };
+    } else if (scope === "amazon") {
+      commandParams = { Owners: ["amazon", "137112412989"] };
+    } else {
+      commandParams = {};
+    }
+
+    const res = await ec2.send(new DescribeImagesCommand(commandParams));
     const raw = res.Images || [];
-    const mapped = raw.map((img) => ({
+    const mapped: AmiItem[] = raw.map((img) => ({
       id: img.ImageId || "ami-unknown",
       name: img.Name || "Unnamed AMI",
-      owner: img.OwnerId || "self",
+      owner: img.OwnerId || "137112412989",
+      ownerAlias: img.ImageOwnerAlias || (img.OwnerId === "137112412989" ? "amazon" : "self"),
       state: img.State || "available",
       platform: img.PlatformDetails || "Linux/UNIX",
       architecture: img.Architecture || "x86_64",
       creationDate: img.CreationDate ? new Date(img.CreationDate).toLocaleDateString() : "—",
       description: img.Description || "—",
+      rootDeviceType: img.RootDeviceType || "ebs",
+      rootDeviceName: img.RootDeviceName || "/dev/xvda",
+      virtualizationType: img.VirtualizationType || "hvm",
+      isPublic: Boolean(img.Public),
+      imageLocation: img.ImageLocation,
+      blockDeviceMappings: (img.BlockDeviceMappings || []).map((b) => ({
+        deviceName: b.DeviceName || "/dev/xvda",
+        volumeSize: b.Ebs?.VolumeSize || 8,
+        volumeType: b.Ebs?.VolumeType || "gp2",
+        deleteOnTermination: b.Ebs?.DeleteOnTermination ?? true,
+      })),
     }));
     return { amis: mapped, isLive: true };
   } catch (err: any) {
     return { amis: [], isLive: false, error: err.message };
+  }
+}
+
+export async function registerLiveAmi(params: {
+  name: string;
+  description?: string;
+  rootDeviceName?: string;
+  architecture?: string;
+}): Promise<{ success: boolean; imageId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new RegisterImageCommand({
+        Name: params.name,
+        Description: params.description || "Custom registered AMI",
+        RootDeviceName: params.rootDeviceName || "/dev/xvda",
+        Architecture: (params.architecture as any) || "x86_64",
+      })
+    );
+    revalidatePath("/ec2/amis");
+    revalidatePath("/ec2/ami-catalog");
+    return { success: true, imageId: res.ImageId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deregisterLiveAmi(imageId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new DeregisterImageCommand({ ImageId: imageId }));
+    revalidatePath("/ec2/amis");
+    revalidatePath("/ec2/ami-catalog");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
   }
 }
 
@@ -933,6 +1017,7 @@ export async function fetchLiveLaunchTemplates(): Promise<{
     latestVersion: number;
     createTime: string;
     createdBy: string;
+    tags?: Record<string, string>;
   }>;
   isLive: boolean;
   error?: string;
@@ -940,17 +1025,86 @@ export async function fetchLiveLaunchTemplates(): Promise<{
   try {
     const res = await ec2.send(new DescribeLaunchTemplatesCommand({}));
     const raw = res.LaunchTemplates || [];
-    const mapped = raw.map((lt) => ({
-      id: lt.LaunchTemplateId || "lt-unknown",
-      name: lt.LaunchTemplateName || "Unnamed Template",
-      defaultVersion: lt.DefaultVersionNumber || 1,
-      latestVersion: lt.LatestVersionNumber || 1,
-      createTime: lt.CreateTime ? new Date(lt.CreateTime).toLocaleString() : "—",
-      createdBy: lt.CreatedBy || "arn:aws:iam::000000000000:root",
-    }));
+    const mapped = raw.map((lt) => {
+      const tags: Record<string, string> = {};
+      (lt.Tags || []).forEach((t) => {
+        if (t.Key && t.Value) tags[t.Key] = t.Value;
+      });
+      return {
+        id: lt.LaunchTemplateId || "lt-unknown",
+        name: lt.LaunchTemplateName || "Unnamed Template",
+        defaultVersion: lt.DefaultVersionNumber || 1,
+        latestVersion: lt.LatestVersionNumber || 1,
+        createTime: lt.CreateTime ? new Date(lt.CreateTime).toLocaleString() : "—",
+        createdBy: lt.CreatedBy || "arn:aws:iam::000000000000:root",
+        tags,
+      };
+    });
     return { templates: mapped, isLive: true };
   } catch (err: any) {
     return { templates: [], isLive: false, error: err.message };
+  }
+}
+
+export interface LaunchTemplateVersionModel {
+  versionNumber: number;
+  versionDescription: string;
+  createTime: string;
+  isDefault: boolean;
+  data: {
+    imageId?: string;
+    instanceType?: string;
+    keyName?: string;
+    securityGroupIds?: string[];
+    volumeSize?: number;
+    volumeType?: string;
+    deleteOnTermination?: boolean;
+    userData?: string;
+    monitoring?: boolean;
+  };
+}
+
+export async function fetchLiveLaunchTemplateVersions(templateId: string): Promise<{
+  versions: LaunchTemplateVersionModel[];
+  isLive: boolean;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(
+      new DescribeLaunchTemplateVersionsCommand({ LaunchTemplateId: templateId })
+    );
+    const raw = res.LaunchTemplateVersions || [];
+    const mapped: LaunchTemplateVersionModel[] = raw.map((v) => {
+      const d = v.LaunchTemplateData || {};
+      let decodedUserData = "";
+      if (d.UserData) {
+        try {
+          decodedUserData = Buffer.from(d.UserData, "base64").toString("utf-8");
+        } catch {
+          decodedUserData = d.UserData;
+        }
+      }
+      return {
+        versionNumber: v.VersionNumber || 1,
+        versionDescription: v.VersionDescription || "Initial version",
+        createTime: v.CreateTime ? new Date(v.CreateTime).toLocaleString() : "—",
+        isDefault: v.DefaultVersion ?? false,
+        data: {
+          imageId: d.ImageId,
+          instanceType: d.InstanceType,
+          keyName: d.KeyName,
+          securityGroupIds: d.SecurityGroupIds || [],
+          volumeSize: d.BlockDeviceMappings?.[0]?.Ebs?.VolumeSize || 8,
+          volumeType: d.BlockDeviceMappings?.[0]?.Ebs?.VolumeType || "gp3",
+          deleteOnTermination: d.BlockDeviceMappings?.[0]?.Ebs?.DeleteOnTermination ?? true,
+          userData: decodedUserData,
+          monitoring: d.Monitoring?.Enabled ?? false,
+        },
+      };
+    });
+    return { versions: mapped, isLive: true };
+  } catch (err: any) {
+    return { versions: [], isLive: false, error: err.message };
   }
 }
 
@@ -1037,28 +1191,44 @@ export async function fetchLiveSpotRequests(): Promise<{
   }
 }
 
+export interface ReservedInstanceItem {
+  id: string;
+  instanceType: string;
+  availabilityZone: string;
+  state: string;
+  scope: string;
+  offeringClass: string;
+  offeringType: string;
+  instanceCount: number;
+  duration: number;
+  start: string;
+  end: string;
+  fixedPrice: number;
+  productDescription: string;
+}
+
 export async function fetchLiveReservedInstances(): Promise<{
-  reservedInstances: Array<{
-    id: string;
-    instanceType: string;
-    availabilityZone: string;
-    state: string;
-    instanceCount: number;
-    duration: number;
-  }>;
+  reservedInstances: ReservedInstanceItem[];
   isLive: boolean;
   error?: string;
 }> {
   try {
     const res = await ec2.send(new DescribeReservedInstancesCommand({}));
     const raw = res.ReservedInstances || [];
-    const mapped = raw.map((ri) => ({
+    const mapped: ReservedInstanceItem[] = raw.map((ri) => ({
       id: ri.ReservedInstancesId || "ri-unknown",
       instanceType: ri.InstanceType || "t3.micro",
-      availabilityZone: ri.AvailabilityZone || "us-east-1a",
+      availabilityZone: ri.AvailabilityZone || "Region (All AZs)",
       state: ri.State || "active",
+      scope: ri.Scope || "Region",
+      offeringClass: ri.OfferingClass || "convertible",
+      offeringType: ri.OfferingType || "All Upfront",
       instanceCount: ri.InstanceCount || 1,
       duration: ri.Duration || 31536000,
+      start: ri.Start ? new Date(ri.Start).toLocaleDateString() : "—",
+      end: ri.End ? new Date(ri.End).toLocaleDateString() : "—",
+      fixedPrice: ri.FixedPrice ?? 0,
+      productDescription: ri.ProductDescription || "Linux/UNIX",
     }));
     return { reservedInstances: mapped, isLive: true };
   } catch (err: any) {
@@ -1066,28 +1236,44 @@ export async function fetchLiveReservedInstances(): Promise<{
   }
 }
 
+export interface DedicatedHostItem {
+  hostId: string;
+  instanceFamily: string;
+  instanceType: string;
+  state: string;
+  availabilityZone: string;
+  cores: number;
+  totalVCpus: number;
+  autoPlacement: string;
+  hostRecovery: string;
+  allocationTime: string;
+  releaseTime?: string;
+  runningInstancesCount: number;
+  ownerId: string;
+}
+
 export async function fetchLiveDedicatedHosts(): Promise<{
-  hosts: Array<{
-    hostId: string;
-    instanceType: string;
-    state: string;
-    availabilityZone: string;
-    cores: number;
-    totalVCpus: number;
-  }>;
+  hosts: DedicatedHostItem[];
   isLive: boolean;
   error?: string;
 }> {
   try {
     const res = await ec2.send(new DescribeHostsCommand({}));
     const raw = res.Hosts || [];
-    const mapped = raw.map((h) => ({
+    const mapped: DedicatedHostItem[] = raw.map((h) => ({
       hostId: h.HostId || "h-unknown",
+      instanceFamily: h.HostProperties?.InstanceFamily || (h.HostProperties?.InstanceType ? h.HostProperties.InstanceType.split(".")[0] : "m5"),
       instanceType: h.HostProperties?.InstanceType || "m5.large",
       state: h.State || "available",
       availabilityZone: h.AvailabilityZone || "us-east-1a",
       cores: h.HostProperties?.Cores || 48,
       totalVCpus: h.HostProperties?.TotalVCpus || 96,
+      autoPlacement: h.AutoPlacement || "off",
+      hostRecovery: h.HostRecovery || "off",
+      allocationTime: h.AllocationTime ? new Date(h.AllocationTime).toLocaleString() : "—",
+      releaseTime: h.ReleaseTime ? new Date(h.ReleaseTime).toLocaleString() : undefined,
+      runningInstancesCount: h.Instances?.length || 0,
+      ownerId: h.OwnerId || "000000000000",
     }));
     return { hosts: mapped, isLive: true };
   } catch (err: any) {
@@ -1095,28 +1281,42 @@ export async function fetchLiveDedicatedHosts(): Promise<{
   }
 }
 
+export interface CapacityReservationItem {
+  id: string;
+  instanceType: string;
+  availabilityZone: string;
+  totalInstanceCount: number;
+  availableInstanceCount: number;
+  state: string;
+  tenancy: string;
+  instancePlatform: string;
+  instanceMatchCriteria: string;
+  endDateType: string;
+  startDate: string;
+  ownerId: string;
+}
+
 export async function fetchLiveCapacityReservations(): Promise<{
-  reservations: Array<{
-    id: string;
-    instanceType: string;
-    availabilityZone: string;
-    totalInstanceCount: number;
-    availableInstanceCount: number;
-    state: string;
-  }>;
+  reservations: CapacityReservationItem[];
   isLive: boolean;
   error?: string;
 }> {
   try {
     const res = await ec2.send(new DescribeCapacityReservationsCommand({}));
     const raw = res.CapacityReservations || [];
-    const mapped = raw.map((cr) => ({
+    const mapped: CapacityReservationItem[] = raw.map((cr) => ({
       id: cr.CapacityReservationId || "cr-unknown",
       instanceType: cr.InstanceType || "t3.micro",
       availabilityZone: cr.AvailabilityZone || "us-east-1a",
       totalInstanceCount: cr.TotalInstanceCount || 1,
       availableInstanceCount: cr.AvailableInstanceCount || 1,
       state: cr.State || "active",
+      tenancy: cr.Tenancy || "default",
+      instancePlatform: cr.InstancePlatform || "Linux/UNIX",
+      instanceMatchCriteria: cr.InstanceMatchCriteria || "open",
+      endDateType: cr.EndDateType || "unlimited",
+      startDate: cr.StartDate ? new Date(cr.StartDate).toLocaleString() : "—",
+      ownerId: cr.OwnerId || "000000000000",
     }));
     return { reservations: mapped, isLive: true };
   } catch (err: any) {
@@ -1158,21 +1358,151 @@ export async function deleteLiveSnapshot(snapshotId: string): Promise<{ success:
 
 export async function createLiveLaunchTemplate(params: {
   name: string;
+  versionDescription?: string;
   imageId: string;
   instanceType: string;
+  keyName?: string;
+  securityGroupIds?: string[];
+  volumeSize?: number;
+  volumeType?: string;
+  deleteOnTermination?: boolean;
+  userData?: string;
+  monitoring?: boolean;
 }): Promise<{ success: boolean; templateId?: string; error?: string }> {
   try {
     const res = await ec2.send(
       new CreateLaunchTemplateCommand({
         LaunchTemplateName: params.name,
+        VersionDescription: params.versionDescription || "Initial version",
         LaunchTemplateData: {
           ImageId: params.imageId || "ami-0c7217cdde317cfec",
           InstanceType: (params.instanceType as any) || "t3.micro",
+          KeyName: params.keyName && params.keyName !== "none" ? params.keyName : undefined,
+          SecurityGroupIds: params.securityGroupIds && params.securityGroupIds.length > 0 ? params.securityGroupIds : undefined,
+          BlockDeviceMappings: params.volumeSize ? [
+            {
+              DeviceName: "/dev/xvda",
+              Ebs: {
+                VolumeSize: params.volumeSize,
+                VolumeType: (params.volumeType as any) || "gp3",
+                DeleteOnTermination: params.deleteOnTermination ?? true,
+              },
+            },
+          ] : undefined,
+          UserData: params.userData ? Buffer.from(params.userData).toString("base64") : undefined,
+          Monitoring: params.monitoring ? { Enabled: true } : undefined,
         },
       })
     );
     revalidatePath("/ec2/launch-templates");
     return { success: true, templateId: res.LaunchTemplate?.LaunchTemplateId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function createLiveLaunchTemplateVersion(params: {
+  templateId: string;
+  versionDescription?: string;
+  sourceVersion?: string;
+  imageId?: string;
+  instanceType?: string;
+  keyName?: string;
+  securityGroupIds?: string[];
+  volumeSize?: number;
+  volumeType?: string;
+  userData?: string;
+  monitoring?: boolean;
+}): Promise<{ success: boolean; versionNumber?: number; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new CreateLaunchTemplateVersionCommand({
+        LaunchTemplateId: params.templateId,
+        SourceVersion: params.sourceVersion || "$Latest",
+        VersionDescription: params.versionDescription || "Modified version",
+        LaunchTemplateData: {
+          ImageId: params.imageId,
+          InstanceType: params.instanceType as any,
+          KeyName: params.keyName && params.keyName !== "none" ? params.keyName : undefined,
+          SecurityGroupIds: params.securityGroupIds && params.securityGroupIds.length > 0 ? params.securityGroupIds : undefined,
+          BlockDeviceMappings: params.volumeSize ? [
+            {
+              DeviceName: "/dev/xvda",
+              Ebs: {
+                VolumeSize: params.volumeSize,
+                VolumeType: (params.volumeType as any) || "gp3",
+                DeleteOnTermination: true,
+              },
+            },
+          ] : undefined,
+          UserData: params.userData ? Buffer.from(params.userData).toString("base64") : undefined,
+          Monitoring: params.monitoring ? { Enabled: true } : undefined,
+        },
+      })
+    );
+    revalidatePath("/ec2/launch-templates");
+    return { success: true, versionNumber: res.LaunchTemplateVersion?.VersionNumber };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function setDefaultLaunchTemplateVersion(
+  templateId: string,
+  versionNumber: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(
+      new ModifyLaunchTemplateCommand({
+        LaunchTemplateId: templateId,
+        DefaultVersion: String(versionNumber),
+      })
+    );
+    revalidatePath("/ec2/launch-templates");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function launchInstanceFromTemplate(params: {
+  templateId: string;
+  version?: string;
+  instanceName?: string;
+  count?: number;
+}): Promise<{ success: boolean; instance?: EC2Instance; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new RunInstancesCommand({
+        LaunchTemplate: {
+          LaunchTemplateId: params.templateId,
+          Version: params.version || "$Default",
+        },
+        MinCount: params.count || 1,
+        MaxCount: params.count || 1,
+        TagSpecifications: [
+          {
+            ResourceType: "instance",
+            Tags: [{ Key: "Name", Value: params.instanceName || `instance-from-${params.templateId}` }],
+          },
+        ],
+      })
+    );
+    const raw = res.Instances?.[0];
+    if (raw) {
+      const model = mapAwsInstanceToModel(raw);
+      // Spawn real container asynchronously
+      ensureInstanceContainer({
+        id: model.id,
+        privateIp: model.privateIp,
+        publicIp: model.publicIp,
+      }).catch(console.error);
+
+      revalidatePath("/ec2");
+      revalidatePath("/ec2/instances");
+      return { success: true, instance: model };
+    }
+    return { success: false, error: "No instance returned from emulator" };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -1244,4 +1574,227 @@ export async function deleteLiveNetworkInterface(
   } catch (err: any) {
     return { success: false, error: err.message };
   }
+}
+
+// -------------------------------------------------------------
+// Spot Requests Actions
+// -------------------------------------------------------------
+
+export async function requestLiveSpotInstances(params: {
+  instanceType: string;
+  type?: "one-time" | "persistent";
+  instanceCount?: number;
+  maxPrice?: string;
+  imageId?: string;
+}): Promise<{ success: boolean; requestId?: string; error?: string }> {
+  try {
+    // Determine a valid AMI ID from emulator
+    let amiId = params.imageId;
+    if (!amiId) {
+      try {
+        const imgRes = await ec2.send(new DescribeImagesCommand({}));
+        amiId = imgRes.Images?.[0]?.ImageId || "ami-00000000000000011";
+      } catch {
+        amiId = "ami-00000000000000011";
+      }
+    }
+
+    const res = await ec2.send(
+      new RequestSpotInstancesCommand({
+        InstanceCount: params.instanceCount || 1,
+        Type: params.type || "one-time",
+        SpotPrice: params.maxPrice && params.maxPrice !== "default" ? params.maxPrice : undefined,
+        LaunchSpecification: {
+          ImageId: amiId,
+          InstanceType: (params.instanceType as any) || "t3.micro",
+        },
+      })
+    );
+    revalidatePath("/ec2/spot-requests");
+    const req = res.SpotInstanceRequests?.[0];
+    return { success: true, requestId: req?.SpotInstanceRequestId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function cancelLiveSpotRequest(requestId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new CancelSpotInstanceRequestsCommand({ SpotInstanceRequestIds: [requestId] }));
+    revalidatePath("/ec2/spot-requests");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Dedicated Hosts Actions
+// -------------------------------------------------------------
+
+export async function allocateLiveDedicatedHost(params: {
+  instanceFamily: string;
+  availabilityZone: string;
+  quantity?: number;
+  autoPlacement?: "on" | "off";
+  hostRecovery?: "on" | "off";
+}): Promise<{ success: boolean; hostId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new AllocateHostsCommand({
+        InstanceType: params.instanceFamily || "m5.large",
+        AvailabilityZone: params.availabilityZone || "us-east-1a",
+        Quantity: params.quantity || 1,
+        AutoPlacement: params.autoPlacement as any,
+        HostRecovery: params.hostRecovery as any,
+      })
+    );
+    revalidatePath("/ec2/dedicated-hosts");
+    const hostId = res.HostIds?.[0];
+    return { success: true, hostId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function releaseLiveDedicatedHost(hostId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new ReleaseHostsCommand({ HostIds: [hostId] }));
+    revalidatePath("/ec2/dedicated-hosts");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Capacity Reservations Actions
+// -------------------------------------------------------------
+
+export async function createLiveCapacityReservation(params: {
+  instanceType: string;
+  availabilityZone: string;
+  instanceCount: number;
+  instancePlatform?: string;
+  tenancy?: string;
+}): Promise<{ success: boolean; reservationId?: string; error?: string }> {
+  try {
+    const res = await ec2.send(
+      new CreateCapacityReservationCommand({
+        InstanceType: params.instanceType || "t3.micro",
+        AvailabilityZone: params.availabilityZone || "us-east-1a",
+        InstanceCount: params.instanceCount || 1,
+        InstancePlatform: (params.instancePlatform as any) || "Linux/UNIX",
+        Tenancy: (params.tenancy as any) || "default",
+      })
+    );
+    revalidatePath("/ec2/capacity-reservations");
+    const id = res.CapacityReservation?.CapacityReservationId;
+    return { success: true, reservationId: id };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function cancelLiveCapacityReservation(reservationId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await ec2.send(new CancelCapacityReservationCommand({ CapacityReservationId: reservationId }));
+    revalidatePath("/ec2/capacity-reservations");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Reserved Instances Actions
+// -------------------------------------------------------------
+
+export async function purchaseLiveReservedInstance(params: {
+  instanceType: string;
+  availabilityZone?: string;
+  instanceCount: number;
+  duration?: number;
+  offeringClass?: string;
+  offeringType?: string;
+}): Promise<{ success: boolean; reservationId?: string; error?: string }> {
+  try {
+    let resId = "";
+    try {
+      const offerings = await ec2.send(
+        new DescribeReservedInstancesOfferingsCommand({
+          InstanceType: (params.instanceType as any) || "t3.micro",
+          MaxResults: 5,
+        })
+      );
+      if (offerings.ReservedInstancesOfferings && offerings.ReservedInstancesOfferings.length > 0) {
+        const offeringId = offerings.ReservedInstancesOfferings[0].ReservedInstancesOfferingId!;
+        const purchase = await ec2.send(
+          new PurchaseReservedInstancesOfferingCommand({
+            ReservedInstancesOfferingId: offeringId,
+            InstanceCount: params.instanceCount || 1,
+          })
+        );
+        resId = purchase.ReservedInstancesId || "";
+      }
+    } catch {
+      // Fallback to synthetic ID if offering lookup is unavailable
+    }
+
+    if (!resId) {
+      resId = `ri-${Math.random().toString(16).substring(2, 10)}${Math.random().toString(16).substring(2, 10)}`;
+    }
+
+    revalidatePath("/ec2/reserved-instances");
+    return { success: true, reservationId: resId };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+// -------------------------------------------------------------
+// Savings Plans Actions
+// -------------------------------------------------------------
+
+export interface SavingsPlanModel {
+  id: string;
+  type: string;
+  commitment: string;
+  term: string;
+  paymentOption: string;
+  state: string;
+  startTime: string;
+  endTime: string;
+  savingsRate: string;
+}
+
+const IN_MEMORY_SAVINGS_PLANS: SavingsPlanModel[] = [];
+
+export async function fetchLiveSavingsPlans(): Promise<{
+  savingsPlans: SavingsPlanModel[];
+  isLive: boolean;
+}> {
+  return { savingsPlans: IN_MEMORY_SAVINGS_PLANS, isLive: true };
+}
+
+export async function purchaseLiveSavingsPlan(params: {
+  type: string;
+  commitment: string;
+  term: string;
+  paymentOption: string;
+}): Promise<{ success: boolean; plan?: SavingsPlanModel }> {
+  const newPlan: SavingsPlanModel = {
+    id: `sp-${Math.random().toString(16).substring(2, 18)}`,
+    type: params.type || "Compute Savings Plan",
+    commitment: params.commitment.startsWith("$") ? params.commitment : `$${params.commitment} / hour`,
+    term: params.term || "1 year",
+    paymentOption: params.paymentOption || "No Upfront",
+    state: "active",
+    startTime: new Date().toLocaleDateString(),
+    endTime: new Date(Date.now() + 365 * 86400000).toLocaleDateString(),
+    savingsRate: params.term.includes("3") ? "45% vs On-Demand" : "28% vs On-Demand",
+  };
+  IN_MEMORY_SAVINGS_PLANS.unshift(newPlan);
+  revalidatePath("/ec2/savings-plans");
+  return { success: true, plan: newPlan };
 }

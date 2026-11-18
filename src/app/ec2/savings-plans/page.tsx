@@ -5,19 +5,17 @@
 
 import ServiceLayout from "@/components/ServiceLayout";
 import { ec2Nav } from "@/components/ec2/EC2Nav";
-import EC2PlaceholderView from "@/components/ec2/EC2PlaceholderView";
+import SavingsPlansClient from "@/components/ec2/SavingsPlansClient";
+import { fetchLiveSavingsPlans } from "../actions";
 
-export default function SavingsPlansPage() {
+export const dynamic = "force-dynamic";
+
+export default async function SavingsPlansPage() {
+  const { savingsPlans, isLive } = await fetchLiveSavingsPlans();
+
   return (
     <ServiceLayout serviceName="EC2" serviceColor="#EC7211" navItems={ec2Nav}>
-      <EC2PlaceholderView
-        title="Savings Plans"
-        description="Savings Plans are a flexible pricing model offering lower prices compared to On-Demand pricing, in exchange for a commitment to a consistent amount of usage."
-        columns={["Plan ID", "Plan type", "Commitment", "Term", "Payment option", "Start time", "End time"]}
-        rows={[]}
-        emptyTitle="No Savings Plans active"
-        emptyDescription="Purchase a Savings Plan through AWS Cost Management to reduce compute spending."
-      />
+      <SavingsPlansClient initialPlans={savingsPlans} isLive={isLive} />
     </ServiceLayout>
   );
 }
