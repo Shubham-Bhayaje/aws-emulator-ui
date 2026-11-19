@@ -760,7 +760,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "shortName": "Organizations",
     "href": "/organizations",
     "category": "Management & Governance",
-    "color": "#545b64",
+    "color": "#C925D1",
+    "status": "functional",
     "desc": "Centralized management and governance for multiple AWS accounts with policy enforcement"
   },
   {
@@ -2699,7 +2700,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "shortName": "Organizations",
         "href": "/organizations",
         "category": "Management & Governance",
-        "color": "#545b64",
+        "color": "#C925D1",
+        "status": "functional",
         "desc": "Centralized management and governance for multiple AWS accounts with policy enforcement"
       },
       {
