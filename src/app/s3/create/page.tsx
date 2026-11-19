@@ -1,20 +1,20 @@
-/**
- * Create Bucket page – matches the real AWS Console's "Create bucket" form.
- * Shows General configuration, Block Public Access, Bucket Versioning sections.
- */
-
 import ServiceLayout from "@/components/ServiceLayout";
-import Link from "next/link";
+import { s3Nav } from "../s3Nav";
 import { createBucket } from "../actions";
 import { CreateBucketForm } from "./CreateBucketForm";
 
-const s3Nav = [{ label: "Buckets", href: "/s3" }];
+export const dynamic = "force-dynamic";
 
 export default function CreateBucketPage() {
   return (
     <ServiceLayout serviceName="S3" serviceColor="#3ECF8E" navItems={s3Nav}>
-      <div className="max-w-[800px]">
-        <h1 className="text-[22px] font-bold text-[#16191f] mb-6">Create bucket</h1>
+      <div className="max-w-4xl space-y-6">
+        <div>
+          <h1 className="text-[22px] font-bold text-[#16191f] tracking-tight">Create bucket</h1>
+          <p className="text-[13px] text-[#545b64] mt-1">
+            Buckets are containers for data stored in Amazon S3. Configure bucket settings below.
+          </p>
+        </div>
         <CreateBucketForm action={createBucket} />
       </div>
     </ServiceLayout>

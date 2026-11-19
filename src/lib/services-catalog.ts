@@ -599,6 +599,7 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/kms",
     "category": "Security, Identity, & Compliance",
     "color": "#E7157B",
+    "status": "functional",
     "desc": "Managed creation and centralized control of cryptographic keys used to protect data"
   },
   {
@@ -2534,6 +2535,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "href": "/kms",
         "category": "Security, Identity, & Compliance",
         "color": "#E7157B",
+        "status": "functional",
         "desc": "Managed creation and centralized control of cryptographic keys used to protect data"
       },
       {

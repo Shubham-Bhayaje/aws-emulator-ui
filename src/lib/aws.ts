@@ -22,6 +22,7 @@ import { LambdaClient } from "@aws-sdk/client-lambda";
 import { ElasticLoadBalancingV2Client } from "@aws-sdk/client-elastic-load-balancing-v2";
 import { AutoScalingClient } from "@aws-sdk/client-auto-scaling";
 import { OrganizationsClient } from "@aws-sdk/client-organizations";
+import { KMSClient } from "@aws-sdk/client-kms";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -87,5 +88,12 @@ export const organizations = new OrganizationsClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });
+
+// --- KMS (Key Management Service) ---
+export const kms = new KMSClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
 
 

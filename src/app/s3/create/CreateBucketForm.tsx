@@ -1,135 +1,329 @@
 /**
- * CreateBucketForm – Client component for the create bucket form.
- * Matches the real AWS Console's create bucket page sections.
+ * src/app/s3/create/CreateBucketForm.tsx – AWS S3 Create Bucket Form.
+ * Zero emojis, Cloudscape enterprise standard, strict 32px button height standard.
  */
 
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-type Props = {
+interface CreateBucketFormProps {
   action: (formData: FormData) => Promise<{ error: string } | undefined>;
-};
+}
 
-export function CreateBucketForm({ action }: Props) {
+export function CreateBucketForm({ action }: CreateBucketFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
 
-  async function handleSubmit(formData: FormData) {
+  // Form states
+  const [bucketName, setBucketName] = useState("");
+  const [versioning, setVersioning] = useState<"disabled" | "enabled">("disabled");
+  const [blockAllPab, setBlockAllPab] = useState(true);
+  const [blockNewAcls, setBlockNewAcls] = useState(true);
+  const [ignoreAcls, setIgnoreAcls] = useState(true);
+  const [blockNewPolicies, setBlockNewPolicies] = useState(true);
+  const [restrictBuckets, setRestrictBuckets] = useState(true);
+  const [sseAlgo, setSseAlgo] = useState<"AES256" | "aws:kms">("AES256");
+  const [kmsKeyId, setKmsKeyId] = useState("");
+  const [bucketKey, setBucketKey] = useState(true);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!bucketName.trim()) {
+      setError("Bucket name is required.");
+      return;
+    }
+
     setLoading(true);
     setError(null);
+
+    const formData = new FormData();
+    formData.set("bucketName", bucketName.trim().toLowerCase());
+    formData.set("versioning", versioning);
+    formData.set("sseAlgorithm", sseAlgo);
+    if (sseAlgo === "aws:kms" && kmsKeyId.trim()) {
+      formData.set("kmsKeyId", kmsKeyId.trim());
+    }
+    if (blockAllPab || blockNewAcls) formData.set("blockPublicAcls", "on");
+    if (blockAllPab || ignoreAcls) formData.set("ignorePublicAcls", "on");
+    if (blockAllPab || blockNewPolicies) formData.set("blockPublicPolicy", "on");
+    if (blockAllPab || restrictBuckets) formData.set("restrictPublicBuckets", "on");
+
     const result = await action(formData);
     if (result?.error) {
       setError(result.error);
       setLoading(false);
     }
-    // On success, the action redirects to /s3
-  }
+  };
 
   return (
-    <form action={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="bg-[#fdf3f1] border border-[#d13212] rounded p-3 mb-4 text-[13px] text-[#d13212] flex items-start gap-2">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[#d13212] mt-0.5">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <div>
-            <div className="font-bold">Error creating bucket</div>
-            <div>{error}</div>
-          </div>
+        <div className="bg-[#fbeeed] border-l-4 border-[#d13212] p-4 text-[13px] text-[#d13212]">
+          <div className="font-bold mb-0.5">Error creating bucket</div>
+          <div>{error}</div>
         </div>
       )}
 
       {/* General configuration */}
-      <div className="bg-white border border-[#d5dbdb] rounded awsui-shadow mb-4">
-        <div className="px-5 py-3 border-b border-[#eaeded]">
-          <h2 className="text-[16px] font-bold text-[#16191f]">General configuration</h2>
-        </div>
-        <div className="px-5 py-4 space-y-4">
-          {/* AWS Region */}
-          <div>
-            <label className="block text-[13px] font-bold text-[#16191f] mb-1">
-              AWS Region
-            </label>
-            <div className="text-[13px] text-[#545b64] bg-[#f2f3f3] border border-[#d5dbdb] rounded-sm px-3 py-[6px] w-[300px]">
-              US East (N. Virginia) us-east-1
-            </div>
-          </div>
+      <div className="bg-white border border-[#eaeded] rounded p-6 shadow-sm space-y-4">
+        <h2 className="text-[16px] font-bold text-[#16191f] border-b border-[#eaeded] pb-2">
+          General configuration
+        </h2>
 
-          {/* Bucket name */}
-          <div>
-            <label htmlFor="bucketName" className="block text-[13px] font-bold text-[#16191f] mb-1">
-              Bucket name
-            </label>
-            <input
-              id="bucketName"
-              name="bucketName"
-              type="text"
-              required
-              placeholder="Enter a unique bucket name"
-              className="w-full max-w-[400px] border border-[#aab7b8] rounded-sm px-3 py-[6px] text-[13px] text-[#16191f] focus:outline-none focus:border-[#0073bb] focus:ring-1 focus:ring-[#0073bb]"
-            />
-            <p className="text-[12px] text-[#545b64] mt-1">
-              Bucket name must be globally unique and must not contain spaces or uppercase letters.
-            </p>
+        <div>
+          <label className="block text-[13px] font-bold text-[#16191f] mb-1">Bucket name</label>
+          <input
+            type="text"
+            required
+            placeholder="my-s3-bucket-unique-name"
+            value={bucketName}
+            onChange={(e) => setBucketName(e.target.value.toLowerCase())}
+            className="w-full max-w-lg text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3] font-mono"
+          />
+          <p className="text-[12px] text-[#545b64] mt-1">
+            Bucket name must be globally unique across all AWS accounts and contain only lowercase
+            letters, numbers, dots, and hyphens.
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-[13px] font-bold text-[#16191f] mb-1">AWS Region</label>
+          <div className="text-[13px] text-[#545b64] bg-[#f2f3f3] border border-[#d5dbdb] rounded px-3 py-1.5 max-w-md select-none">
+            US East (N. Virginia) us-east-1
           </div>
         </div>
       </div>
 
-      {/* Block Public Access */}
-      <div className="bg-white border border-[#d5dbdb] rounded awsui-shadow mb-4">
-        <div className="px-5 py-3 border-b border-[#eaeded]">
-          <h2 className="text-[16px] font-bold text-[#16191f]">Block Public Access settings for this bucket</h2>
+      {/* Object Ownership */}
+      <div className="bg-white border border-[#eaeded] rounded p-6 shadow-sm space-y-3">
+        <h2 className="text-[16px] font-bold text-[#16191f] border-b border-[#eaeded] pb-2">
+          Object Ownership
+        </h2>
+        <div className="p-3 bg-[#f2f8fd] border border-[#d0e6f9] rounded text-[13px]">
+          <div className="font-bold text-[#0972d3]">ACLs disabled (recommended)</div>
+          <p className="text-[#16191f] text-[12px] mt-0.5">
+            All objects in this bucket are owned by this account. Access to this bucket and its
+            objects is specified using only policies.
+          </p>
         </div>
-        <div className="px-5 py-4">
-          <label className="flex items-start gap-2 cursor-pointer">
-            <input type="checkbox" defaultChecked className="mt-1 accent-[#0073bb]" />
+      </div>
+
+      {/* Block Public Access settings */}
+      <div className="bg-white border border-[#eaeded] rounded p-6 shadow-sm space-y-4">
+        <h2 className="text-[16px] font-bold text-[#16191f] border-b border-[#eaeded] pb-2">
+          Block Public Access settings for this bucket
+        </h2>
+        <p className="text-[13px] text-[#545b64]">
+          Block Public Access provides settings for access points, buckets, and accounts to help you
+          manage public access to Amazon S3 resources.
+        </p>
+
+        <div className="space-y-3 pt-1">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={blockAllPab}
+              onChange={(e) => {
+                setBlockAllPab(e.target.checked);
+                if (e.target.checked) {
+                  setBlockNewAcls(true);
+                  setIgnoreAcls(true);
+                  setBlockNewPolicies(true);
+                  setRestrictBuckets(true);
+                }
+              }}
+              className="mt-0.5 text-[#0972d3] rounded"
+            />
             <div>
-              <div className="text-[13px] font-bold text-[#16191f]">Block <em>all</em> public access</div>
+              <div className="font-bold text-[13px] text-[#16191f]">Block all public access</div>
               <div className="text-[12px] text-[#545b64]">
-                Turning this setting on is the same as turning on all four settings below. We recommend that you turn this setting on.
+                Turning on this setting enables all four settings below. We recommend that you keep
+                this enabled.
+              </div>
+            </div>
+          </label>
+
+          <div className="border-t border-[#eaeded] pt-3 space-y-2 ml-5">
+            <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+              <input
+                type="checkbox"
+                checked={blockNewAcls}
+                onChange={(e) => setBlockNewAcls(e.target.checked)}
+                disabled={blockAllPab}
+                className="text-[#0972d3] rounded"
+              />
+              <span>Block public access to buckets and objects granted through new ACLs</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+              <input
+                type="checkbox"
+                checked={ignoreAcls}
+                onChange={(e) => setIgnoreAcls(e.target.checked)}
+                disabled={blockAllPab}
+                className="text-[#0972d3] rounded"
+              />
+              <span>Block public access to buckets and objects granted through any ACLs</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+              <input
+                type="checkbox"
+                checked={blockNewPolicies}
+                onChange={(e) => setBlockNewPolicies(e.target.checked)}
+                disabled={blockAllPab}
+                className="text-[#0972d3] rounded"
+              />
+              <span>
+                Block public access to buckets and objects granted through new public policies
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+              <input
+                type="checkbox"
+                checked={restrictBuckets}
+                onChange={(e) => setRestrictBuckets(e.target.checked)}
+                disabled={blockAllPab}
+                className="text-[#0972d3] rounded"
+              />
+              <span>
+                Block public and cross-account access to buckets and objects with public policies
+              </span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Bucket Versioning */}
+      <div className="bg-white border border-[#eaeded] rounded p-6 shadow-sm space-y-4">
+        <h2 className="text-[16px] font-bold text-[#16191f] border-b border-[#eaeded] pb-2">
+          Bucket Versioning
+        </h2>
+        <div className="space-y-3">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="versioning"
+              checked={versioning === "disabled"}
+              onChange={() => setVersioning("disabled")}
+              className="mt-0.5 text-[#0972d3]"
+            />
+            <div>
+              <div className="font-bold text-[13px] text-[#16191f]">Disable</div>
+              <div className="text-[12px] text-[#545b64]">
+                Never preserve older versions of overwritten or deleted objects.
+              </div>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="versioning"
+              checked={versioning === "enabled"}
+              onChange={() => setVersioning("enabled")}
+              className="mt-0.5 text-[#0972d3]"
+            />
+            <div>
+              <div className="font-bold text-[13px] text-[#16191f]">Enable</div>
+              <div className="text-[12px] text-[#545b64]">
+                Preserve, retrieve, and restore every version of every object stored in your bucket.
               </div>
             </div>
           </label>
         </div>
       </div>
 
-      {/* Bucket Versioning */}
-      <div className="bg-white border border-[#d5dbdb] rounded awsui-shadow mb-6">
-        <div className="px-5 py-3 border-b border-[#eaeded]">
-          <h2 className="text-[16px] font-bold text-[#16191f]">Bucket Versioning</h2>
-        </div>
-        <div className="px-5 py-4 space-y-2">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="versioning" value="disabled" defaultChecked className="accent-[#0073bb]" />
-            <span className="text-[13px] text-[#16191f]">Disable</span>
+      {/* Default encryption */}
+      <div className="bg-white border border-[#eaeded] rounded p-6 shadow-sm space-y-4">
+        <h2 className="text-[16px] font-bold text-[#16191f] border-b border-[#eaeded] pb-2">
+          Default encryption
+        </h2>
+        <div className="space-y-3">
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="encryption"
+              checked={sseAlgo === "AES256"}
+              onChange={() => setSseAlgo("AES256")}
+              className="mt-0.5 text-[#0972d3]"
+            />
+            <div>
+              <div className="font-bold text-[13px] text-[#16191f]">
+                Server-side encryption with Amazon S3 managed keys (SSE-S3)
+              </div>
+              <div className="text-[12px] text-[#545b64]">
+                Base encryption using 256-bit Advanced Encryption Standard (AES-256).
+              </div>
+            </div>
           </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="radio" name="versioning" value="enabled" className="accent-[#0073bb]" />
-            <span className="text-[13px] text-[#16191f]">Enable</span>
+
+          <label className="flex items-start gap-2.5 cursor-pointer">
+            <input
+              type="radio"
+              name="encryption"
+              checked={sseAlgo === "aws:kms"}
+              onChange={() => setSseAlgo("aws:kms")}
+              className="mt-0.5 text-[#0972d3]"
+            />
+            <div>
+              <div className="font-bold text-[13px] text-[#16191f]">
+                Server-side encryption with AWS Key Management Service keys (SSE-KMS)
+              </div>
+              <div className="text-[12px] text-[#545b64]">
+                Uses KMS keys for encryption. Provides audit trails of key usage.
+              </div>
+            </div>
           </label>
+
+          {sseAlgo === "aws:kms" && (
+            <div className="ml-6 pt-2">
+              <label className="block text-[13px] font-semibold text-[#16191f] mb-1">
+                AWS KMS key (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="alias/aws/s3 or custom KMS key ARN"
+                value={kmsKeyId}
+                onChange={(e) => setKmsKeyId(e.target.value)}
+                className="w-full max-w-md text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3]"
+              />
+            </div>
+          )}
+
+          <div className="pt-2">
+            <label className="flex items-center gap-2 cursor-pointer text-[13px]">
+              <input
+                type="checkbox"
+                checked={bucketKey}
+                onChange={(e) => setBucketKey(e.target.checked)}
+                className="text-[#0972d3] rounded"
+              />
+              <span className="font-semibold text-[#16191f]">Enable Bucket Key</span>
+            </label>
+            <p className="text-[12px] text-[#545b64] ml-6">
+              Reduces encryption costs by decreasing request traffic to AWS KMS.
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Action buttons */}
-      <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#eaeded]">
+      {/* Form Actions Footer */}
+      <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#eaeded]">
         <Link
           href="/s3"
-          className="px-4 py-[6px] text-[13px] border border-[#545b64] rounded-sm text-[#545b64] hover:bg-[#fafafa]"
+          style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-4 rounded border border-[#aab7b8] bg-white text-[#16191f] hover:bg-[#f2f8fd] transition-colors shadow-sm"
         >
           Cancel
         </Link>
         <button
           type="submit"
           disabled={loading}
-          className="px-4 py-[6px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] disabled:opacity-50"
+          style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-5 rounded bg-[#ec7211] text-white hover:bg-[#eb5f07] transition-colors shadow-sm disabled:opacity-50"
         >
-          {loading ? "Creating..." : "Create bucket"}
+          {loading ? "Creating bucket..." : "Create bucket"}
         </button>
       </div>
     </form>

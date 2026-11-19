@@ -1,5 +1,6 @@
 /**
- * UploadForm – Client component with drag-and-drop file upload.
+ * src/app/s3/[bucket]/upload/UploadForm.tsx – S3 Upload Form with storage class & encryption.
+ * Zero emojis, Cloudscape enterprise standard, strict 32px button height standard.
  */
 
 "use client";
@@ -8,79 +9,193 @@ import { useState, useRef } from "react";
 import Link from "next/link";
 import { uploadObject } from "../../actions";
 
-type Props = { bucket: string; prefix: string };
+interface UploadFormProps {
+  bucket: string;
+  prefix: string;
+}
 
-export function UploadForm({ bucket, prefix }: Props) {
+export function UploadForm({ bucket, prefix }: UploadFormProps) {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Advanced upload settings
+  const [storageClass, setStorageClass] = useState("STANDARD");
+  const [sseAlgo, setSseAlgo] = useState<"AES256" | "aws:kms" | "">("");
+  const [kmsKeyId, setKmsKeyId] = useState("");
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!file) return;
-    setLoading(true); setError(null);
+
+    setLoading(true);
+    setError(null);
+
     const formData = new FormData();
     formData.set("bucket", bucket);
     formData.set("prefix", prefix);
     formData.set("file", file);
+    formData.set("storageClass", storageClass);
+    if (sseAlgo) formData.set("sseAlgorithm", sseAlgo);
+    if (sseAlgo === "aws:kms" && kmsKeyId.trim()) formData.set("ssekmsKeyId", kmsKeyId.trim());
+
     const result = await uploadObject(formData);
-    if (result?.error) { setError(result.error); setLoading(false); }
-  }
+    if (result?.error) {
+      setError(result.error);
+      setLoading(false);
+    }
+  };
 
   return (
-    <form onSubmit={handleSubmit}>
+    <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="bg-[#fdf3f1] border border-[#d13212] rounded p-3 mb-4 text-[13px] text-[#d13212] flex items-center gap-2">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-[#d13212]">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <span>{error}</span>
+        <div className="bg-[#fbeeed] border-l-4 border-[#d13212] p-4 text-[13px] text-[#d13212]">
+          <div className="font-bold mb-0.5">Upload failed</div>
+          <div>{error}</div>
         </div>
       )}
 
-      <div className="bg-white border border-[#d5dbdb] rounded awsui-shadow mb-4">
-        <div className="px-5 py-3 border-b border-[#eaeded]">
-          <h2 className="text-[16px] font-bold text-[#16191f]">Files and folders</h2>
-        </div>
-        <div className="p-5">
-          <div className={"border-2 border-dashed rounded p-8 text-center transition-colors " + (dragOver ? "border-[#0073bb] bg-[#f2f8fd]" : "border-[#d5dbdb]")}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) setFile(f); }}>
-            {file ? (
-              <div className="text-[13px]">
-                <div className="text-[#16191f] font-medium mb-1 flex items-center justify-center gap-1.5">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-[#545b64]">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
-                  <span>{file.name}</span>
-                </div>
-                <div className="text-[#545b64]">{(file.size / 1024).toFixed(1)} KB</div>
-                <button type="button" onClick={() => setFile(null)} className="text-[#0073bb] hover:underline mt-2 text-[12px]">Remove</button>
+      {/* Files upload card */}
+      <div className="bg-white border border-[#eaeded] rounded p-6 shadow-sm space-y-4">
+        <h2 className="text-[16px] font-bold text-[#16191f] border-b border-[#eaeded] pb-2">
+          Files and folders
+        </h2>
+
+        <div
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOver(false);
+            const dropped = e.dataTransfer.files[0];
+            if (dropped) setFile(dropped);
+          }}
+          className={`border-2 border-dashed rounded p-8 text-center transition-colors ${
+            dragOver ? "border-[#0972d3] bg-[#f2f8fd]" : "border-[#aab7b8] bg-[#fafafa]"
+          }`}
+        >
+          {file ? (
+            <div className="space-y-2">
+              <div className="font-semibold text-[14px] text-[#16191f]">{file.name}</div>
+              <div className="text-[12px] text-[#545b64]">
+                {(file.size / 1024).toFixed(1)} KB — {file.type || "application/octet-stream"}
               </div>
-            ) : (
               <div>
-                <div className="text-[13px] text-[#545b64] mb-2">Drag and drop files here, or</div>
-                <button type="button" onClick={() => inputRef.current?.click()}
-                  className="px-3 py-[5px] text-[13px] border border-[#545b64] rounded-sm text-[#545b64] hover:bg-[#fafafa]">Add files</button>
+                <button
+                  type="button"
+                  onClick={() => setFile(null)}
+                  className="text-[#d13212] text-[12px] hover:underline"
+                >
+                  Remove file
+                </button>
               </div>
-            )}
-          </div>
-          <input ref={inputRef} type="file" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setFile(f); }} />
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="text-[13px] text-[#545b64]">
+                Drag and drop files and folders here, or choose Add files below.
+              </div>
+              <div>
+                <button
+                  type="button"
+                  onClick={() => inputRef.current?.click()}
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-4 rounded border border-[#aab7b8] bg-white text-[#16191f] hover:bg-[#f2f8fd] transition-colors shadow-sm"
+                >
+                  Add files
+                </button>
+              </div>
+            </div>
+          )}
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const selected = e.target.files?.[0];
+              if (selected) setFile(selected);
+            }}
+          />
         </div>
       </div>
 
-      <div className="flex justify-end gap-2">
-        <Link href={"/s3/" + bucket + (prefix ? "?prefix=" + encodeURIComponent(prefix) : "")}
-          className="px-4 py-[6px] text-[13px] border border-[#545b64] rounded-sm text-[#545b64] hover:bg-[#fafafa]">Cancel</Link>
-        <button type="submit" disabled={!file || loading}
-          className="px-4 py-[6px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] disabled:opacity-50">
-          {loading ? "Uploading..." : "Upload"}</button>
+      {/* Storage properties card */}
+      <div className="bg-white border border-[#eaeded] rounded p-6 shadow-sm space-y-4">
+        <h2 className="text-[16px] font-bold text-[#16191f] border-b border-[#eaeded] pb-2">
+          Properties
+        </h2>
+
+        <div>
+          <label className="block text-[13px] font-semibold text-[#16191f] mb-1">
+            Storage class
+          </label>
+          <select
+            value={storageClass}
+            onChange={(e) => setStorageClass(e.target.value)}
+            className="w-full max-w-md text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3] bg-white"
+          >
+            <option value="STANDARD">Standard (General purpose for frequently accessed data)</option>
+            <option value="INTELLIGENT_TIERING">Intelligent-Tiering (Automatic cost savings)</option>
+            <option value="STANDARD_IA">Standard-IA (Infrequently accessed data)</option>
+            <option value="ONEZONE_IA">One Zone-IA (Re-creatable, infrequently accessed data)</option>
+            <option value="GLACIER">Glacier Flexible Retrieval (Long-term data archiving)</option>
+            <option value="DEEP_ARCHIVE">Glacier Deep Archive (Lowest-cost archive storage)</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[13px] font-semibold text-[#16191f] mb-1">
+            Server-side encryption override
+          </label>
+          <select
+            value={sseAlgo}
+            onChange={(e) => setSseAlgo(e.target.value as any)}
+            className="w-full max-w-md text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3] bg-white"
+          >
+            <option value="">Inherit bucket default settings</option>
+            <option value="AES256">Amazon S3 managed keys (SSE-S3)</option>
+            <option value="aws:kms">AWS Key Management Service key (SSE-KMS)</option>
+          </select>
+        </div>
+
+        {sseAlgo === "aws:kms" && (
+          <div>
+            <label className="block text-[13px] font-semibold text-[#16191f] mb-1">
+              AWS KMS key ID or alias
+            </label>
+            <input
+              type="text"
+              placeholder="alias/aws/s3 or KMS key ARN"
+              value={kmsKeyId}
+              onChange={(e) => setKmsKeyId(e.target.value)}
+              className="w-full max-w-md text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3]"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Footer action buttons */}
+      <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#eaeded]">
+        <Link
+          href={`/s3/${bucket}${prefix ? `?prefix=${encodeURIComponent(prefix)}` : ""}`}
+          style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-4 rounded border border-[#aab7b8] bg-white text-[#16191f] hover:bg-[#f2f8fd] transition-colors shadow-sm"
+        >
+          Cancel
+        </Link>
+        <button
+          type="submit"
+          disabled={!file || loading}
+          style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-5 rounded bg-[#ec7211] text-white hover:bg-[#eb5f07] transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {loading ? "Uploading..." : "Upload"}
+        </button>
       </div>
     </form>
   );
