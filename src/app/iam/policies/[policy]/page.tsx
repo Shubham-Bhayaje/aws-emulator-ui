@@ -4,7 +4,7 @@
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
-import { inspectPolicy } from "../../actions";
+import { inspectPolicy, fetchPolicyEntities } from "../../actions";
 import { PolicyDetail, PolicyMetadata } from "./PolicyDetail";
 import { iamNav } from "../../page";
 
@@ -22,7 +22,10 @@ export default async function PolicyDetailPage({ params }: PageProps) {
     policyArn = `arn:aws:iam::aws:policy/${policyParam}`;
   }
 
-  const res = await inspectPolicy(policyArn);
+  const [res, entitiesRes] = await Promise.all([
+    inspectPolicy(policyArn),
+    fetchPolicyEntities(policyArn),
+  ]);
 
   const policyMeta: PolicyMetadata | null = res.policy
     ? {
@@ -45,7 +48,14 @@ export default async function PolicyDetailPage({ params }: PageProps) {
           Error: {res.error}
         </div>
       ) : policyMeta ? (
-        <PolicyDetail policy={policyMeta} />
+        <PolicyDetail
+          policy={policyMeta}
+          attachedEntities={{
+            users: entitiesRes.users || [],
+            roles: entitiesRes.roles || [],
+            groups: entitiesRes.groups || [],
+          }}
+        />
       ) : (
         <div className="text-[13px] text-[#545b64]">Policy not found.</div>
       )}

@@ -14,6 +14,12 @@ import {
   DescribeTargetGroupsCommand,
   CreateTargetGroupCommand,
   DeleteTargetGroupCommand,
+  DescribeTargetHealthCommand,
+  RegisterTargetsCommand,
+  DeregisterTargetsCommand,
+  DescribeListenersCommand,
+  CreateListenerCommand,
+  DeleteListenerCommand,
 } from "@aws-sdk/client-elastic-load-balancing-v2";
 import {
   DescribeAutoScalingGroupsCommand,
@@ -2307,12 +2313,24 @@ export async function fetchLiveLoadBalancers(): Promise<{
   }
 }
 
+export interface ListenerModel {
+  arn: string;
+  loadBalancerArn: string;
+  port: number;
+  protocol: string;
+  targetGroupArn?: string;
+  targetGroupName?: string;
+}
+
 export async function createLiveLoadBalancer(params: {
   name: string;
   type?: "application" | "network" | "gateway";
   scheme?: "internet-facing" | "internal";
   subnets: string[];
   securityGroups?: string[];
+  listenerProtocol?: string;
+  listenerPort?: number;
+  targetGroupArn?: string;
 }): Promise<{ success: boolean; loadBalancerArn?: string; error?: string }> {
   try {
     const input: any = {
@@ -2325,8 +2343,30 @@ export async function createLiveLoadBalancer(params: {
       input.SecurityGroups = params.securityGroups;
     }
     const res = await elbv2.send(new CreateLoadBalancerCommand(input));
+    const loadBalancerArn = res.LoadBalancers?.[0]?.LoadBalancerArn;
+
+    if (loadBalancerArn && params.targetGroupArn) {
+      try {
+        await elbv2.send(
+          new CreateListenerCommand({
+            LoadBalancerArn: loadBalancerArn,
+            Protocol: (params.listenerProtocol || (params.type === "network" ? "TCP" : "HTTP")) as any,
+            Port: params.listenerPort || 80,
+            DefaultActions: [
+              {
+                Type: "forward",
+                TargetGroupArn: params.targetGroupArn,
+              },
+            ],
+          })
+        );
+      } catch (listenerErr: any) {
+        console.warn("Failed to create initial listener:", listenerErr.message);
+      }
+    }
+
     revalidatePath("/ec2/load-balancers");
-    return { success: true, loadBalancerArn: res.LoadBalancers?.[0]?.LoadBalancerArn };
+    return { success: true, loadBalancerArn };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -2337,6 +2377,85 @@ export async function deleteLiveLoadBalancer(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await elbv2.send(new DeleteLoadBalancerCommand({ LoadBalancerArn: loadBalancerArn }));
+    revalidatePath("/ec2/load-balancers");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function fetchLiveListeners(
+  loadBalancerArn: string
+): Promise<{ listeners: ListenerModel[]; success: boolean; error?: string }> {
+  try {
+    const [listenersRes, tgRes] = await Promise.all([
+      elbv2.send(new DescribeListenersCommand({ LoadBalancerArn: loadBalancerArn })),
+      elbv2.send(new DescribeTargetGroupsCommand({})).catch(() => ({ TargetGroups: [] })),
+    ]);
+
+    const tgMap = new Map<string, string>();
+    (tgRes.TargetGroups || []).forEach((tg) => {
+      if (tg.TargetGroupArn && tg.TargetGroupName) {
+        tgMap.set(tg.TargetGroupArn, tg.TargetGroupName);
+      }
+    });
+
+    const raw = listenersRes.Listeners || [];
+    const mapped: ListenerModel[] = raw.map((l) => {
+      const forwardAction = l.DefaultActions?.find((a) => a.Type === "forward");
+      const tgArn =
+        forwardAction?.TargetGroupArn ||
+        forwardAction?.ForwardConfig?.TargetGroups?.[0]?.TargetGroupArn;
+      return {
+        arn: l.ListenerArn || "",
+        loadBalancerArn: l.LoadBalancerArn || "",
+        port: l.Port || 80,
+        protocol: l.Protocol || "HTTP",
+        targetGroupArn: tgArn,
+        targetGroupName: tgArn
+          ? tgMap.get(tgArn) || tgArn.split("/").slice(-2, -1)[0] || "Target group"
+          : undefined,
+      };
+    });
+
+    return { listeners: mapped, success: true };
+  } catch (err: any) {
+    return { listeners: [], success: false, error: err.message };
+  }
+}
+
+export async function createLiveListener(params: {
+  loadBalancerArn: string;
+  protocol: string;
+  port: number;
+  targetGroupArn: string;
+}): Promise<{ success: boolean; listenerArn?: string; error?: string }> {
+  try {
+    const res = await elbv2.send(
+      new CreateListenerCommand({
+        LoadBalancerArn: params.loadBalancerArn,
+        Protocol: params.protocol as any,
+        Port: params.port,
+        DefaultActions: [
+          {
+            Type: "forward",
+            TargetGroupArn: params.targetGroupArn,
+          },
+        ],
+      })
+    );
+    revalidatePath("/ec2/load-balancers");
+    return { success: true, listenerArn: res.Listeners?.[0]?.ListenerArn };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deleteLiveListener(
+  listenerArn: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await elbv2.send(new DeleteListenerCommand({ ListenerArn: listenerArn }));
     revalidatePath("/ec2/load-balancers");
     return { success: true };
   } catch (err: any) {
@@ -2402,6 +2521,7 @@ export async function createLiveTargetGroup(params: {
   vpcId: string;
   targetType?: string;
   healthCheckPath?: string;
+  initialTargets?: { id: string; port?: number; availabilityZone?: string }[];
 }): Promise<{ success: boolean; targetGroupArn?: string; error?: string }> {
   try {
     const res = await elbv2.send(
@@ -2414,8 +2534,23 @@ export async function createLiveTargetGroup(params: {
         HealthCheckPath: params.healthCheckPath || "/",
       })
     );
+    const targetGroupArn = res.TargetGroups?.[0]?.TargetGroupArn;
+
+    if (targetGroupArn && params.initialTargets && params.initialTargets.length > 0) {
+      await elbv2.send(
+        new RegisterTargetsCommand({
+          TargetGroupArn: targetGroupArn,
+          Targets: params.initialTargets.map((t) => ({
+            Id: t.id,
+            Port: t.port || params.port || 80,
+            AvailabilityZone: t.availabilityZone,
+          })),
+        })
+      );
+    }
+
     revalidatePath("/ec2/target-groups");
-    return { success: true, targetGroupArn: res.TargetGroups?.[0]?.TargetGroupArn };
+    return { success: true, targetGroupArn };
   } catch (err: any) {
     return { success: false, error: err.message };
   }
@@ -2430,6 +2565,107 @@ export async function deleteLiveTargetGroup(
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
+  }
+}
+
+export interface TargetHealthModel {
+  id: string;
+  port: number;
+  availabilityZone?: string;
+  state: "healthy" | "unhealthy" | "initial" | "unused" | "draining";
+  reason?: string;
+  description?: string;
+}
+
+export interface AvailableInstanceModel {
+  id: string;
+  name: string;
+  state: string;
+  type: string;
+  availabilityZone: string;
+  privateIp?: string;
+}
+
+export async function fetchLiveTargetHealth(
+  targetGroupArn: string
+): Promise<{ targets: TargetHealthModel[]; success: boolean; error?: string }> {
+  try {
+    const res = await elbv2.send(new DescribeTargetHealthCommand({ TargetGroupArn: targetGroupArn }));
+    const raw = res.TargetHealthDescriptions || [];
+    const mapped: TargetHealthModel[] = raw.map((th) => ({
+      id: th.Target?.Id || "",
+      port: th.Target?.Port || 80,
+      availabilityZone: th.Target?.AvailabilityZone || "",
+      state: (th.TargetHealth?.State as any) || "unused",
+      reason: th.TargetHealth?.Reason || "",
+      description: th.TargetHealth?.Description || "",
+    }));
+    return { targets: mapped, success: true };
+  } catch (err: any) {
+    return { targets: [], success: false, error: err.message };
+  }
+}
+
+export async function registerLiveTargets(
+  targetGroupArn: string,
+  targets: { id: string; port?: number; availabilityZone?: string }[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await elbv2.send(
+      new RegisterTargetsCommand({
+        TargetGroupArn: targetGroupArn,
+        Targets: targets.map((t) => ({
+          Id: t.id,
+          Port: t.port || 80,
+          AvailabilityZone: t.availabilityZone,
+        })),
+      })
+    );
+    revalidatePath("/ec2/target-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function deregisterLiveTargets(
+  targetGroupArn: string,
+  targets: { id: string; port?: number }[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await elbv2.send(
+      new DeregisterTargetsCommand({
+        TargetGroupArn: targetGroupArn,
+        Targets: targets.map((t) => ({
+          Id: t.id,
+          Port: t.port || 80,
+        })),
+      })
+    );
+    revalidatePath("/ec2/target-groups");
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: err.message };
+  }
+}
+
+export async function fetchLiveAvailableInstances(): Promise<AvailableInstanceModel[]> {
+  try {
+    const res = await ec2.send(new DescribeInstancesCommand({}));
+    const raw = res.Reservations?.flatMap((r) => r.Instances || []) || [];
+    return raw.map((inst) => {
+      const nameTag = inst.Tags?.find((t) => t.Key === "Name")?.Value;
+      return {
+        id: inst.InstanceId || "",
+        name: nameTag || (inst.KeyName ? `Instance (${inst.KeyName})` : inst.InstanceId || ""),
+        state: inst.State?.Name || "stopped",
+        type: inst.InstanceType || "t3.micro",
+        availabilityZone: inst.Placement?.AvailabilityZone || "us-east-1a",
+        privateIp: inst.PrivateIpAddress || "",
+      };
+    });
+  } catch (err) {
+    return [];
   }
 }
 

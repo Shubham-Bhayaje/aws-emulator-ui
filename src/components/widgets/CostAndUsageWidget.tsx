@@ -1,13 +1,15 @@
 /**
  * CostAndUsageWidget.tsx – Authentic AWS Console Cost and usage widget.
  * Features:
- * - Live resource-backed cost calculations and estimates
+ * - Real dynamic billing calculation system backed by live emulator resources
+ * - Automatically assigns and calculates usage costs to resources when created
  * - Dynamic "Group by" filter (Service vs Usage Type)
  * - Dynamic Timeframe filter (Last 6 months, Last 3 months, Month to date)
+ * - Dynamic calendar months (calculated from actual date)
  * - Interactive stacked bar chart with live hover tooltips
  * - Fully functional "AWS Budgets" management (Create, Edit, Delete, Threshold Alerts)
  * - Functional Cost Optimization Hub with actionable recommendations
- * - Interactive "View in Cost Explorer" detailed modal
+ * - Interactive "View in Cost Explorer" detailed modal listing live itemized resources
  * - Zero emojis, Cloudscape enterprise styling.
  */
 
@@ -15,41 +17,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { getLiveCostAndUsage, LiveCostData } from "@/app/actions/widgetActions";
-
-interface MonthlyCost {
-  month: string;
-  ec2: number;
-  s3: number;
-  dynamodb: number;
-  sqs: number;
-  other: number;
-}
-
-const DEFAULT_MONTHLY_DATA: MonthlyCost[] = [
-  { month: "Apr 24", ec2: 42.0, s3: 12.5, dynamodb: 8.2, sqs: 4.5, other: 4.0 },
-  { month: "May 24", ec2: 41.5, s3: 13.0, dynamodb: 7.8, sqs: 4.2, other: 3.3 },
-  { month: "Jun 24", ec2: 44.2, s3: 14.8, dynamodb: 9.1, sqs: 4.8, other: 3.5 },
-  { month: "Jul 24", ec2: 172.0, s3: 38.5, dynamodb: 26.0, sqs: 15.5, other: 16.5 },
-  { month: "Aug 24", ec2: 170.5, s3: 37.8, dynamodb: 25.5, sqs: 16.0, other: 17.3 },
-  { month: "Sep 24", ec2: 78.0, s3: 24.5, dynamodb: 14.2, sqs: 8.8, other: 8.8 },
-];
-
-const SERVICE_COLORS = {
-  ec2: { name: "Amazon EC2", color: "#3b82f6" },
-  s3: { name: "Amazon S3", color: "#10b981" },
-  dynamodb: { name: "Amazon DynamoDB", color: "#8b5cf6" },
-  sqs: { name: "Amazon SQS", color: "#f97316" },
-  other: { name: "Other Services", color: "#06b6d4" },
-};
-
-const USAGE_TYPE_COLORS = {
-  compute: { name: "BoxUsage (Compute)", color: "#2563eb" },
-  storage: { name: "TimedStorage (GB-Mo)", color: "#059669" },
-  requests: { name: "Requests (Tier 1/2)", color: "#7c3aed" },
-  dataTransfer: { name: "DataTransfer-Out", color: "#ea580c" },
-  other: { name: "Other Usage Types", color: "#0891b2" },
-};
+import {
+  getLiveCostAndUsage,
+  LiveBillingResult,
+  BilledResource,
+  MonthlyCostItem,
+} from "@/app/actions/widgetActions";
 
 export interface Budget {
   id: string;
@@ -62,9 +35,9 @@ export interface Budget {
 }
 
 const DEFAULT_BUDGETS: Budget[] = [
-  { id: "1", name: "Monthly Development Budget", limit: 50.0, actual: 31.1, thresholdPercent: 80, period: "MONTHLY", unit: "USD" },
-  { id: "2", name: "S3 Storage Cap", limit: 10.0, actual: 4.2, thresholdPercent: 75, period: "MONTHLY", unit: "USD" },
-  { id: "3", name: "Zero-Spend Alert", limit: 1.0, actual: 31.1, thresholdPercent: 100, period: "MONTHLY", unit: "USD" },
+  { id: "1", name: "Monthly Development Budget", limit: 50.0, actual: 0.0, thresholdPercent: 80, period: "MONTHLY", unit: "USD" },
+  { id: "2", name: "S3 Storage Cap", limit: 10.0, actual: 0.0, thresholdPercent: 75, period: "MONTHLY", unit: "USD" },
+  { id: "3", name: "Zero-Spend Alert", limit: 1.0, actual: 0.0, thresholdPercent: 100, period: "MONTHLY", unit: "USD" },
 ];
 
 interface CostAndUsageWidgetProps {
@@ -75,7 +48,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
   const [activeTab, setActiveTab] = useState<"cost" | "budgets">("cost");
   const [groupBy, setGroupBy] = useState<"service" | "usageType">("service");
   const [timeframe, setTimeframe] = useState<"6m" | "3m" | "mtd">("6m");
-  const [hoveredMonth, setHoveredMonth] = useState<MonthlyCost | null>(null);
+  const [hoveredMonth, setHoveredMonth] = useState<MonthlyCostItem | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [showCostExplorerModal, setShowCostExplorerModal] = useState(false);
@@ -85,11 +58,12 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
   const [optRecommendationsApplied, setOptRecommendationsApplied] = useState<string[]>([]);
   const [showOptHubModal, setShowOptHubModal] = useState(false);
 
-  // Live costs from backend
-  const [currentCost, setCurrentCost] = useState(31.10);
-  const [forecastCost, setForecastCost] = useState(62.15);
-  const [monthlyData, setMonthlyData] = useState<MonthlyCost[]>(DEFAULT_MONTHLY_DATA);
-  const [resourceCounts, setResourceCounts] = useState<{ s3Buckets: number; dynamoTables: number; sqsQueues: number } | null>(null);
+  // Live billing result from backend
+  const [billingData, setBillingData] = useState<LiveBillingResult | null>(null);
+  const [currentCost, setCurrentCost] = useState(0.0);
+  const [forecastCost, setForecastCost] = useState(0.0);
+  const [monthlyData, setMonthlyData] = useState<MonthlyCostItem[]>([]);
+  const [billedResources, setBilledResources] = useState<BilledResource[]>([]);
 
   // Budgets state with localStorage persistence
   const [budgets, setBudgets] = useState<Budget[]>(DEFAULT_BUDGETS);
@@ -98,10 +72,10 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
   const [newBudgetThreshold, setNewBudgetThreshold] = useState("80");
   const [newBudgetPeriod, setNewBudgetPeriod] = useState<"MONTHLY" | "QUARTERLY">("MONTHLY");
 
-  // Load budgets & live data on mount
+  // Load budgets & live billing data on mount
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("aws_console_budgets_v2");
+      const saved = localStorage.getItem("aws_console_budgets_v3");
       if (saved) {
         setBudgets(JSON.parse(saved));
       }
@@ -111,19 +85,26 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
       if (savedApplied) setOptRecommendationsApplied(JSON.parse(savedApplied));
     } catch { /* ignore */ }
 
-    getLiveCostAndUsage().then((res: LiveCostData) => {
+    fetchBillingData();
+  }, []);
+
+  async function fetchBillingData() {
+    try {
+      const res = await getLiveCostAndUsage();
+      setBillingData(res);
       setCurrentCost(res.monthToDate);
       setForecastCost(res.forecasted);
       setMonthlyData(res.monthlyHistory);
-      setResourceCounts({
-        s3Buckets: res.serviceCounts.s3Buckets,
-        dynamoTables: res.serviceCounts.dynamoTables,
-        sqsQueues: res.serviceCounts.sqsQueues,
-      });
-    }).catch(() => {
-      // Keep defaults
-    });
-  }, []);
+      setBilledResources(res.billedResources);
+
+      // Update actual spend on active budgets
+      setBudgets((prev) =>
+        prev.map((b) => ({ ...b, actual: res.monthToDate }))
+      );
+    } catch (err) {
+      console.error("Failed to fetch live billing data:", err);
+    }
+  }
 
   function handleCreateBudget(e: React.FormEvent) {
     e.preventDefault();
@@ -144,7 +125,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
     const updated = [...budgets, newB];
     setBudgets(updated);
     try {
-      localStorage.setItem("aws_console_budgets_v2", JSON.stringify(updated));
+      localStorage.setItem("aws_console_budgets_v3", JSON.stringify(updated));
     } catch { /* ignore */ }
 
     setNewBudgetName("");
@@ -159,7 +140,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
     const updated = budgets.map((b) => (b.id === editingBudget.id ? editingBudget : b));
     setBudgets(updated);
     try {
-      localStorage.setItem("aws_console_budgets_v2", JSON.stringify(updated));
+      localStorage.setItem("aws_console_budgets_v3", JSON.stringify(updated));
     } catch { /* ignore */ }
     setEditingBudget(null);
   }
@@ -168,7 +149,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
     const updated = budgets.filter((b) => b.id !== id);
     setBudgets(updated);
     try {
-      localStorage.setItem("aws_console_budgets_v2", JSON.stringify(updated));
+      localStorage.setItem("aws_console_budgets_v3", JSON.stringify(updated));
     } catch { /* ignore */ }
   }
 
@@ -184,7 +165,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
   function handleApplyRecommendation(id: string, savings: number) {
     const nextApplied = [...optRecommendationsApplied, id];
     setOptRecommendationsApplied(nextApplied);
-    setForecastCost((prev) => +(Math.max(10, prev - savings)).toFixed(2));
+    setForecastCost((prev) => +(Math.max(0, prev - savings)).toFixed(2));
     try {
       localStorage.setItem("aws_cost_opt_applied", JSON.stringify(nextApplied));
     } catch { /* ignore */ }
@@ -195,7 +176,10 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
     timeframe === "mtd" ? -1 : timeframe === "3m" ? -3 : 0
   );
 
-  const maxCost = 300;
+  // Dynamic max cost for chart scaling
+  const highestSpend = Math.max(0, ...filteredData.map((d) => d.total));
+  const maxCost = highestSpend > 0 ? Math.max(10, Math.ceil(highestSpend * 1.25)) : 10;
+  const gridSteps = [maxCost, +(maxCost * 0.66).toFixed(1), +(maxCost * 0.33).toFixed(1), 0];
 
   return (
     <div className="relative bg-white border border-[#d5dbdb] rounded-sm awsui-shadow flex flex-col h-full">
@@ -267,6 +251,15 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
               <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-[#d5dbdb] rounded shadow-lg py-1 z-30 text-[13px]">
                 <button
                   onClick={() => {
+                    fetchBillingData();
+                    setShowMenu(false);
+                  }}
+                  className="w-full text-left px-3 py-1.5 hover:bg-[#f2f8fd] text-[#16191f]"
+                >
+                  Refresh billing
+                </button>
+                <button
+                  onClick={() => {
                     setShowInfoModal(true);
                     setShowMenu(false);
                   }}
@@ -321,8 +314,18 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                   ${currentCost.toFixed(2)}
                 </div>
                 <div className="text-[11px] text-[#545b64] mt-1 flex items-center gap-1">
-                  <span className="text-emerald-700 font-medium">&darr; 6%</span>
-                  <span>compared to last month for same period</span>
+                  {currentCost === 0 ? (
+                    <span className="text-[#879596]">$0.00 (No active resource spend)</span>
+                  ) : billingData && billingData.percentChange !== 0 ? (
+                    <>
+                      <span className={billingData.percentChange > 0 ? "text-amber-700 font-medium" : "text-emerald-700 font-medium"}>
+                        {billingData.percentChange > 0 ? `+${billingData.percentChange}%` : `${billingData.percentChange}%`}
+                      </span>
+                      <span>compared to last month</span>
+                    </>
+                  ) : (
+                    <span className="text-[#879596]">Baseline initial tracking</span>
+                  )}
                 </div>
               </div>
 
@@ -331,25 +334,44 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                 <div className="text-[26px] font-bold text-[#0073bb] leading-none">
                   ${forecastCost.toFixed(2)}
                 </div>
-                <div className="text-[11px] text-[#545b64] mt-1 flex items-center gap-1">
-                  <span className="text-emerald-700 font-medium">&darr; 5%</span>
-                  <span>compared to last month&apos;s total costs</span>
+                <div className="text-[11px] text-[#545b64] mt-1">
+                  {currentCost === 0
+                    ? "Forecasted spend will update as resources run"
+                    : "Estimated full month cost at current run-rate"}
                 </div>
               </div>
 
-              {resourceCounts && (
-                <div className="text-[11px] text-[#545b64] bg-[#f8f9fa] border border-[#eaeded] p-2 rounded">
-                  <div className="font-semibold text-[#16191f] mb-0.5">Local Inventory Tracked:</div>
-                  <div>S3: {resourceCounts.s3Buckets} buckets | DynamoDB: {resourceCounts.dynamoTables} tables | SQS: {resourceCounts.sqsQueues} queues</div>
+              {/* Resource Inventory */}
+              <div className="text-[11px] text-[#545b64] bg-[#f8f9fa] border border-[#eaeded] p-2.5 rounded">
+                <div className="font-semibold text-[#16191f] mb-1 flex items-center justify-between">
+                  <span>Live Tracked Inventory:</span>
+                  <span className="text-[10px] text-[#0073bb] font-mono">
+                    {billingData?.resourceCounts.totalActive || 0} active
+                  </span>
                 </div>
-              )}
+                {billingData && billingData.resourceCounts.totalActive > 0 ? (
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[11px]">
+                    <div>EC2: <strong className="text-[#16191f]">{billingData.resourceCounts.ec2Instances}</strong></div>
+                    <div>EBS: <strong className="text-[#16191f]">{billingData.resourceCounts.ebsVolumes}</strong></div>
+                    <div>S3: <strong className="text-[#16191f]">{billingData.resourceCounts.s3Buckets}</strong></div>
+                    <div>DynamoDB: <strong className="text-[#16191f]">{billingData.resourceCounts.dynamoTables}</strong></div>
+                    <div>SQS: <strong className="text-[#16191f]">{billingData.resourceCounts.sqsQueues}</strong></div>
+                    <div>Other: <strong className="text-[#16191f]">{billingData.resourceCounts.loadBalancers + billingData.resourceCounts.elasticIps + billingData.resourceCounts.lambdaFunctions}</strong></div>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-[#879596] leading-tight">
+                    No active billable resources. Launching an EC2 instance, creating an EBS volume, or creating an S3 bucket will automatically bill them here.
+                  </p>
+                )}
+              </div>
 
               <div className="pt-1">
                 <div className="text-[12px] font-bold text-[#16191f] mb-1.5">Savings opportunities</div>
                 <button
                   type="button"
                   onClick={toggleOptHub}
-                  className={`px-3 py-1.5 text-[12px] rounded-sm font-medium border transition-colors ${
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className={`px-3 text-[12px] rounded-sm font-medium border transition-colors whitespace-nowrap inline-flex items-center justify-center ${
                     optHubEnabled
                       ? "bg-[#f2f8fd] border-[#0073bb] text-[#0073bb]"
                       : "bg-white border-[#0073bb] text-[#0073bb] hover:bg-[#f2f8fd]"
@@ -360,7 +382,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                 {optHubEnabled && (
                   <div className="mt-1 flex items-center justify-between text-[11px]">
                     <span className="text-emerald-700 font-medium">
-                      {3 - optRecommendationsApplied.length} active opportunities
+                      Optimization active
                     </span>
                     <button
                       onClick={() => setShowOptHubModal(true)}
@@ -381,20 +403,16 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                   <span className="text-[#545b64] font-medium">Group by:</span>
                   <button
                     onClick={() => setGroupBy("service")}
-                    className={`px-2 py-0.5 rounded ${
-                      groupBy === "service"
-                        ? "bg-[#0073bb] text-white font-medium"
-                        : "bg-[#f2f3f3] text-[#545b64] hover:text-[#16191f]"
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      groupBy === "service" ? "bg-[#0073bb] text-white" : "bg-[#f2f3f3] text-[#545b64] hover:text-[#16191f]"
                     }`}
                   >
                     Service
                   </button>
                   <button
                     onClick={() => setGroupBy("usageType")}
-                    className={`px-2 py-0.5 rounded ${
-                      groupBy === "usageType"
-                        ? "bg-[#0073bb] text-white font-medium"
-                        : "bg-[#f2f3f3] text-[#545b64] hover:text-[#16191f]"
+                    className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                      groupBy === "usageType" ? "bg-[#0073bb] text-white" : "bg-[#f2f3f3] text-[#545b64] hover:text-[#16191f]"
                     }`}
                   >
                     Usage type
@@ -402,7 +420,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                 </div>
 
                 <div className="flex items-center gap-1 text-[11px]">
-                  <span className="text-[#545b64] mr-1">Timeframe:</span>
+                  <span className="text-[#545b64] mr-1 font-medium">Timeframe:</span>
                   <button
                     onClick={() => setTimeframe("6m")}
                     className={`px-1.5 py-0.5 rounded ${
@@ -431,128 +449,235 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
               </div>
 
               {/* Stacked Bar Chart Graphic */}
-              <div className="relative pt-2 pb-6 border-b border-[#eaeded]">
+              <div className="relative pt-2 pb-2">
                 {/* Horizontal Gridlines */}
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none pb-6">
-                  {[300, 200, 100, 0].map((val) => (
+                <div className="absolute inset-0 h-[140px] flex flex-col justify-between pointer-events-none">
+                  {gridSteps.map((val) => (
                     <div key={val} className="w-full flex items-center gap-2 text-[10px] text-[#879596]">
-                      <span className="w-6 text-right font-mono">{val}</span>
+                      <span className="w-8 text-right font-mono">${val}</span>
                       <div className="flex-1 border-b border-[#eaeded]" />
                     </div>
                   ))}
                 </div>
 
                 {/* Bars Container */}
-                <div className="relative ml-8 flex items-end justify-around h-[140px] pt-2">
+                <div className="relative ml-10 flex items-end justify-around h-[140px] z-10">
                   {filteredData.map((d) => {
-                    const total = d.ec2 + d.s3 + d.dynamodb + d.sqs + d.other;
-                    const totalHeightPct = Math.min(100, (total / maxCost) * 100);
-
-                    const pEc2 = (d.ec2 / total) * totalHeightPct;
-                    const pS3 = (d.s3 / total) * totalHeightPct;
-                    const pDyn = (d.dynamodb / total) * totalHeightPct;
-                    const pSqs = (d.sqs / total) * totalHeightPct;
-                    const pOth = (d.other / total) * totalHeightPct;
+                    const total = d.total;
+                    const maxBarHeightPx = 118;
+                    const barHeightPx = total > 0 ? Math.max(10, Math.round((total / maxCost) * maxBarHeightPx)) : 0;
 
                     return (
                       <div
                         key={d.month}
-                        className="group relative flex flex-col items-center cursor-pointer"
+                        className="group relative flex flex-col items-center justify-end h-full cursor-pointer w-12 sm:w-16"
                         onMouseEnter={() => setHoveredMonth(d)}
                         onMouseLeave={() => setHoveredMonth(null)}
                       >
                         {/* Hover Tooltip */}
                         {hoveredMonth?.month === d.month && (
-                          <div className="absolute bottom-[calc(100%+8px)] z-40 bg-[#16191f] text-white text-[11px] rounded px-3 py-2 shadow-xl whitespace-nowrap min-w-[170px] pointer-events-none">
+                          <div className="absolute bottom-[calc(100%+8px)] z-40 bg-[#16191f] text-white text-[11px] rounded px-3 py-2 shadow-xl whitespace-nowrap min-w-[190px] pointer-events-none">
                             <div className="font-bold border-b border-gray-600 pb-1 mb-1.5 flex justify-between">
                               <span>{d.month}</span>
-                              <span className="text-[#fbd89a]">${total.toFixed(2)}</span>
+                              <span className="text-[#fbd89a] font-mono">${total.toFixed(2)}</span>
                             </div>
-                            {groupBy === "service" ? (
+                            {total === 0 ? (
+                              <div className="text-[11px] text-gray-400 py-0.5">
+                                No active resource spend
+                              </div>
+                            ) : groupBy === "service" ? (
                               <div className="space-y-1">
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#3b82f6]" />
-                                    <span>Amazon EC2</span>
-                                  </span>
-                                  <span className="font-mono">${d.ec2.toFixed(2)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#10b981]" />
-                                    <span>Amazon S3</span>
-                                  </span>
-                                  <span className="font-mono">${d.s3.toFixed(2)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#8b5cf6]" />
-                                    <span>Amazon DynamoDB</span>
-                                  </span>
-                                  <span className="font-mono">${d.dynamodb.toFixed(2)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#f97316]" />
-                                    <span>Amazon SQS</span>
-                                  </span>
-                                  <span className="font-mono">${d.sqs.toFixed(2)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#06b6d4]" />
-                                    <span>Other Services</span>
-                                  </span>
-                                  <span className="font-mono">${d.other.toFixed(2)}</span>
-                                </div>
+                                {d.ec2 > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#3b82f6]" />
+                                      <span>Amazon EC2</span>
+                                    </span>
+                                    <span className="font-mono">${d.ec2.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.ebs > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#2563eb]" />
+                                      <span>Amazon EBS</span>
+                                    </span>
+                                    <span className="font-mono">${d.ebs.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.s3 > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#10b981]" />
+                                      <span>Amazon S3</span>
+                                    </span>
+                                    <span className="font-mono">${d.s3.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.dynamodb > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#8b5cf6]" />
+                                      <span>Amazon DynamoDB</span>
+                                    </span>
+                                    <span className="font-mono">${d.dynamodb.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.sqs > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#f97316]" />
+                                      <span>Amazon SQS</span>
+                                    </span>
+                                    <span className="font-mono">${d.sqs.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.other > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#06b6d4]" />
+                                      <span>Other Services</span>
+                                    </span>
+                                    <span className="font-mono">${d.other.toFixed(2)}</span>
+                                  </div>
+                                )}
                               </div>
                             ) : (
                               <div className="space-y-1">
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#2563eb]" />
-                                    <span>BoxUsage (Compute)</span>
-                                  </span>
-                                  <span className="font-mono">${d.ec2.toFixed(2)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#059669]" />
-                                    <span>TimedStorage (S3)</span>
-                                  </span>
-                                  <span className="font-mono">${d.s3.toFixed(2)}</span>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                  <span className="flex items-center gap-1">
-                                    <span className="w-2 h-2 rounded-xs bg-[#7c3aed]" />
-                                    <span>Read/Write Units</span>
-                                  </span>
-                                  <span className="font-mono">${d.dynamodb.toFixed(2)}</span>
-                                </div>
+                                {d.ec2 > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#2563eb]" />
+                                      <span>BoxUsage (Compute)</span>
+                                    </span>
+                                    <span className="font-mono">${d.ec2.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.ebs > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#3b82f6]" />
+                                      <span>VolumeStorage (EBS)</span>
+                                    </span>
+                                    <span className="font-mono">${d.ebs.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.s3 > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#059669]" />
+                                      <span>TimedStorage (S3)</span>
+                                    </span>
+                                    <span className="font-mono">${d.s3.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {d.dynamodb > 0 && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#7c3aed]" />
+                                      <span>ProvisionedCapacity</span>
+                                    </span>
+                                    <span className="font-mono">${d.dynamodb.toFixed(2)}</span>
+                                  </div>
+                                )}
+                                {(d.sqs > 0 || d.other > 0) && (
+                                  <div className="flex items-center justify-between gap-3">
+                                    <span className="flex items-center gap-1">
+                                      <span className="w-2 h-2 rounded-xs bg-[#0891b2]" />
+                                      <span>Requests &amp; Other</span>
+                                    </span>
+                                    <span className="font-mono">${(d.sqs + d.other).toFixed(2)}</span>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
                         )}
 
                         {/* Stacked Bar Segments */}
-                        <div
-                          className="w-7 sm:w-10 rounded-t flex flex-col-reverse overflow-hidden transition-all duration-200 group-hover:brightness-110 shadow-xs"
-                          style={{ height: `${totalHeightPct}%` }}
-                        >
-                          <div style={{ height: `${pEc2}%` }} className="bg-[#3b82f6]" />
-                          <div style={{ height: `${pS3}%` }} className="bg-[#10b981]" />
-                          <div style={{ height: `${pDyn}%` }} className="bg-[#8b5cf6]" />
-                          <div style={{ height: `${pSqs}%` }} className="bg-[#f97316]" />
-                          <div style={{ height: `${pOth}%` }} className="bg-[#06b6d4]" />
-                        </div>
-
-                        {/* X-axis Label */}
-                        <span className="text-[11px] text-[#545b64] mt-2 group-hover:text-[#16191f] font-medium">
-                          {d.month}
-                        </span>
+                        {barHeightPx > 0 ? (
+                          <div
+                            className="w-7 sm:w-10 rounded-t flex flex-col-reverse overflow-hidden transition-all duration-200 group-hover:brightness-110 shadow-xs border border-white/20"
+                            style={{ height: `${barHeightPx}px` }}
+                          >
+                            {groupBy === "service" ? (
+                              <>
+                                {d.ec2 > 0 && (
+                                  <div style={{ height: `${(d.ec2 / total) * 100}%` }} className="bg-[#3b82f6] shrink-0" />
+                                )}
+                                {d.ebs > 0 && (
+                                  <div style={{ height: `${(d.ebs / total) * 100}%` }} className="bg-[#2563eb] shrink-0" />
+                                )}
+                                {d.s3 > 0 && (
+                                  <div style={{ height: `${(d.s3 / total) * 100}%` }} className="bg-[#10b981] shrink-0" />
+                                )}
+                                {d.dynamodb > 0 && (
+                                  <div style={{ height: `${(d.dynamodb / total) * 100}%` }} className="bg-[#8b5cf6] shrink-0" />
+                                )}
+                                {d.sqs > 0 && (
+                                  <div style={{ height: `${(d.sqs / total) * 100}%` }} className="bg-[#f97316] shrink-0" />
+                                )}
+                                {d.other > 0 && (
+                                  <div style={{ height: `${(d.other / total) * 100}%` }} className="bg-[#06b6d4] shrink-0" />
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {d.ec2 > 0 && (
+                                  <div style={{ height: `${(d.ec2 / total) * 100}%` }} className="bg-[#2563eb] shrink-0" />
+                                )}
+                                {d.ebs > 0 && (
+                                  <div style={{ height: `${(d.ebs / total) * 100}%` }} className="bg-[#3b82f6] shrink-0" />
+                                )}
+                                {d.s3 > 0 && (
+                                  <div style={{ height: `${(d.s3 / total) * 100}%` }} className="bg-[#059669] shrink-0" />
+                                )}
+                                {d.dynamodb > 0 && (
+                                  <div style={{ height: `${(d.dynamodb / total) * 100}%` }} className="bg-[#7c3aed] shrink-0" />
+                                )}
+                                {(d.sqs > 0 || d.other > 0) && (
+                                  <div style={{ height: `${((d.sqs + d.other) / total) * 100}%` }} className="bg-[#0891b2] shrink-0" />
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="w-7 sm:w-10 h-1 bg-[#d5dbdb] rounded-full mb-0.5" />
+                        )}
                       </div>
                     );
                   })}
+                </div>
+
+                {/* X-axis Labels */}
+                <div className="ml-10 flex justify-around pt-1.5 border-t border-[#d5dbdb]">
+                  {filteredData.map((d) => (
+                    <span key={d.month} className="w-12 sm:w-16 text-center text-[11px] text-[#545b64] font-medium">
+                      {d.month}
+                    </span>
+                  ))}
+                </div>
+
+                {/* Color Legend */}
+                <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1 pt-2.5 text-[11px] text-[#545b64]">
+                  {groupBy === "service" ? (
+                    <>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6]" />Amazon EC2</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#2563eb]" />Amazon EBS</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#10b981]" />Amazon S3</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#8b5cf6]" />Amazon DynamoDB</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#f97316]" />Amazon SQS</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#06b6d4]" />Other</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#2563eb]" />BoxUsage (Compute)</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6]" />VolumeStorage (EBS)</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#059669]" />TimedStorage (S3)</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#7c3aed]" />ProvisionedCapacity</span>
+                      <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-xs bg-[#0891b2]" />Requests &amp; Other</span>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -564,7 +689,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                 >
                   View in Cost Explorer &rarr;
                 </button>
-                <span className="text-[11px] text-[#879596]">Data refreshed today</span>
+                <span className="text-[11px] text-[#879596]">Data refreshed live from emulator</span>
               </div>
             </div>
           </div>
@@ -581,7 +706,8 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
               <button
                 type="button"
                 onClick={() => setShowCreateBudgetModal(true)}
-                className="px-3 py-1 text-[12px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07] transition-colors"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-3 text-[12px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07] transition-colors whitespace-nowrap inline-flex items-center justify-center"
               >
                 + Create budget
               </button>
@@ -590,8 +716,8 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
             {/* Budgets List */}
             <div className="space-y-2.5 overflow-y-auto max-h-[190px] pr-1">
               {budgets.map((b) => {
-                const pct = Math.min(150, Math.round((b.actual / b.limit) * 100));
-                const isOver = b.actual >= b.limit;
+                const pct = b.limit > 0 ? Math.min(150, Math.round((b.actual / b.limit) * 100)) : 0;
+                const isOver = b.actual >= b.limit && b.actual > 0;
                 const isWarning = !isOver && pct >= (b.thresholdPercent || 80);
 
                 return (
@@ -599,43 +725,31 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                     <div className="flex items-center justify-between text-[12px]">
                       <div className="flex items-center gap-2">
                         <span className="font-bold text-[#16191f]">{b.name}</span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${
-                            isOver
-                              ? "bg-[#fdf3f1] text-[#d13212] border border-[#f5b8b0]"
-                              : isWarning
-                              ? "bg-[#fff8e6] text-[#b35900] border border-[#fed688]"
-                              : "bg-[#f2f8f0] text-[#1d8102] border border-[#b8dfaf]"
-                          }`}
-                        >
-                          {isOver ? "EXCEEDED" : isWarning ? `WARNING (${pct}%)` : `OK (${pct}%)`}
+                        <span className="text-[10px] text-[#545b64] border border-[#d5dbdb] px-1.5 py-0.5 rounded">
+                          {b.period}
                         </span>
                       </div>
-
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-[#545b64]">
+                        <span className="font-mono text-[#16191f]">
                           ${b.actual.toFixed(2)} / ${b.limit.toFixed(2)} {b.unit}
                         </span>
                         <button
                           onClick={() => setEditingBudget(b)}
-                          className="text-[#0073bb] hover:underline text-[11px]"
+                          className="text-[11px] text-[#0073bb] hover:underline"
                         >
                           Edit
                         </button>
                         <button
                           onClick={() => handleDeleteBudget(b.id)}
-                          className="text-[#879596] hover:text-[#d13212] p-0.5"
-                          title="Delete budget"
+                          className="text-[11px] text-[#d13212] hover:underline"
                         >
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
+                          Delete
                         </button>
                       </div>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full bg-[#eaeded] h-2 rounded-full overflow-hidden">
+                    <div className="h-2 w-full bg-[#eaeded] rounded-full overflow-hidden">
                       <div
                         className={`h-full transition-all duration-300 ${
                           isOver ? "bg-[#d13212]" : isWarning ? "bg-[#eb5f07]" : "bg-[#10b981]"
@@ -643,54 +757,57 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                         style={{ width: `${Math.min(100, pct)}%` }}
                       />
                     </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-[#545b64]">
+                      <span>{pct}% of target spend</span>
+                      <span>Alert at {b.thresholdPercent}%</span>
+                    </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="pt-2 border-t border-[#eaeded] flex items-center justify-between text-[12px]">
-              <button
-                onClick={() => setShowCostExplorerModal(true)}
-                className="text-[#0073bb] hover:underline font-medium"
-              >
-                Go to AWS Budgets console &rarr;
-              </button>
+            <div className="pt-2 border-t border-[#eaeded] flex justify-between items-center text-[12px]">
               <span className="text-[11px] text-[#545b64]">
-                Total monthly limit: ${budgets.reduce((acc, b) => acc + b.limit, 0).toFixed(2)} USD
+                Total Budgets: <strong>{budgets.length}</strong>
               </span>
+              <button
+                type="button"
+                onClick={() => setShowCreateBudgetModal(true)}
+                className="text-[#0073bb] hover:underline text-[12px] font-medium"
+              >
+                Add new threshold budget &rarr;
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Resize handle icon */}
-      <div className="absolute right-1 bottom-1 text-[#aab7b8] pointer-events-none">
-        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
-          <line x1="9" y1="3" x2="3" y2="9" />
-          <line x1="9" y1="6" x2="6" y2="9" />
-        </svg>
-      </div>
-
       {/* Info Modal */}
       {showInfoModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[500px] w-full p-6 space-y-4">
+          <div className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[480px] w-full p-6 space-y-4">
             <div className="flex items-center justify-between border-b border-[#eaeded] pb-3">
-              <h3 className="text-[16px] font-bold text-[#16191f]">About Cost and Usage</h3>
+              <h3 className="text-[16px] font-bold text-[#16191f]">Cost and Usage Widget Info</h3>
               <button onClick={() => setShowInfoModal(false)} className="text-[#879596] hover:text-[#16191f]">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
                 </svg>
               </button>
             </div>
-            <p className="text-[13px] text-[#545b64] leading-relaxed">
-              Provides real-time visibility into local cloud spending, forecasts month-end invoices,
-              and allows setting budget thresholds to control emulator infrastructure costs.
-            </p>
-            <div className="flex justify-end pt-2 border-t border-[#eaeded]">
+            <div className="text-[13px] text-[#545b64] space-y-2">
+              <p>
+                This widget scans all active resources in your AWS Emulator (EC2 instances, EBS volumes, S3 buckets, DynamoDB tables, SQS queues) and computes real month-to-date and forecasted costs using official AWS pricing rates.
+              </p>
+              <p>
+                When you launch an EC2 instance, create an S3 bucket, or provision an EBS volume, this widget automatically assigns usage costs to each resource.
+              </p>
+            </div>
+            <div className="flex justify-end pt-3 border-t border-[#eaeded]">
               <button
                 onClick={() => setShowInfoModal(false)}
-                className="px-4 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e] whitespace-nowrap inline-flex items-center justify-center"
               >
                 Close
               </button>
@@ -704,10 +821,10 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <form
             onSubmit={handleCreateBudget}
-            className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[460px] w-full p-6 space-y-4"
+            className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[440px] w-full p-6 space-y-4"
           >
             <div className="flex items-center justify-between border-b border-[#eaeded] pb-3">
-              <h3 className="text-[16px] font-bold text-[#16191f]">Create Budget</h3>
+              <h3 className="text-[16px] font-bold text-[#16191f]">Create AWS Budget</h3>
               <button type="button" onClick={() => setShowCreateBudgetModal(false)} className="text-[#879596] hover:text-[#16191f]">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
                   <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
@@ -721,7 +838,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                 <input
                   type="text"
                   required
-                  placeholder="e.g. S3 Storage Limit"
+                  placeholder="e.g. Monthly EC2 Cap"
                   value={newBudgetName}
                   onChange={(e) => setNewBudgetName(e.target.value)}
                   className="w-full px-3 py-1.5 border border-[#aab7b8] rounded text-[#16191f] focus:border-[#0073bb] outline-hidden"
@@ -729,12 +846,12 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
               </div>
 
               <div>
-                <label className="block font-medium text-[#16191f] mb-1">Target Amount (USD)</label>
+                <label className="block font-medium text-[#16191f] mb-1">Target Limit (USD)</label>
                 <input
                   type="number"
                   step="0.01"
                   required
-                  placeholder="100.00"
+                  placeholder="50.00"
                   value={newBudgetLimit}
                   onChange={(e) => setNewBudgetLimit(e.target.value)}
                   className="w-full px-3 py-1.5 border border-[#aab7b8] rounded text-[#16191f] focus:border-[#0073bb] outline-hidden"
@@ -745,7 +862,8 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                 <label className="block font-medium text-[#16191f] mb-1">Alert Threshold (%)</label>
                 <input
                   type="number"
-                  placeholder="80"
+                  min="1"
+                  max="200"
                   value={newBudgetThreshold}
                   onChange={(e) => setNewBudgetThreshold(e.target.value)}
                   className="w-full px-3 py-1.5 border border-[#aab7b8] rounded text-[#16191f] focus:border-[#0073bb] outline-hidden"
@@ -769,13 +887,15 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
               <button
                 type="button"
                 onClick={() => setShowCreateBudgetModal(false)}
-                className="px-4 py-1.5 text-[13px] border border-[#545b64] text-[#16191f] rounded-sm hover:bg-[#f2f3f3]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] border border-[#545b64] text-[#16191f] rounded-sm hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 text-[13px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] bg-[#ec7211] text-white rounded-sm font-medium hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center"
               >
                 Save Budget
               </button>
@@ -827,13 +947,15 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
               <button
                 type="button"
                 onClick={() => setEditingBudget(null)}
-                className="px-4 py-1.5 text-[13px] border border-[#545b64] text-[#16191f] rounded-sm hover:bg-[#f2f3f3]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] border border-[#545b64] text-[#16191f] rounded-sm hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e] whitespace-nowrap inline-flex items-center justify-center"
               >
                 Update Budget
               </button>
@@ -842,14 +964,14 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
         </div>
       )}
 
-      {/* Cost Explorer Detailed Modal */}
+      {/* Cost Explorer Detailed Modal with Live Billed Resources */}
       {showCostExplorerModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[700px] w-full p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3">
+          <div className="bg-white rounded border border-[#d5dbdb] shadow-2xl max-w-[840px] w-full p-6 space-y-4 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3 shrink-0">
               <div>
-                <h3 className="text-[17px] font-bold text-[#16191f]">AWS Cost Explorer (Interactive)</h3>
-                <p className="text-[12px] text-[#545b64]">Current Month: September 2024 | Region: us-east-1</p>
+                <h3 className="text-[17px] font-bold text-[#16191f]">AWS Cost Explorer (Interactive Replica)</h3>
+                <p className="text-[12px] text-[#545b64]">Live Resource Usage Billing Engine | Region: us-east-1</p>
               </div>
               <button onClick={() => setShowCostExplorerModal(false)} className="text-[#879596] hover:text-[#16191f]">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -858,7 +980,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-3 p-3 bg-[#f8f9fa] border border-[#eaeded] rounded text-center">
+            <div className="grid grid-cols-3 gap-3 p-3 bg-[#f8f9fa] border border-[#eaeded] rounded text-center shrink-0">
               <div>
                 <div className="text-[11px] text-[#545b64]">Actual Spend (MTD)</div>
                 <div className="text-[20px] font-bold text-[#0073bb]">${currentCost.toFixed(2)}</div>
@@ -868,58 +990,72 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
                 <div className="text-[20px] font-bold text-[#16191f]">${forecastCost.toFixed(2)}</div>
               </div>
               <div>
-                <div className="text-[11px] text-[#545b64]">Daily Average</div>
-                <div className="text-[20px] font-bold text-[#16191f]">${(currentCost / 18).toFixed(2)}</div>
+                <div className="text-[11px] text-[#545b64]">Active Billed Resources</div>
+                <div className="text-[20px] font-bold text-[#16191f]">{billedResources.length}</div>
               </div>
             </div>
 
-            {/* Service Breakdown Table */}
-            <div>
-              <div className="text-[13px] font-bold text-[#16191f] mb-2">Cost by Service</div>
+            {/* Billed Resources Table */}
+            <div className="flex-1 overflow-y-auto min-h-0 space-y-2">
+              <div className="text-[13px] font-bold text-[#16191f]">Itemized Resource Charges</div>
               <div className="border border-[#eaeded] rounded overflow-hidden">
                 <table className="w-full text-[12px] text-left">
-                  <thead className="bg-[#f2f3f3] text-[#545b64] font-semibold">
+                  <thead className="bg-[#f2f3f3] text-[#545b64] font-semibold sticky top-0 bg-[#f2f3f3]">
                     <tr>
+                      <th className="py-2 px-3">Resource ID</th>
                       <th className="py-2 px-3">Service</th>
                       <th className="py-2 px-3">Usage Type</th>
-                      <th className="py-2 px-3 text-right">Cost (USD)</th>
-                      <th className="py-2 px-3 text-right">% of Total</th>
+                      <th className="py-2 px-3">Rate</th>
+                      <th className="py-2 px-3 text-right">MTD Cost</th>
+                      <th className="py-2 px-3 text-right">Forecasted</th>
+                      <th className="py-2 px-3 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#eaeded]">
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#16191f]">Amazon EC2</td>
-                      <td className="py-2 px-3 text-[#545b64]">t3.medium Running Hours</td>
-                      <td className="py-2 px-3 text-right font-mono">$18.50</td>
-                      <td className="py-2 px-3 text-right font-mono">59.5%</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#16191f]">Amazon S3</td>
-                      <td className="py-2 px-3 text-[#545b64]">Standard Storage &amp; GET/PUT</td>
-                      <td className="py-2 px-3 text-right font-mono">${(currentCost * 0.18).toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono">18.0%</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#16191f]">Amazon DynamoDB</td>
-                      <td className="py-2 px-3 text-[#545b64]">Provisioned WCU/RCU</td>
-                      <td className="py-2 px-3 text-right font-mono">${(currentCost * 0.12).toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono">12.0%</td>
-                    </tr>
-                    <tr>
-                      <td className="py-2 px-3 font-medium text-[#16191f]">Amazon SQS</td>
-                      <td className="py-2 px-3 text-[#545b64]">API Requests &amp; Queue Storage</td>
-                      <td className="py-2 px-3 text-right font-mono">${(currentCost * 0.05).toFixed(2)}</td>
-                      <td className="py-2 px-3 text-right font-mono">5.0%</td>
-                    </tr>
+                    {billedResources.length > 0 ? (
+                      billedResources.map((res) => (
+                        <tr key={res.id} className="hover:bg-[#f9fafb]">
+                          <td className="py-2 px-3 font-mono font-medium text-[#0073bb]">{res.id}</td>
+                          <td className="py-2 px-3 text-[#16191f] font-medium">{res.service}</td>
+                          <td className="py-2 px-3 text-[#545b64]">{res.usageType}</td>
+                          <td className="py-2 px-3 text-[#545b64] font-mono text-[11px]">{res.rateDescription}</td>
+                          <td className="py-2 px-3 text-right font-mono font-bold text-[#16191f]">
+                            ${res.mtdCost.toFixed(2)}
+                          </td>
+                          <td className="py-2 px-3 text-right font-mono text-[#545b64]">
+                            ${res.forecastedCost.toFixed(2)}
+                          </td>
+                          <td className="py-2 px-3 text-center">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
+                              res.status === "running" || res.status === "in-use" || res.status === "active"
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-gray-100 text-gray-600 border border-gray-200"
+                            }`}>
+                              {res.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan={7} className="py-8 px-4 text-center text-[#545b64] space-y-1">
+                          <div className="font-semibold text-[13px] text-[#16191f]">No active usage charges</div>
+                          <p className="text-[12px] text-[#879596]">
+                            No billable AWS resources are currently active. Launch an EC2 instance, create an EBS volume, create an S3 bucket, or provision a DynamoDB table to see live usage charges here.
+                          </p>
+                        </td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
             </div>
 
-            <div className="flex justify-end pt-2 border-t border-[#eaeded]">
+            <div className="flex justify-end pt-2 border-t border-[#eaeded] shrink-0">
               <button
                 onClick={() => setShowCostExplorerModal(false)}
-                className="px-4 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e] whitespace-nowrap inline-flex items-center justify-center"
               >
                 Close
               </button>
@@ -935,7 +1071,7 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
             <div className="flex items-center justify-between border-b border-[#eaeded] pb-3">
               <div>
                 <h3 className="text-[16px] font-bold text-[#16191f]">Cost Optimization Hub</h3>
-                <p className="text-[12px] text-[#545b64]">Actionable recommendations to reduce your AWS spend</p>
+                <p className="text-[12px] text-[#545b64]">Actionable recommendations based on active resources</p>
               </div>
               <button onClick={() => setShowOptHubModal(false)} className="text-[#879596] hover:text-[#16191f]">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -945,65 +1081,65 @@ export default function CostAndUsageWidget({ onRemove }: CostAndUsageWidgetProps
             </div>
 
             <div className="space-y-3">
-              {[
-                {
-                  id: "rec-s3-1",
-                  title: "Delete unused test S3 bucket",
-                  service: "Amazon S3",
-                  savings: 1.80,
-                  details: "Bucket has no incoming requests in the last 14 days.",
-                },
-                {
-                  id: "rec-ddb-1",
-                  title: "Switch DynamoDB table to On-Demand capacity",
-                  service: "Amazon DynamoDB",
-                  savings: 3.20,
-                  details: "Current read/write utilization is under 5% of provisioned capacity.",
-                },
-                {
-                  id: "rec-glacier-1",
-                  title: "Enable S3 Lifecycle Rule for archive objects",
-                  service: "Amazon S3",
-                  savings: 5.40,
-                  details: "Transition objects older than 30 days to Glacier Flexible Retrieval.",
-                },
-              ].map((rec) => {
-                const applied = optRecommendationsApplied.includes(rec.id);
-                return (
-                  <div key={rec.id} className="p-3 border border-[#eaeded] rounded bg-[#fafafa] flex items-center justify-between gap-3">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-[13px] text-[#16191f]">{rec.title}</span>
-                        <span className="text-[10px] bg-[#f2f8fd] text-[#0073bb] border border-[#d5dbdb] px-1.5 py-0.5 rounded">
-                          {rec.service}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#545b64] mt-0.5">{rec.details}</p>
-                      <div className="text-[11px] font-semibold text-emerald-700 mt-1">
-                        Estimated savings: ${rec.savings.toFixed(2)}/month
-                      </div>
-                    </div>
+              {billedResources.length > 0 ? (
+                billedResources
+                  .filter((r) => r.status === "stopped" || r.usageType.includes("IdleAddress"))
+                  .map((res) => {
+                    const id = `opt-${res.id}`;
+                    const applied = optRecommendationsApplied.includes(id);
+                    const savings = res.forecastedCost;
 
-                    <button
-                      disabled={applied}
-                      onClick={() => handleApplyRecommendation(rec.id, rec.savings)}
-                      className={`px-3 py-1.5 text-[12px] rounded-sm font-medium transition-colors shrink-0 ${
-                        applied
-                          ? "bg-[#f2f8f0] text-[#1d8102] border border-[#b8dfaf] cursor-default"
-                          : "bg-[#0073bb] text-white hover:bg-[#005a9e]"
-                      }`}
-                    >
-                      {applied ? "Applied" : "Apply"}
-                    </button>
-                  </div>
-                );
-              })}
+                    return (
+                      <div key={id} className="p-3 border border-[#eaeded] rounded bg-[#fafafa] flex items-center justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-[13px] text-[#16191f]">
+                              Release idle resource: {res.id}
+                            </span>
+                            <span className="text-[10px] bg-[#f2f8fd] text-[#0073bb] border border-[#d5dbdb] px-1.5 py-0.5 rounded">
+                              {res.serviceKey.toUpperCase()}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[#545b64] mt-0.5">
+                            Resource is in {res.status} state. Terminating or releasing eliminates storage/idle charges.
+                          </p>
+                          <div className="text-[11px] font-semibold text-emerald-700 mt-1">
+                            Estimated savings: ${savings.toFixed(2)}/month
+                          </div>
+                        </div>
+
+                        <button
+                          disabled={applied}
+                          onClick={() => handleApplyRecommendation(id, savings)}
+                          style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                          className={`px-3 text-[12px] rounded-sm font-medium transition-colors shrink-0 whitespace-nowrap inline-flex items-center justify-center ${
+                            applied
+                              ? "bg-[#f2f8f0] text-[#1d8102] border border-[#b8dfaf] cursor-default"
+                              : "bg-[#0073bb] text-white hover:bg-[#005a9e]"
+                          }`}
+                        >
+                          {applied ? "Applied" : "Optimize"}
+                        </button>
+                      </div>
+                    );
+                  })
+              ) : null}
+
+              {billedResources.filter((r) => r.status === "stopped" || r.usageType.includes("IdleAddress")).length === 0 && (
+                <div className="p-6 text-center text-[#545b64] space-y-1">
+                  <div className="font-semibold text-[13px] text-[#16191f]">No optimization actions required</div>
+                  <p className="text-[12px] text-[#879596]">
+                    All active resources are operating efficiently with zero unattached idle addresses or wasteful stopped allocations.
+                  </p>
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end pt-2 border-t border-[#eaeded]">
               <button
                 onClick={() => setShowOptHubModal(false)}
-                className="px-4 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e] whitespace-nowrap inline-flex items-center justify-center"
               >
                 Done
               </button>

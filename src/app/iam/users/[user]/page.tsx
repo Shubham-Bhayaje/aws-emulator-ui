@@ -1,6 +1,7 @@
 /**
- * IAM User detail page – Server component.
- * Loads user details, attached policies, and evaluates active identity permissions.
+ * src/app/iam/users/[user]/page.tsx – IAM User Detail Page.
+ * Loads user details, attached policies, groups, access keys, and checks permissions.
+ * Zero emojis, Cloudscape enterprise styling.
  */
 
 import ServiceLayout from "@/components/ServiceLayout";
@@ -9,11 +10,15 @@ import {
   GetUserCommand,
   ListAttachedUserPoliciesCommand,
   ListPoliciesCommand,
+  ListGroupsCommand,
 } from "@aws-sdk/client-iam";
 import { UserDetail, UserDetailMeta } from "./UserDetail";
 import { iamNav } from "../../page";
 import { getActiveIdentity } from "@/lib/identity";
 import { evaluatePermissions } from "@/lib/permissions";
+import { fetchUserGroups, listAccessKeysAction } from "../../actions";
+
+export const dynamic = "force-dynamic";
 
 interface PageProps {
   params: Promise<{ user: string }>;
@@ -25,19 +30,27 @@ export default async function UserDetailPage({ params }: PageProps) {
 
   let userMeta: UserDetailMeta | null = null;
   let allPolicies: { name: string; arn: string }[] = [];
+  let userGroups: Array<{ groupName: string; arn: string; createDate: string }> = [];
+  let allGroups: Array<{ groupName: string }> = [];
+  let initialAccessKeys: Array<{ accessKeyId: string; status: "Active" | "Inactive"; createDate: string }> = [];
   let error: string | null = null;
   const identity = await getActiveIdentity();
 
   try {
-    const userRes = await iam.send(new GetUserCommand({ UserName: userName }));
-    const u = userRes.User;
+    const [userRes, attachedRes, policiesRes, userGroupsRes, allGroupsRes, accessKeysRes] =
+      await Promise.all([
+        iam.send(new GetUserCommand({ UserName: userName })),
+        iam.send(new ListAttachedUserPoliciesCommand({ UserName: userName })),
+        iam.send(new ListPoliciesCommand({ Scope: "All", MaxItems: 200 })),
+        fetchUserGroups(userName),
+        iam.send(new ListGroupsCommand({})).catch(() => ({ Groups: [] })),
+        listAccessKeysAction(userName),
+      ]);
 
+    const u = userRes.User;
     if (!u) {
       error = `User "${userName}" was not found.`;
     } else {
-      const attachedRes = await iam.send(
-        new ListAttachedUserPoliciesCommand({ UserName: userName })
-      );
       const attachedPolicies = (attachedRes.AttachedPolicies ?? []).map((p) => ({
         name: p.PolicyName ?? "",
         arn: p.PolicyArn ?? "",
@@ -51,9 +64,6 @@ export default async function UserDetailPage({ params }: PageProps) {
         attachedPolicies,
       };
 
-      const policiesRes = await iam.send(
-        new ListPoliciesCommand({ Scope: "All", MaxItems: 200 })
-      );
       allPolicies = (policiesRes.Policies ?? [])
         .map((p) => ({
           name: p.PolicyName ?? "",
@@ -61,6 +71,10 @@ export default async function UserDetailPage({ params }: PageProps) {
         }))
         .filter((p) => p.name && p.arn)
         .sort((a, b) => a.name.localeCompare(b.name));
+
+      userGroups = userGroupsRes.groups || [];
+      allGroups = (allGroupsRes.Groups || []).map((g) => ({ groupName: g.GroupName || "" }));
+      initialAccessKeys = accessKeysRes.accessKeys || [];
     }
   } catch (err: unknown) {
     error = err instanceof Error ? err.message : String(err);
@@ -80,6 +94,9 @@ export default async function UserDetailPage({ params }: PageProps) {
         <UserDetail
           user={userMeta}
           allPolicies={allPolicies}
+          userGroups={userGroups}
+          allGroups={allGroups}
+          initialAccessKeys={initialAccessKeys}
           canAttachPolicy={canAttachPolicy}
           canDetachPolicy={canDetachPolicy}
           activeIdentityName={identity.name}

@@ -6,14 +6,19 @@
 import ServiceLayout from "@/components/ServiceLayout";
 import { ec2Nav } from "@/components/ec2/EC2Nav";
 import LoadBalancersClient from "@/components/ec2/LoadBalancersClient";
-import { fetchLiveLoadBalancers, fetchLiveSecurityGroups } from "../actions";
+import {
+  fetchLiveLoadBalancers,
+  fetchLiveSecurityGroups,
+  fetchLiveTargetGroups,
+} from "../actions";
 
 export const dynamic = "force-dynamic";
 
 export default async function LoadBalancersPage() {
-  const [lbRes, sgRes] = await Promise.all([
+  const [lbRes, sgRes, tgRes] = await Promise.all([
     fetchLiveLoadBalancers(),
     fetchLiveSecurityGroups(),
+    fetchLiveTargetGroups(),
   ]);
 
   return (
@@ -21,6 +26,7 @@ export default async function LoadBalancersPage() {
       <LoadBalancersClient
         initialLoadBalancers={lbRes.loadBalancers || []}
         securityGroups={sgRes.securityGroups || []}
+        initialTargetGroups={tgRes.targetGroups || []}
         isLive={lbRes.isLive}
         liveError={lbRes.error}
       />

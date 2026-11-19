@@ -1,22 +1,32 @@
 /**
  * src/components/ec2/LoadBalancersClient.tsx – AWS Elastic Load Balancers Console Replica.
+ * Replicates AWS ELBv2 creation flow with listener & target group routing,
+ * and interactive listeners management.
  * Zero emojis, Cloudscape enterprise styling.
  */
 
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useEffect, useTransition, useCallback } from "react";
+import Link from "next/link";
 import {
   LoadBalancerModel,
+  ListenerModel,
+  TargetGroupModel,
   createLiveLoadBalancer,
   deleteLiveLoadBalancer,
   fetchLiveLoadBalancers,
+  fetchLiveListeners,
+  createLiveListener,
+  deleteLiveListener,
+  fetchLiveTargetGroups,
 } from "@/app/ec2/actions";
 import { SecurityGroup } from "@/lib/ec2-data";
 
 interface Props {
   initialLoadBalancers?: LoadBalancerModel[];
   securityGroups?: SecurityGroup[];
+  initialTargetGroups?: TargetGroupModel[];
   subnets?: string[];
   isLive?: boolean;
   liveError?: string;
@@ -25,32 +35,51 @@ interface Props {
 export default function LoadBalancersClient({
   initialLoadBalancers = [],
   securityGroups = [],
+  initialTargetGroups = [],
   subnets = ["subnet-00000000000000007", "subnet-00000000000000009", "subnet-0000000000000000b"],
   isLive = true,
   liveError,
 }: Props) {
   const [loadBalancers, setLoadBalancers] = useState<LoadBalancerModel[]>(initialLoadBalancers || []);
+  const [targetGroups, setTargetGroups] = useState<TargetGroupModel[]>(initialTargetGroups || []);
   const [selectedArn, setSelectedArn] = useState<string | null>(
     initialLoadBalancers && initialLoadBalancers.length > 0 ? initialLoadBalancers[0]?.arn : null
   );
   const [search, setSearch] = useState("");
   const [feedback, setFeedback] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<"details" | "listeners" | "tags">("details");
+  const [activeTab, setActiveTab] = useState<"details" | "listeners">("details");
   const [isPending, startTransition] = useTransition();
+
+  // Listeners state for selected Load Balancer
+  const [listeners, setListeners] = useState<ListenerModel[]>([]);
+  const [selectedListenerArn, setSelectedListenerArn] = useState<string | null>(null);
+  const [isLoadingListeners, setIsLoadingListeners] = useState(false);
 
   // Modals
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showAddListenerModal, setShowAddListenerModal] = useState(false);
 
   // Create Form State
   const [createName, setCreateName] = useState("");
   const [createType, setCreateType] = useState<"application" | "network">("application");
   const [createScheme, setCreateScheme] = useState<"internet-facing" | "internal">("internet-facing");
-  const [selectedSubnets, setSelectedSubnets] = useState<string[]>(
-    subnets.slice(0, 2)
-  );
+  const [selectedSubnets, setSelectedSubnets] = useState<string[]>(subnets.slice(0, 2));
   const [createSelectedSg, setCreateSelectedSg] = useState<string>(
     securityGroups && securityGroups.length > 0 ? securityGroups[0].id : ""
+  );
+  // Listener & Target Group routing within Create Modal
+  const [createListenerProtocol, setCreateListenerProtocol] = useState<string>("HTTP");
+  const [createListenerPort, setCreateListenerPort] = useState<number>(80);
+  const [createTargetGroupArn, setCreateTargetGroupArn] = useState<string>(
+    initialTargetGroups && initialTargetGroups.length > 0 ? initialTargetGroups[0].arn : ""
+  );
+
+  // Add Listener Modal State (for existing LB)
+  const [addListenerProtocol, setAddListenerProtocol] = useState<string>("HTTP");
+  const [addListenerPort, setAddListenerPort] = useState<number>(80);
+  const [addListenerTargetGroupArn, setAddListenerTargetGroupArn] = useState<string>(
+    initialTargetGroups && initialTargetGroups.length > 0 ? initialTargetGroups[0].arn : ""
   );
 
   const selectedLb = (loadBalancers || []).find((lb) => lb.arn === selectedArn) || null;
@@ -60,6 +89,31 @@ export default function LoadBalancersClient({
   const nlbCount = (loadBalancers || []).filter((lb) => (lb.type || "").toLowerCase() === "network").length;
   const activeCount = (loadBalancers || []).filter((lb) => (lb.state || "").toLowerCase() === "active").length;
 
+  const loadListeners = useCallback(async (lbArn: string) => {
+    setIsLoadingListeners(true);
+    try {
+      const res = await fetchLiveListeners(lbArn);
+      if (res.success) {
+        setListeners(res.listeners);
+        setSelectedListenerArn(res.listeners.length > 0 ? res.listeners[0].arn : null);
+      } else {
+        setListeners([]);
+        setSelectedListenerArn(null);
+      }
+    } catch {
+      setListeners([]);
+      setSelectedListenerArn(null);
+    } finally {
+      setIsLoadingListeners(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedArn && activeTab === "listeners") {
+      loadListeners(selectedArn);
+    }
+  }, [selectedArn, activeTab, loadListeners]);
+
   function refreshLoadBalancers() {
     startTransition(async () => {
       const res = await fetchLiveLoadBalancers();
@@ -68,14 +122,52 @@ export default function LoadBalancersClient({
       if (list.length > 0 && (!selectedArn || !list.some((lb) => lb.arn === selectedArn))) {
         setSelectedArn(list[0]?.arn || null);
       }
+      if (selectedArn && activeTab === "listeners") {
+        await loadListeners(selectedArn);
+      }
     });
+  }
+
+  function openCreateModal() {
+    setCreateName("");
+    setCreateType("application");
+    setCreateScheme("internet-facing");
+    setSelectedSubnets(subnets.slice(0, 2));
+    setCreateSelectedSg(securityGroups && securityGroups.length > 0 ? securityGroups[0].id : "");
+    setCreateListenerProtocol("HTTP");
+    setCreateListenerPort(80);
+    setCreateTargetGroupArn(targetGroups && targetGroups.length > 0 ? targetGroups[0].arn : "");
+    setShowCreateModal(true);
+
+    // Refresh available target groups in background
+    fetchLiveTargetGroups()
+      .then((res) => {
+        if (res.targetGroups) {
+          setTargetGroups(res.targetGroups);
+          if (!createTargetGroupArn && res.targetGroups.length > 0) {
+            setCreateTargetGroupArn(res.targetGroups[0].arn);
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  function handleTypeChange(newType: "application" | "network") {
+    setCreateType(newType);
+    if (newType === "application") {
+      setCreateListenerProtocol("HTTP");
+      setCreateListenerPort(80);
+    } else {
+      setCreateListenerProtocol("TCP");
+      setCreateListenerPort(80);
+    }
   }
 
   function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     if (!createName.trim()) return;
     if (selectedSubnets.length < 2) {
-      alert("Please select at least 2 subnets across different Availability Zones.");
+      setFeedback("Please select at least 2 subnets across different Availability Zones.");
       return;
     }
 
@@ -86,6 +178,9 @@ export default function LoadBalancersClient({
         scheme: createScheme,
         subnets: selectedSubnets,
         securityGroups: createSelectedSg ? [createSelectedSg] : undefined,
+        listenerProtocol: createListenerProtocol,
+        listenerPort: createListenerPort,
+        targetGroupArn: createTargetGroupArn || undefined,
       });
 
       if (res.success && res.loadBalancerArn) {
@@ -95,7 +190,11 @@ export default function LoadBalancersClient({
         const list = fresh.loadBalancers || [];
         setLoadBalancers(list);
         setSelectedArn(res.loadBalancerArn);
-        setFeedback(`Created load balancer "${createName.trim()}" successfully.`);
+        setFeedback(
+          `Created load balancer "${createName.trim()}" successfully${
+            createTargetGroupArn ? " with listener forwarding to target group." : "."
+          }`
+        );
       } else {
         setFeedback(`Failed to create load balancer: ${res.error || "Unknown error"}`);
       }
@@ -119,6 +218,66 @@ export default function LoadBalancersClient({
         setFeedback(`Deleted load balancer "${targetName}" successfully.`);
       } else {
         setFeedback(`Failed to delete load balancer: ${res.error || "Unknown error"}`);
+      }
+      setTimeout(() => setFeedback(null), 5000);
+    });
+  }
+
+  function openAddListenerModal() {
+    if (!selectedLb) return;
+    setAddListenerProtocol(selectedLb.type === "network" ? "TCP" : "HTTP");
+    setAddListenerPort(selectedLb.type === "network" ? 80 : 80);
+    setAddListenerTargetGroupArn(targetGroups && targetGroups.length > 0 ? targetGroups[0].arn : "");
+    setShowAddListenerModal(true);
+
+    fetchLiveTargetGroups()
+      .then((res) => {
+        if (res.targetGroups) {
+          setTargetGroups(res.targetGroups);
+          if (!addListenerTargetGroupArn && res.targetGroups.length > 0) {
+            setAddListenerTargetGroupArn(res.targetGroups[0].arn);
+          }
+        }
+      })
+      .catch(() => {});
+  }
+
+  function handleAddListener(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedLb || !addListenerTargetGroupArn) return;
+
+    startTransition(async () => {
+      const res = await createLiveListener({
+        loadBalancerArn: selectedLb.arn,
+        protocol: addListenerProtocol,
+        port: addListenerPort,
+        targetGroupArn: addListenerTargetGroupArn,
+      });
+
+      if (res.success) {
+        setShowAddListenerModal(false);
+        await loadListeners(selectedLb.arn);
+        setFeedback(
+          `Listener ${addListenerProtocol}:${addListenerPort} forwarding to target group added successfully.`
+        );
+      } else {
+        setFeedback(`Failed to add listener: ${res.error || "Unknown error"}`);
+      }
+      setTimeout(() => setFeedback(null), 5000);
+    });
+  }
+
+  function handleDeleteListener() {
+    if (!selectedLb || !selectedListenerArn) return;
+
+    startTransition(async () => {
+      const res = await deleteLiveListener(selectedListenerArn);
+      if (res.success) {
+        setSelectedListenerArn(null);
+        await loadListeners(selectedLb.arn);
+        setFeedback("Listener deleted successfully.");
+      } else {
+        setFeedback(`Failed to delete listener: ${res.error || "Unknown error"}`);
       }
       setTimeout(() => setFeedback(null), 5000);
     });
@@ -156,7 +315,9 @@ export default function LoadBalancersClient({
               }`}
             />
             <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "Elastic Load Balancing (ELBv2) Connected (AWS Emulator)" : "Disconnected from AWS Emulator (127.0.0.1:9297)"}
+              {isLive
+                ? "Elastic Load Balancing (ELBv2) Connected (AWS Emulator)"
+                : "Disconnected from AWS Emulator (127.0.0.1:9297)"}
             </span>
           </div>
           <span className="text-[#95a5a6] text-[12px]">|</span>
@@ -192,7 +353,7 @@ export default function LoadBalancersClient({
         </div>
 
         <div className="bg-white border border-[#d5dbdb] p-4 rounded-sm shadow-xs">
-          <div className="text-[11px] font-bold text-[#545b64] uppercase tracking-wider">
+          <div className="text-[11px] font-bold text-[#1d8102] uppercase tracking-wider">
             Active Status
           </div>
           <div className="text-[24px] font-bold text-[#1d8102] mt-1">{activeCount}</div>
@@ -228,7 +389,7 @@ export default function LoadBalancersClient({
               Load Balancers ({totalCount})
             </h1>
             <p className="text-[12px] text-[#545b64] mt-0.5">
-              Elastic Load Balancing automatically distributes your incoming traffic across multiple instances, containers, and IP addresses.
+              Elastic Load Balancing automatically distributes incoming traffic across targets, such as EC2 instances in target groups.
             </p>
           </div>
 
@@ -268,7 +429,7 @@ export default function LoadBalancersClient({
             </button>
 
             <button
-              onClick={() => setShowCreateModal(true)}
+              onClick={openCreateModal}
               style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
               className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors shadow-xs"
             >
@@ -309,7 +470,7 @@ export default function LoadBalancersClient({
               <tr>
                 <th className="py-2.5 px-3 w-10 text-center"></th>
                 <th className="py-2.5 px-4">Name</th>
-                <th className="py-2.5 px-3">DNS name</th>
+                <th className="py-2.5 px-3">DNS Name</th>
                 <th className="py-2.5 px-3">State</th>
                 <th className="py-2.5 px-3">Type</th>
                 <th className="py-2.5 px-3">Scheme</th>
@@ -379,7 +540,7 @@ export default function LoadBalancersClient({
         </div>
       </div>
 
-      {/* Cloudscape Bottom Drawer for Details */}
+      {/* Cloudscape Bottom Drawer for Selected Load Balancer Details */}
       {selectedLb && (
         <div className="bg-white border border-[#d5dbdb] rounded-sm shadow-xs mt-4">
           <div className="border-b border-[#eaeded] flex items-center px-4">
@@ -401,7 +562,7 @@ export default function LoadBalancersClient({
                   : "border-transparent text-[#545b64] hover:text-[#16191f]"
               }`}
             >
-              Listeners and routing
+              Listeners and routing ({listeners.length})
             </button>
           </div>
 
@@ -469,24 +630,158 @@ export default function LoadBalancersClient({
               </div>
             ) : (
               <div className="space-y-4">
-                <div className="text-[13px] font-bold text-[#16191f]">Listeners</div>
-                <div className="p-4 bg-[#fafafa] border border-[#eaeded] rounded-sm text-[13px] text-[#545b64]">
-                  Default listener HTTP:80 forwarding to registered target groups.
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#eaeded]">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-[#16191f]">
+                      Listeners ({listeners.length})
+                    </h3>
+                    <p className="text-[12px] text-[#545b64]">
+                      Listeners check for incoming connection requests on configured ports and forward traffic to target groups.
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => loadListeners(selectedLb.arn)}
+                      disabled={isLoadingListeners || isPending}
+                      style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                      className="h-[32px] px-3 border border-[#aab7b8] rounded-sm text-[13px] font-bold text-[#16191f] bg-white hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50"
+                    >
+                      <svg
+                        width="14"
+                        height="14"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        className={`mr-1.5 ${isLoadingListeners ? "animate-spin" : ""}`}
+                      >
+                        <path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67" />
+                      </svg>
+                      Refresh
+                    </button>
+
+                    <button
+                      onClick={handleDeleteListener}
+                      disabled={!selectedListenerArn || isPending}
+                      style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                      className={`h-[32px] px-3 border rounded-sm text-[13px] font-bold whitespace-nowrap inline-flex items-center justify-center transition-colors ${
+                        selectedListenerArn
+                          ? "border-[#d5dbdb] text-[#d13212] hover:bg-[#fdf3f1] bg-white"
+                          : "border-[#eaeded] text-[#aab7b8] cursor-not-allowed bg-white"
+                      }`}
+                    >
+                      Delete listener
+                    </button>
+
+                    <button
+                      onClick={openAddListenerModal}
+                      style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                      className="h-[32px] px-3 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors shadow-xs"
+                    >
+                      Add listener
+                    </button>
+                  </div>
                 </div>
+
+                {isLoadingListeners ? (
+                  <div className="py-8 text-center text-[#545b64] text-[13px]">
+                    Loading listeners from AWS Emulator...
+                  </div>
+                ) : listeners.length === 0 ? (
+                  <div className="p-6 bg-[#fafafa] border border-[#eaeded] rounded-sm text-center">
+                    <p className="text-[13px] font-bold text-[#16191f]">No listeners configured</p>
+                    <p className="text-[12px] text-[#545b64] mt-1 mb-4">
+                      This load balancer has no listeners. Add a listener to forward client traffic to a target group.
+                    </p>
+                    <button
+                      onClick={openAddListenerModal}
+                      style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                      className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors shadow-xs"
+                    >
+                      Add listener
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-[#eaeded] rounded-sm overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-[13px]">
+                      <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64] text-[11px] font-semibold uppercase tracking-wider">
+                        <tr>
+                          <th className="py-2.5 px-3 w-10 text-center"></th>
+                          <th className="py-2.5 px-4">Listener</th>
+                          <th className="py-2.5 px-3">Protocol</th>
+                          <th className="py-2.5 px-3">Port</th>
+                          <th className="py-2.5 px-4">Default action (Forward to target group)</th>
+                          <th className="py-2.5 px-3">Rules</th>
+                          <th className="py-2.5 px-3">Listener ARN</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#eaeded] text-[#16191f]">
+                        {listeners.map((listener) => {
+                          const isChecked = selectedListenerArn === listener.arn;
+                          return (
+                            <tr
+                              key={listener.arn}
+                              onClick={() => setSelectedListenerArn(listener.arn)}
+                              className={`cursor-pointer transition-colors ${
+                                isChecked ? "bg-[#f2f8fd]" : "hover:bg-[#fafafa]"
+                              }`}
+                            >
+                              <td className="py-2.5 px-3 text-center" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="radio"
+                                  name="selectedListener"
+                                  checked={isChecked}
+                                  onChange={() => setSelectedListenerArn(listener.arn)}
+                                  className="accent-[#0073bb] cursor-pointer"
+                                />
+                              </td>
+                              <td className="py-2.5 px-4 font-mono font-semibold text-[#0073bb]">
+                                {listener.protocol}:{listener.port}
+                              </td>
+                              <td className="py-2.5 px-3 font-mono">{listener.protocol}</td>
+                              <td className="py-2.5 px-3 font-mono">{listener.port}</td>
+                              <td className="py-2.5 px-4">
+                                {listener.targetGroupName ? (
+                                  <Link
+                                    href="/ec2/target-groups"
+                                    className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[12px] font-semibold bg-[#f2f8fd] text-[#0073bb] border border-[#a2c8e5] hover:underline"
+                                  >
+                                    Forward to: {listener.targetGroupName}
+                                  </Link>
+                                ) : listener.targetGroupArn ? (
+                                  <span className="font-mono text-[12px] text-[#0073bb]">
+                                    Forward to target group
+                                  </span>
+                                ) : (
+                                  <span className="text-[#545b64] text-[12px]">No action</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-[#545b64]">Default rule (1 rule)</td>
+                              <td className="py-2.5 px-3 font-mono text-[11px] text-[#545b64] max-w-[200px] truncate">
+                                {listener.arn}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             )}
           </div>
         </div>
       )}
 
-      {/* Create Modal */}
+      {/* Create Load Balancer Modal with Listener & Target Group Selection */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4 overflow-y-auto">
           <form
             onSubmit={handleCreate}
-            className="bg-white rounded-sm border border-[#d5dbdb] shadow-xl w-full max-w-lg p-6 space-y-4"
+            className="bg-white rounded-sm border border-[#d5dbdb] shadow-xl w-full max-w-xl my-6 flex flex-col max-h-[90vh]"
           >
-            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3">
+            <div className="p-5 border-b border-[#eaeded] flex items-center justify-between flex-shrink-0">
               <h3 className="text-[17px] font-bold text-[#16191f]">Create load balancer</h3>
               <button
                 type="button"
@@ -500,121 +795,212 @@ export default function LoadBalancersClient({
               </button>
             </div>
 
-            <div>
-              <label className="block text-[12px] font-bold text-[#16191f] mb-1">
-                Load balancer name <span className="text-[#d13212]">*</span>
-              </label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. app-web-alb"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] text-[#16191f] focus:outline-hidden focus:border-[#0073bb]"
-              />
-              <p className="text-[11px] text-[#545b64] mt-1">
-                Can be up to 32 alphanumeric characters, with hyphens.
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-bold text-[#16191f] mb-1">Type</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer text-[13px]">
-                  <input
-                    type="radio"
-                    name="lbType"
-                    checked={createType === "application"}
-                    onChange={() => setCreateType("application")}
-                    className="accent-[#0073bb]"
-                  />
-                  <span>Application Load Balancer (HTTP/HTTPS)</span>
+            <div className="p-6 overflow-y-auto space-y-4 flex-1">
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                  Load balancer name <span className="text-[#d13212]">*</span>
                 </label>
-                <label className="flex items-center gap-2 cursor-pointer text-[13px]">
-                  <input
-                    type="radio"
-                    name="lbType"
-                    checked={createType === "network"}
-                    onChange={() => setCreateType("network")}
-                    className="accent-[#0073bb]"
-                  />
-                  <span>Network (TCP/UDP)</span>
-                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. app-web-alb"
+                  value={createName}
+                  onChange={(e) => setCreateName(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] text-[#16191f] focus:outline-hidden focus:border-[#0073bb]"
+                />
+                <p className="text-[11px] text-[#545b64] mt-1">
+                  Can be up to 32 alphanumeric characters, with hyphens.
+                </p>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-[12px] font-bold text-[#16191f] mb-1">Scheme</label>
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer text-[13px]">
-                  <input
-                    type="radio"
-                    name="lbScheme"
-                    checked={createScheme === "internet-facing"}
-                    onChange={() => setCreateScheme("internet-facing")}
-                    className="accent-[#0073bb]"
-                  />
-                  <span>Internet-facing</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer text-[13px]">
-                  <input
-                    type="radio"
-                    name="lbScheme"
-                    checked={createScheme === "internal"}
-                    onChange={() => setCreateScheme("internal")}
-                    className="accent-[#0073bb]"
-                  />
-                  <span>Internal</span>
-                </label>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[12px] font-bold text-[#16191f] mb-1">
-                Subnets (select at least 2) <span className="text-[#d13212]">*</span>
-              </label>
-              <div className="space-y-1.5 border border-[#eaeded] p-2.5 rounded-sm bg-[#fafafa]">
-                {subnets.map((sub) => (
-                  <label key={sub} className="flex items-center gap-2 cursor-pointer text-[12px]">
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">Type</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-[13px]">
                     <input
-                      type="checkbox"
-                      checked={selectedSubnets.includes(sub)}
-                      onChange={() => toggleSubnet(sub)}
+                      type="radio"
+                      name="lbType"
+                      checked={createType === "application"}
+                      onChange={() => handleTypeChange("application")}
                       className="accent-[#0073bb]"
                     />
-                    <span className="font-mono text-[#16191f]">{sub}</span>
+                    <span>Application Load Balancer (HTTP/HTTPS)</span>
                   </label>
-                ))}
+                  <label className="flex items-center gap-2 cursor-pointer text-[13px]">
+                    <input
+                      type="radio"
+                      name="lbType"
+                      checked={createType === "network"}
+                      onChange={() => handleTypeChange("network")}
+                      className="accent-[#0073bb]"
+                    />
+                    <span>Network (TCP/UDP)</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">Scheme</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-[13px]">
+                    <input
+                      type="radio"
+                      name="lbScheme"
+                      checked={createScheme === "internet-facing"}
+                      onChange={() => setCreateScheme("internet-facing")}
+                      className="accent-[#0073bb]"
+                    />
+                    <span>Internet-facing</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-[13px]">
+                    <input
+                      type="radio"
+                      name="lbScheme"
+                      checked={createScheme === "internal"}
+                      onChange={() => setCreateScheme("internal")}
+                      className="accent-[#0073bb]"
+                    />
+                    <span>Internal</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                  Subnets (select at least 2) <span className="text-[#d13212]">*</span>
+                </label>
+                <div className="space-y-1.5 border border-[#eaeded] p-2.5 rounded-sm bg-[#fafafa]">
+                  {subnets.map((sub) => (
+                    <label key={sub} className="flex items-center gap-2 cursor-pointer text-[12px]">
+                      <input
+                        type="checkbox"
+                        checked={selectedSubnets.includes(sub)}
+                        onChange={() => toggleSubnet(sub)}
+                        className="accent-[#0073bb]"
+                      />
+                      <span className="font-mono text-[#16191f]">{sub}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                  Security group
+                </label>
+                <select
+                  value={createSelectedSg}
+                  onChange={(e) => setCreateSelectedSg(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white text-[#16191f]"
+                >
+                  {securityGroups.length === 0 ? (
+                    <option value="">No security groups available</option>
+                  ) : (
+                    securityGroups.map((sg) => (
+                      <option key={sg.id} value={sg.id}>
+                        {sg.name} ({sg.id})
+                      </option>
+                    ))
+                  )}
+                </select>
+              </div>
+
+              {/* Listeners and Routing Section (Connect to Target Group) */}
+              <div className="border-t border-[#eaeded] pt-4 space-y-3">
+                <div>
+                  <h4 className="text-[13px] font-bold text-[#16191f]">Listeners and routing</h4>
+                  <p className="text-[11px] text-[#545b64]">
+                    Configure a listener and select the target group to forward traffic to.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[12px] font-bold text-[#16191f] mb-1">Protocol</label>
+                    <select
+                      value={createListenerProtocol}
+                      onChange={(e) => setCreateListenerProtocol(e.target.value)}
+                      className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white text-[#16191f]"
+                    >
+                      {createType === "application" ? (
+                        <>
+                          <option value="HTTP">HTTP</option>
+                          <option value="HTTPS">HTTPS</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="TCP">TCP</option>
+                          <option value="TLS">TLS</option>
+                          <option value="UDP">UDP</option>
+                          <option value="TCP_UDP">TCP_UDP</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-bold text-[#16191f] mb-1">Port</label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={65535}
+                      value={createListenerPort}
+                      onChange={(e) => setCreateListenerPort(parseInt(e.target.value, 10) || 80)}
+                      className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] text-[#16191f]"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-[12px] font-bold text-[#16191f]">
+                      Default action: Forward to target group
+                    </label>
+                    <Link
+                      href="/ec2/target-groups"
+                      target="_blank"
+                      className="text-[11px] text-[#0073bb] hover:underline"
+                    >
+                      Create target group
+                    </Link>
+                  </div>
+
+                  <select
+                    value={createTargetGroupArn}
+                    onChange={(e) => setCreateTargetGroupArn(e.target.value)}
+                    className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white text-[#16191f]"
+                  >
+                    <option value="">-- None (do not attach listener) --</option>
+                    {targetGroups.map((tg) => (
+                      <option key={tg.arn} value={tg.arn}>
+                        {tg.name} ({tg.protocol}:{tg.port} — {tg.targetType})
+                      </option>
+                    ))}
+                  </select>
+
+                  {targetGroups.length === 0 ? (
+                    <p className="text-[11px] text-[#ec7211] mt-1">
+                      No target groups found. You can create one in{" "}
+                      <Link href="/ec2/target-groups" target="_blank" className="underline font-bold">
+                        EC2 &gt; Target groups
+                      </Link>
+                      .
+                    </p>
+                  ) : (
+                    <p className="text-[11px] text-[#545b64] mt-1">
+                      Traffic received on {createListenerProtocol}:{createListenerPort} will be routed to the selected target group.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div>
-              <label className="block text-[12px] font-bold text-[#16191f] mb-1">
-                Security group
-              </label>
-              <select
-                value={createSelectedSg}
-                onChange={(e) => setCreateSelectedSg(e.target.value)}
-                className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white text-[#16191f]"
-              >
-                {securityGroups.length === 0 ? (
-                  <option value="">No security groups available</option>
-                ) : (
-                  securityGroups.map((sg) => (
-                    <option key={sg.id} value={sg.id}>
-                      {sg.name} ({sg.id})
-                    </option>
-                  ))
-                )}
-              </select>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#eaeded]">
+            <div className="p-4 border-t border-[#eaeded] flex items-center justify-end gap-2 flex-shrink-0 bg-[#fafafa]">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
                 style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
-                className="h-[32px] px-4 border border-[#aab7b8] rounded-sm text-[13px] font-bold text-[#16191f] hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
+                className="h-[32px] px-4 border border-[#aab7b8] rounded-sm text-[13px] font-bold text-[#16191f] bg-white hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
               >
                 Cancel
               </button>
@@ -622,9 +1008,120 @@ export default function LoadBalancersClient({
                 type="submit"
                 disabled={isPending}
                 style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
-                className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50"
+                className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
               >
                 {isPending ? "Creating..." : "Create load balancer"}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Add Listener Modal */}
+      {showAddListenerModal && selectedLb && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <form
+            onSubmit={handleAddListener}
+            className="bg-white rounded-sm border border-[#d5dbdb] shadow-xl w-full max-w-md p-6 space-y-4"
+          >
+            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3">
+              <h3 className="text-[17px] font-bold text-[#16191f]">
+                Add listener to {selectedLb.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowAddListenerModal(false)}
+                className="text-[#545b64] hover:text-[#16191f]"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">Protocol</label>
+                <select
+                  value={addListenerProtocol}
+                  onChange={(e) => setAddListenerProtocol(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white text-[#16191f]"
+                >
+                  {selectedLb.type === "application" ? (
+                    <>
+                      <option value="HTTP">HTTP</option>
+                      <option value="HTTPS">HTTPS</option>
+                    </>
+                  ) : (
+                    <>
+                      <option value="TCP">TCP</option>
+                      <option value="TLS">TLS</option>
+                      <option value="UDP">UDP</option>
+                      <option value="TCP_UDP">TCP_UDP</option>
+                    </>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f] mb-1">Port</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={65535}
+                  value={addListenerPort}
+                  onChange={(e) => setAddListenerPort(parseInt(e.target.value, 10) || 80)}
+                  className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] text-[#16191f]"
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[12px] font-bold text-[#16191f]">
+                  Forward to target group <span className="text-[#d13212]">*</span>
+                </label>
+                <Link
+                  href="/ec2/target-groups"
+                  target="_blank"
+                  className="text-[11px] text-[#0073bb] hover:underline"
+                >
+                  Create target group
+                </Link>
+              </div>
+
+              <select
+                required
+                value={addListenerTargetGroupArn}
+                onChange={(e) => setAddListenerTargetGroupArn(e.target.value)}
+                className="w-full px-3 py-1.5 border border-[#aab7b8] rounded-sm text-[13px] bg-white text-[#16191f]"
+              >
+                <option value="">-- Select a target group --</option>
+                {targetGroups.map((tg) => (
+                  <option key={tg.arn} value={tg.arn}>
+                    {tg.name} ({tg.protocol}:{tg.port} — {tg.targetType})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-[#eaeded]">
+              <button
+                type="button"
+                onClick={() => setShowAddListenerModal(false)}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 border border-[#aab7b8] rounded-sm text-[13px] font-bold text-[#16191f] hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!addListenerTargetGroupArn || isPending}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
+              >
+                {isPending ? "Adding..." : "Add listener"}
               </button>
             </div>
           </form>

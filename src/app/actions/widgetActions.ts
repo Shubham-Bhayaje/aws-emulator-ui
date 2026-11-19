@@ -225,83 +225,13 @@ export async function runLiveSecurityAudit(): Promise<SecurityAuditResponse> {
 }
 
 // -------------------------------------------------------------
-// 3. COST & USAGE WIDGET: Live Resource Inventory & Estimates
+// 3. COST & USAGE WIDGET: Live Resource Inventory & Billing Engine
 // -------------------------------------------------------------
 
-export interface LiveCostData {
-  monthToDate: number;
-  forecasted: number;
-  serviceCounts: {
-    s3Buckets: number;
-    dynamoTables: number;
-    sqsQueues: number;
-    iamUsers: number;
-    iamRoles: number;
-  };
-  monthlyHistory: {
-    month: string;
-    ec2: number;
-    s3: number;
-    dynamodb: number;
-    sqs: number;
-    other: number;
-  }[];
-}
+import { calculateLiveBilling, LiveBillingResult, BilledResource, MonthlyCostItem } from "@/lib/billingEngine";
 
-export async function getLiveCostAndUsage(): Promise<LiveCostData> {
-  let s3Buckets = 0;
-  let dynamoTables = 0;
-  let sqsQueues = 0;
-  let iamUsers = 0;
-  let iamRoles = 0;
+export type { LiveBillingResult, BilledResource, MonthlyCostItem };
 
-  try {
-    const [bRes, tRes, qRes, uRes, rRes] = await Promise.all([
-      s3.send(new ListBucketsCommand({})).catch(() => ({ Buckets: [] })),
-      dynamodb.send(new ListTablesCommand({})).catch(() => ({ TableNames: [] })),
-      sqs.send(new ListQueuesCommand({})).catch(() => ({ QueueUrls: [] })),
-      iam.send(new ListUsersCommand({})).catch(() => ({ Users: [] })),
-      iam.send(new ListRolesCommand({})).catch(() => ({ Roles: [] })),
-    ]);
-
-    s3Buckets = bRes.Buckets?.length || 0;
-    dynamoTables = tRes.TableNames?.length || 0;
-    sqsQueues = qRes.QueueUrls?.length || 0;
-    iamUsers = uRes.Users?.length || 0;
-    iamRoles = rRes.Roles?.length || 0;
-  } catch (err) {
-    console.error("Error fetching live resource counts:", err);
-  }
-
-  // Realistic dynamic cost model based on actual local resources + base infrastructure
-  const baseEc2 = 18.5;
-  const s3Cost = +(2.5 + s3Buckets * 1.8).toFixed(2);
-  const dynamoCost = +(1.2 + dynamoTables * 2.1).toFixed(2);
-  const sqsCost = +(0.8 + sqsQueues * 0.4).toFixed(2);
-  const otherCost = +(3.0 + iamUsers * 0.5).toFixed(2);
-
-  const monthToDate = +(baseEc2 + s3Cost + dynamoCost + sqsCost + otherCost).toFixed(2);
-  const forecasted = +(monthToDate * 1.95).toFixed(2);
-
-  const monthlyHistory = [
-    { month: "Apr 24", ec2: 42.0, s3: 12.5, dynamodb: 8.2, sqs: 4.5, other: 4.0 },
-    { month: "May 24", ec2: 41.5, s3: 13.0, dynamodb: 7.8, sqs: 4.2, other: 3.3 },
-    { month: "Jun 24", ec2: 44.2, s3: 14.8, dynamodb: 9.1, sqs: 4.8, other: 3.5 },
-    { month: "Jul 24", ec2: 172.0, s3: 38.5, dynamodb: 26.0, sqs: 15.5, other: 16.5 },
-    { month: "Aug 24", ec2: 170.5, s3: 37.8, dynamodb: 25.5, sqs: 16.0, other: 17.3 },
-    { month: "Sep 24", ec2: baseEc2, s3: s3Cost, dynamodb: dynamoCost, sqs: sqsCost, other: otherCost },
-  ];
-
-  return {
-    monthToDate,
-    forecasted,
-    serviceCounts: {
-      s3Buckets,
-      dynamoTables,
-      sqsQueues,
-      iamUsers,
-      iamRoles,
-    },
-    monthlyHistory,
-  };
+export async function getLiveCostAndUsage(): Promise<LiveBillingResult> {
+  return await calculateLiveBilling();
 }

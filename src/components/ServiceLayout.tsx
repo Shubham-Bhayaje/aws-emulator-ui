@@ -58,7 +58,7 @@ export default function ServiceLayout({
     <div className="flex min-h-[calc(100vh-40px)]">
       {/* Service sidebar */}
       <aside
-        className={`bg-white border-r border-[#d5dbdb] flex flex-col shrink-0 transition-all duration-150 ${
+        className={`sticky top-[40px] h-[calc(100vh-40px)] bg-white border-r border-[#d5dbdb] flex flex-col shrink-0 self-start transition-all duration-150 z-30 ${
           collapsed ? "w-[36px]" : "w-[220px]"
         }`}
       >
@@ -75,7 +75,7 @@ export default function ServiceLayout({
 
         {/* Nav items */}
         {!collapsed && (
-          <nav className="flex-1 py-1 overflow-y-auto max-h-[calc(100vh-80px)] scrollbar-thin">
+          <nav className="flex-1 min-h-0 py-1 overflow-y-auto scrollbar-thin">
             {navItems.map((item, idx) => {
               const prevItem = navItems[idx - 1];
               const showGroupHeader = item.group && (!prevItem || prevItem.group !== item.group);
