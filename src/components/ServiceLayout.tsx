@@ -79,10 +79,13 @@ export default function ServiceLayout({
             {navItems.map((item, idx) => {
               const prevItem = navItems[idx - 1];
               const showGroupHeader = item.group && (!prevItem || prevItem.group !== item.group);
-              const isExactRoot = item.href === "/ec2" || item.href === "/lambda" || item.href === "/s3" || item.href === "/sqs" || item.href === "/dynamodb" || item.href === "/iam";
-              const isActive = isExactRoot
+              const hasExactMatch = navItems.some((n) => n.href === pathname);
+              const isActive = hasExactMatch
                 ? pathname === item.href
-                : pathname === item.href || (pathname.startsWith(item.href + "/") && item.href !== "/");
+                : pathname.startsWith(item.href + "/") &&
+                  !navItems.some(
+                    (n) => n.href !== item.href && n.href.length > item.href.length && pathname.startsWith(n.href)
+                  );
 
               return (
                 <div key={item.href}>

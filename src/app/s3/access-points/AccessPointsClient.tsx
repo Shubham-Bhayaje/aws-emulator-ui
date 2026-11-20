@@ -5,49 +5,82 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import type { S3AccessPoint } from "../types";
+import { createAccessPointAction, deleteAccessPointAction } from "../actions";
 
-interface AccessPointItem {
-  name: string;
-  bucket: string;
-  networkOrigin: "Internet" | "VPC";
-  vpcId?: string;
-  status: "Active";
-  creationDate: string;
+interface AccessPointsClientProps {
+  bucketNames: string[];
+  initialAccessPoints?: S3AccessPoint[];
 }
 
-export function AccessPointsClient({ bucketNames }: { bucketNames: string[] }) {
-  const [accessPoints, setAccessPoints] = useState<AccessPointItem[]>([]);
+export function AccessPointsClient({
+  bucketNames,
+  initialAccessPoints = [],
+}: AccessPointsClientProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  const [accessPoints, setAccessPoints] = useState<S3AccessPoint[]>(initialAccessPoints);
   const [showModal, setShowModal] = useState(false);
   const [apName, setApName] = useState("");
   const [targetBucket, setTargetBucket] = useState(bucketNames[0] || "");
   const [networkType, setNetworkType] = useState<"Internet" | "VPC">("Internet");
   const [vpcId, setVpcId] = useState("");
   const [info, setInfo] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!apName.trim() || !targetBucket) return;
 
-    const newAp: AccessPointItem = {
-      name: apName.trim().toLowerCase(),
-      bucket: targetBucket,
-      networkOrigin: networkType,
-      vpcId: networkType === "VPC" ? vpcId.trim() || "vpc-default" : undefined,
-      status: "Active",
-      creationDate: new Date().toLocaleString(),
-    };
+    setError(null);
+    setInfo(null);
+    startTransition(async () => {
+      const res = await createAccessPointAction({
+        name: apName.trim().toLowerCase(),
+        bucket: targetBucket,
+        networkOrigin: networkType,
+        vpcId: networkType === "VPC" ? vpcId.trim() || "vpc-default" : undefined,
+      });
 
-    setAccessPoints([...accessPoints, newAp]);
-    setShowModal(false);
-    setApName("");
-    setVpcId("");
-    setInfo(`Access point "${newAp.name}" created for bucket "${targetBucket}".`);
+      if (res.success && res.accessPoint) {
+        setAccessPoints((prev) => [
+          ...prev.filter((p) => p.name !== res.accessPoint!.name),
+          res.accessPoint!,
+        ]);
+        setShowModal(false);
+        setApName("");
+        setVpcId("");
+        setInfo(`Access point "${res.accessPoint.name}" created for bucket "${targetBucket}".`);
+        router.refresh();
+      } else {
+        setError(res.error || "Failed to create access point.");
+      }
+    });
+  };
+
+  const handleDelete = (name: string) => {
+    if (!confirm(`Delete access point "${name}"?`)) return;
+
+    setError(null);
+    setInfo(null);
+    startTransition(async () => {
+      const res = await deleteAccessPointAction(name);
+      if (res.success) {
+        setAccessPoints((prev) => prev.filter((p) => p.name !== name));
+        setInfo(`Access point "${name}" deleted.`);
+        router.refresh();
+      } else {
+        setError(res.error || "Failed to delete access point.");
+      }
+    });
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-[22px] font-bold text-[#16191f] tracking-tight">
@@ -69,6 +102,15 @@ export function AccessPointsClient({ bucketNames }: { bucketNames: string[] }) {
         </div>
       </div>
 
+      {error && (
+        <div className="bg-[#fbeeed] border-l-4 border-[#d13212] p-3 text-[13px] text-[#d13212] flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={() => setError(null)} className="underline text-[12px] ml-4">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       {info && (
         <div className="bg-[#edfbf0] border-l-4 border-[#1d8102] p-3 text-[13px] text-[#1d8102] flex items-center justify-between">
           <span>{info}</span>
@@ -83,19 +125,20 @@ export function AccessPointsClient({ bucketNames }: { bucketNames: string[] }) {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-[13px]">
             <thead>
-              <tr className="border-b border-[#eaeded] bg-[#fafafa] text-[#545b64] font-semibold">
+              <tr className="border-b border-[#eaeded] bg-[#fafafa] text-[#545b64] font-semibold text-[12px]">
                 <th className="py-2.5 px-4">Access point name</th>
                 <th className="py-2.5 px-4">Bucket</th>
                 <th className="py-2.5 px-4">Network origin</th>
                 <th className="py-2.5 px-4">VPC ID</th>
                 <th className="py-2.5 px-4">Status</th>
                 <th className="py-2.5 px-4">Created</th>
+                <th className="py-2.5 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#eaeded]">
               {accessPoints.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-12 text-center text-[#545b64]">
+                  <td colSpan={7} className="py-12 text-center text-[#545b64]">
                     <div className="font-semibold text-[#16191f] text-[14px] mb-1">
                       No access points found
                     </div>
@@ -131,6 +174,16 @@ export function AccessPointsClient({ bucketNames }: { bucketNames: string[] }) {
                       </span>
                     </td>
                     <td className="py-3 px-4 text-[#545b64]">{ap.creationDate}</td>
+                    <td className="py-3 px-4 text-right">
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(ap.name)}
+                        disabled={isPending}
+                        className="text-[#d13212] hover:underline text-[12px] font-medium"
+                      >
+                        Delete
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -231,10 +284,11 @@ export function AccessPointsClient({ bucketNames }: { bucketNames: string[] }) {
                 </button>
                 <button
                   type="submit"
+                  disabled={isPending}
                   style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
                   className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-4 rounded bg-[#ec7211] text-white hover:bg-[#eb5f07]"
                 >
-                  Create
+                  {isPending ? "Creating..." : "Create"}
                 </button>
               </div>
             </form>

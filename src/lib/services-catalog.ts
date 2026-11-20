@@ -720,6 +720,16 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "desc": "On-demand access to AWS security and compliance reports and certifications"
   },
   {
+    "id": "ram",
+    "name": "AWS Resource Access Manager",
+    "shortName": "RAM",
+    "href": "/ram",
+    "category": "Security, Identity, & Compliance",
+    "color": "#E7157B",
+    "status": "functional",
+    "desc": "Simple, secure service to share AWS resources across AWS accounts or within your Organization"
+  },
+  {
     "id": "cloudwatch",
     "name": "Amazon CloudWatch",
     "shortName": "CloudWatch",
@@ -764,6 +774,16 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "color": "#C925D1",
     "status": "functional",
     "desc": "Centralized management and governance for multiple AWS accounts with policy enforcement"
+  },
+  {
+    "id": "service-quotas",
+    "name": "Service Quotas",
+    "shortName": "Service Quotas",
+    "href": "/service-quotas",
+    "category": "Management & Governance",
+    "color": "#C925D1",
+    "status": "functional",
+    "desc": "View and manage quotas for AWS services from a central location as your workloads grow"
   },
   {
     "id": "controltower",
@@ -2654,6 +2674,16 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "category": "Security, Identity, & Compliance",
         "color": "#E7157B",
         "desc": "On-demand access to AWS security and compliance reports and certifications"
+      },
+      {
+        "id": "ram",
+        "name": "AWS Resource Access Manager",
+        "shortName": "RAM",
+        "href": "/ram",
+        "category": "Security, Identity, & Compliance",
+        "color": "#E7157B",
+        "status": "functional",
+        "desc": "Simple, secure service to share AWS resources across AWS accounts or within your Organization"
       }
     ]
   },
@@ -2705,6 +2735,16 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "color": "#C925D1",
         "status": "functional",
         "desc": "Centralized management and governance for multiple AWS accounts with policy enforcement"
+      },
+      {
+        "id": "service-quotas",
+        "name": "Service Quotas",
+        "shortName": "Service Quotas",
+        "href": "/service-quotas",
+        "category": "Management & Governance",
+        "color": "#C925D1",
+        "status": "functional",
+        "desc": "View and manage quotas for AWS services from a central location as your workloads grow"
       },
       {
         "id": "controltower",

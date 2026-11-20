@@ -144,6 +144,24 @@ export function BucketActions({ buckets }: BucketActionsProps) {
 
           {/* Action Buttons with 32px height standard */}
           <div className="flex flex-wrap items-center gap-2">
+            {selected.size === 1 ? (
+              <Link
+                href={`/s3/${Array.from(selected)[0]}`}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-3 rounded border border-[#aab7b8] bg-white text-[#16191f] hover:bg-[#f2f8fd] transition-colors shadow-sm"
+              >
+                View details
+              </Link>
+            ) : (
+              <button
+                disabled
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="whitespace-nowrap inline-flex items-center justify-center font-bold text-[13px] px-3 rounded border border-[#aab7b8] bg-white text-[#16191f] transition-colors shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                View details
+              </button>
+            )}
+
             <button
               onClick={handleCopyArn}
               disabled={selected.size !== 1}

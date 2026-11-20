@@ -23,6 +23,8 @@ import { ElasticLoadBalancingV2Client } from "@aws-sdk/client-elastic-load-balan
 import { AutoScalingClient } from "@aws-sdk/client-auto-scaling";
 import { OrganizationsClient } from "@aws-sdk/client-organizations";
 import { KMSClient } from "@aws-sdk/client-kms";
+import { RAMClient } from "@aws-sdk/client-ram";
+import { ServiceQuotasClient } from "@aws-sdk/client-service-quotas";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -94,6 +96,20 @@ export const kms = new KMSClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });
+
+// --- RAM (Resource Access Manager) ---
+export const ram = new RAMClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- Service Quotas ---
+export const serviceQuotas = new ServiceQuotasClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+
 
 
 

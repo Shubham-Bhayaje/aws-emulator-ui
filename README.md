@@ -50,6 +50,18 @@ This web UI connects directly to your local emulator over HTTPS and provides ded
   - Manage IAM Roles: create roles with trust policies (Lambda, EC2, ECS, or custom JSON) and inspect `AssumeRolePolicyDocument`.
   - Policy Inspector: browse customer and AWS-managed policies, review structured Statement breakdowns (`Effect`, `Action`, `Resource`), and inspect syntax-highlighted JSON policy documents.
 
+- **AWS Resource Access Manager (RAM)**:
+  - Share AWS resources (VPC Subnets, KMS Keys) across accounts and within your AWS Organization.
+  - Multi-step Create resource share wizard with live resource selection from real EC2 and KMS services.
+  - Manage associations for resources, principals, permissions, and tags.
+
+- **AWS Service Quotas**:
+  - View and manage resource limits across 200+ AWS services from a central console.
+  - Compare account applied values against AWS default baselines and filter adjustable quotas.
+  - Submit account-level quota increase requests and track request lifecycle in Quota Request History.
+  - Configure organization-wide Quota Request Templates to automatically apply increases to new accounts.
+  - CloudWatch usage metric dimension inspection and quota tagging.
+
 - **AWS CloudShell Terminal (`>_`)**:
   - Interactive terminal drawer embedded directly in the top navigation bar.
   - Executes real AWS CLI commands directly against the local emulator container (`aws s3 ls`, `aws dynamodb list-tables`, `aws sqs list-queues`, `aws iam list-users`, etc.).
@@ -180,6 +192,54 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 | `AWS_CONFIG_FILE` | `~/.aws/emulator/9297/config` | Path to emulator configuration (`us-east-1` region). |
 | `AWS_EC2_METADATA_DISABLED` | `true` | Prevents SDK calls from querying instance metadata. |
 | `EMULATOR_PORT` | `9297` | Optional override if running the emulator on a custom port. |
+
+---
+
+## Service Status
+
+| Service | Category | Status | Documentation | Date Added |
+| :--- | :--- | :--- | :--- | :--- |
+| Amazon S3 | Storage | Built | [S3 Console](docs/README.md) | Initial |
+| Amazon SQS | Application Integration | Built | [SQS Console](docs/README.md) | Initial |
+| Amazon DynamoDB | Database | Built | [DynamoDB Console](docs/README.md) | Initial |
+| AWS IAM | Security, Identity, & Compliance | Built | [IAM Console](docs/README.md) | Initial |
+| AWS Resource Access Manager (RAM) | Security, Identity, & Compliance | Built | [RAM Console](docs/README.md) | 2026-11-20 |
+| AWS Service Quotas | Management & Governance | Built | [Service Quotas Guide](docs/Service%20Quotas.md) | 2026-11-20 |
+
+---
+
+## Service Quotas Action Support
+
+| API Operation | CLI Command | Support Status | Console Implementation |
+| :--- | :--- | :--- | :--- |
+| `ListServices` | `aws service-quotas list-services` | Supported | Full table on `/service-quotas` |
+| `ListServiceQuotas` | `aws service-quotas list-service-quotas` | Supported | Applied quotas on `/service-quotas/services/[serviceCode]` |
+| `GetServiceQuota` | `aws service-quotas get-service-quota` | Supported | Overview on `/service-quotas/services/[serviceCode]/[quotaCode]` |
+| `ListAWSDefaultServiceQuotas` | `aws service-quotas list-aws-default-service-quotas` | Supported | Baseline comparison in quotas table |
+| `GetAWSDefaultServiceQuota` | `aws service-quotas get-aws-default-service-quota` | Supported | Default value cards on quota details |
+| `RequestServiceQuotaIncrease` | `aws service-quotas request-service-quota-increase` | Supported | Account-level increase modal |
+| `GetRequestedServiceQuotaChange` | `aws service-quotas get-requested-service-quota-change` | Supported | Status tracking & case reference |
+| `ListRequestedServiceQuotaChangeHistory` | `aws service-quotas list-requested-service-quota-change-history` | Supported | History table on `/service-quotas/history` |
+| `ListRequestedServiceQuotaChangeHistoryByQuota` | `aws service-quotas list-requested-service-quota-change-history-by-quota` | Supported | Request history tab on quota details |
+| `GetAssociationForServiceQuotaTemplate` | `aws service-quotas get-association-for-service-quota-template` | Supported | Status display on `/service-quotas/template` |
+| `AssociateServiceQuotaTemplate` | `aws service-quotas associate-service-quota-template` | Supported | One-click template association toggle |
+| `DisassociateServiceQuotaTemplate` | `aws service-quotas disassociate-service-quota-template` | Supported | Template disassociation toggle |
+| `ListServiceQuotaIncreaseRequestsInTemplate` | `aws service-quotas list-service-quota-increase-requests-in-template` | Supported | Template table on `/service-quotas/template` |
+| `PutServiceQuotaIncreaseRequestIntoTemplate` | `aws service-quotas put-service-quota-increase-request-into-template` | Supported | Add to template modal |
+| `DeleteServiceQuotaIncreaseRequestFromTemplate` | `aws service-quotas delete-service-quota-increase-request-from-template` | Supported | Delete from template dialog |
+| `ListTagsForResource` | `aws service-quotas list-tags-for-resource` | Supported | Tags tab table on quota details |
+| `TagResource` | `aws service-quotas tag-resource` | Supported | Manage tags modal |
+| `UntagResource` | `aws service-quotas untag-resource` | Supported | Tag removal action |
+| `GetAutoManagementConfiguration` | `aws service-quotas get-auto-management-configuration` | Supported | Status display on `/service-quotas/settings` |
+
+---
+
+## Changelog
+
+- **2026-11-20** - **AWS Service Quotas**: Full implementation of AWS Service Quotas with services catalog exploration, applied vs default quota comparison, account-level quota increase request modal, quota request history tracking, organization quota request template management, CloudWatch usage metric configurations, and resource tagging.
+- **2026-11-20** - **AWS Resource Access Manager (RAM)**: Full implementation of RAM with resource shares, shared resources, principals, permissions library, and 4-step resource share creation wizard.
+
+---
 
 ---
 
