@@ -54,12 +54,14 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "sns",
   "dynamodb",
   "keyspaces",
+  "timestream",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (!idOrHref) return false;
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "timestream" || clean.startsWith("timestream/")) return true;
   if (clean === "keyspaces" || clean.startsWith("keyspaces/")) return true;
   if (clean === "glacier" || clean.startsWith("glacier/") || clean === "s3-glacier" || clean === "s3glacier") return true;
   if (clean === "systems-manager/parameter-store") return true;

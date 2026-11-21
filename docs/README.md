@@ -19,6 +19,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [Amazon S3 Glacier](S3%20Glacier.md): Low-cost cold data storage and archiving, vaults lifecycle management, archive uploads and checksum tracking, asynchronous inventory and archive retrieval jobs, and data retrieval policies.
 - [Amazon SNS (Simple Notification Service)](SNS.md): Fully managed pub/sub messaging service, Standard and FIFO topics, fanout architectures, protocol subscriptions (SQS, Lambda, HTTP/S, Email), message attributes, and subscription filter policies.
 - [Amazon SQS (Simple Queue Service)](SQS.md): Fully managed message queuing service for microservices, Standard and FIFO queues, visibility timeout, dead-letter queues (DLQs), message deduplication, and KMS encryption.
+- [Amazon Timestream](Timestream.md): Fast, scalable, serverless time-series database for IoT and operational applications. Dual storage tiering (in-memory hot store and magnetic cold store), automated retention policies, live data ingestion, SQL query editor, and KMS encryption.
 - [Resource Groups Tagging API](Resource%20Groups%20Tagging%20API.md): Find tagged resources across services and Regions, bulk add/edit/remove tags via Tag Editor, and create tag-based Resource Groups.
 - [Service Quotas](Service%20Quotas.md): View and manage service limits, request quota increases, configure organization quota request templates, and track change request history.
 
@@ -38,6 +39,9 @@ The following table tracks inter-service integrations that are waiting on future
 | Console Home | AWS Application Manager | Applications widget | Connect AppRegistry and application monitoring when AWS Application Manager is built |
 | Amazon Keyspaces | Amazon CloudWatch | Monitoring metrics and alarms for read/write units and latency | Connect CloudWatch metrics tab when Amazon CloudWatch is built |
 | Amazon Keyspaces | AWS Backup | Centrally managed backup compliance for Keyspaces tables | Connect Keyspaces backup policies when AWS Backup is built |
+| Amazon Timestream | Amazon CloudWatch | Monitoring metrics and alarms for ingested bytes and query latencies | Connect CloudWatch metrics tab when Amazon CloudWatch is built |
+| Amazon Timestream | AWS IoT Core | Ingestion rules forwarding IoT sensor telemetry to Timestream tables | Connect IoT Core rule actions when AWS IoT Core is built |
+| Amazon Timestream | Amazon QuickSight | Business intelligence dashboards and time series visualization | Connect QuickSight data sources when Amazon QuickSight is built |
 
 ---
 
