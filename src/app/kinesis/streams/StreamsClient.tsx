@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StreamSummaryItem } from "../types";
@@ -27,6 +27,11 @@ export default function StreamsClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(initialError || null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
 
   // Actions menu
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
@@ -355,9 +360,11 @@ export default function StreamsClient({
                           <span className="text-[#545b64]">None</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-[#545b64]">
+                      <td className="px-4 py-3 text-[#545b64]" suppressHydrationWarning>
                         {s.StreamCreationTimestamp
-                          ? new Date(s.StreamCreationTimestamp).toLocaleString()
+                          ? isMounted
+                            ? new Date(s.StreamCreationTimestamp).toLocaleString()
+                            : new Date(s.StreamCreationTimestamp).toISOString().replace("T", " ").substring(0, 19) + " UTC"
                           : "—"}
                       </td>
                     </tr>
