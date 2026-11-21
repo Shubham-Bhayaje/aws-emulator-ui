@@ -21,6 +21,22 @@ The official [AWS Emulator](https://github.com/aws/aws-emulator) provides a fast
 
 ---
 
+## Console Interface Preview
+
+| Console Home Dashboard | Amazon DynamoDB Tables |
+| :---: | :---: |
+| [![Console Home](docs/images/console-home.png)](docs/images/console-home.png)<br><sub>Customizable 12-column widget grid with health diagnostics, Security Hub audit, and cost trends</sub> | [![DynamoDB Tables](docs/images/dynamodb-tables.png)](docs/images/dynamodb-tables.png)<br><sub>Global DynamoDB tables inventory with capacity modes, partition/sort keys, and item explorer</sub> |
+
+| Amazon Keyspaces (Apache Cassandra) | Amazon S3 Buckets |
+| :---: | :---: |
+| [![Amazon Keyspaces](docs/images/keyspaces-overview.png)](docs/images/keyspaces-overview.png)<br><sub>Managed Cassandra keyspaces, dynamic CQL schema builder, and multi-region replication</sub> | [![Amazon S3 Buckets](docs/images/s3-buckets.png)](docs/images/s3-buckets.png)<br><sub>Buckets inventory with multi-level folder navigation, KMS encryption, and public access blocks</sub> |
+
+| AWS Key Management Service (KMS) | Amazon SQS Queues |
+| :---: | :---: |
+| [![AWS KMS](docs/images/kms-keys.png)](docs/images/kms-keys.png)<br><sub>Customer & AWS managed keys, key rotation, policy editor, and live cryptographic playground</sub> | [![Amazon SQS](docs/images/sqs-queues.png)](docs/images/sqs-queues.png)<br><sub>Standard & FIFO queues, live polling message inspector, and dead-letter queue redrive</sub> |
+
+---
+
 ## Quickstart
 
 ### 1. Prerequisites
