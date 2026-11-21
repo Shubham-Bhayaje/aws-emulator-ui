@@ -14,6 +14,26 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: "/cloudhsm/clusters",
+        destination: "/cloudhsm",
+        permanent: false,
+      },
+      {
+        source: "/cloudhsm/clusters/create",
+        destination: "/cloudhsm/create",
+        permanent: false,
+      },
+      {
+        source: "/cloudhsm/home",
+        destination: "/cloudhsm",
+        permanent: false,
+      },
+      {
+        source: "/cloudhsm/home/:path*",
+        destination: "/cloudhsm/:path*",
+        permanent: false,
+      },
+      {
         source: "/pca",
         destination: "/acm/pca",
         permanent: false,
@@ -41,6 +61,51 @@ const nextConfig: NextConfig = {
       {
         source: "/private-ca/:path*",
         destination: "/acm/pca/:path*",
+        permanent: false,
+      },
+      {
+        source: "/directoryservice/directories",
+        destination: "/directoryservice",
+        permanent: false,
+      },
+      {
+        source: "/directoryservice/directories/new",
+        destination: "/directoryservice/setup",
+        permanent: false,
+      },
+      {
+        source: "/directoryservice/create",
+        destination: "/directoryservice/setup",
+        permanent: false,
+      },
+      {
+        source: "/directory-service",
+        destination: "/directoryservice",
+        permanent: false,
+      },
+      {
+        source: "/directory-service/:path*",
+        destination: "/directoryservice/:path*",
+        permanent: false,
+      },
+      {
+        source: "/ds",
+        destination: "/directoryservice",
+        permanent: false,
+      },
+      {
+        source: "/ds/:path*",
+        destination: "/directoryservice/:path*",
+        permanent: false,
+      },
+      {
+        source: "/systems-manager/session%20manager",
+        destination: "/systems-manager/session-manager",
+        permanent: false,
+      },
+      {
+        source: "/systems-manager/parameter%20store",
+        destination: "/systems-manager/parameter-store",
         permanent: false,
       },
       {

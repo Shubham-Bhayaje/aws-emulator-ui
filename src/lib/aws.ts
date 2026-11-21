@@ -33,6 +33,8 @@ import { Route53Client } from "@aws-sdk/client-route-53";
 import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
 import { SSMClient } from "@aws-sdk/client-ssm";
 import { ACMPCAClient } from "@aws-sdk/client-acm-pca";
+import { CloudHSMV2Client } from "@aws-sdk/client-cloudhsm-v2";
+import { DirectoryServiceClient } from "@aws-sdk/client-directory-service";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -161,6 +163,18 @@ export const ssm = new SSMClient({
 
 // --- ACM-PCA (AWS Private Certificate Authority) ---
 export const acmPca = new ACMPCAClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- CloudHSM V2 ---
+export const cloudhsmv2 = new CloudHSMV2Client({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- Directory Service ---
+export const ds = new DirectoryServiceClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });

@@ -36,6 +36,10 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "acm-pca",
   "pca",
   "private-ca",
+  "cloudhsm",
+  "directoryservice",
+  "directory-service",
+  "ds",
   "secretsmanager",
   "systems-manager",
   "ssm-parameter-store",
@@ -52,6 +56,8 @@ export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
   if (clean === "systems-manager/parameter-store") return true;
   if (clean === "acm/pca" || clean === "acm-pca" || clean === "pca" || clean === "private-ca") return true;
+  if (clean === "cloudhsm" || clean.startsWith("cloudhsm/")) return true;
+  if (clean === "directoryservice" || clean.startsWith("directoryservice/") || clean === "directory-service" || clean === "ds") return true;
   return false;
 }
 
@@ -728,7 +734,9 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/directoryservice",
     "category": "Security, Identity, & Compliance",
     "color": "#E7157B",
-    "desc": "Managed Microsoft Active Directory in the cloud"
+    "status": "functional",
+    "desc": "Managed Microsoft Active Directory in the cloud",
+    "aliases": ["directoryservice", "directory service", "active directory", "ad", "simple ad", "managed microsoft ad", "ad connector", "ldap", "kerberos", "domain controller", "sso"]
   },
   {
     "id": "cloudhsm",
@@ -737,7 +745,9 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/cloudhsm",
     "category": "Security, Identity, & Compliance",
     "color": "#E7157B",
-    "desc": "Dedicated hardware security module (HSM) appliances for regulatory compliance"
+    "status": "functional",
+    "desc": "Dedicated hardware security module (HSM) appliances for regulatory compliance",
+    "aliases": ["cloudhsm", "hsm", "hardware security module", "fips 140-2", "cryptographic keys", "clusters", "pkcs11", "hsm2m.medium"]
   },
   {
     "id": "network-access-analyzer",
@@ -2733,7 +2743,9 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "href": "/directoryservice",
         "category": "Security, Identity, & Compliance",
         "color": "#E7157B",
-        "desc": "Managed Microsoft Active Directory in the cloud"
+        "status": "functional",
+        "desc": "Managed Microsoft Active Directory in the cloud",
+        "aliases": ["directoryservice", "directory service", "active directory", "ad", "simple ad", "managed microsoft ad", "ad connector", "ldap", "kerberos", "domain controller", "sso"]
       },
       {
         "id": "cloudhsm",

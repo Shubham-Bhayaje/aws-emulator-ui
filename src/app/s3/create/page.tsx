@@ -1,11 +1,13 @@
 import ServiceLayout from "@/components/ServiceLayout";
 import { s3Nav } from "../s3Nav";
-import { createBucket } from "../actions";
+import { createBucket, fetchKmsKeysAction } from "../actions";
 import { CreateBucketForm } from "./CreateBucketForm";
 
 export const dynamic = "force-dynamic";
 
-export default function CreateBucketPage() {
+export default async function CreateBucketPage() {
+  const kmsRes = await fetchKmsKeysAction();
+
   return (
     <ServiceLayout serviceName="S3" serviceColor="#3ECF8E" navItems={s3Nav}>
       <div className="max-w-4xl space-y-6">
@@ -15,7 +17,7 @@ export default function CreateBucketPage() {
             Buckets are containers for data stored in Amazon S3. Configure bucket settings below.
           </p>
         </div>
-        <CreateBucketForm action={createBucket} />
+        <CreateBucketForm action={createBucket} kmsKeys={kmsRes.keys || []} />
       </div>
     </ServiceLayout>
   );

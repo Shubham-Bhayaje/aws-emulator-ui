@@ -7,12 +7,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import type { KmsKeyOption } from "../types";
 
 interface CreateBucketFormProps {
   action: (formData: FormData) => Promise<{ error: string } | undefined>;
+  kmsKeys?: KmsKeyOption[];
 }
 
-export function CreateBucketForm({ action }: CreateBucketFormProps) {
+export function CreateBucketForm({ action, kmsKeys = [] }: CreateBucketFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -25,6 +27,7 @@ export function CreateBucketForm({ action }: CreateBucketFormProps) {
   const [blockNewPolicies, setBlockNewPolicies] = useState(true);
   const [restrictBuckets, setRestrictBuckets] = useState(true);
   const [sseAlgo, setSseAlgo] = useState<"AES256" | "aws:kms">("AES256");
+  const [kmsType, setKmsType] = useState<"default" | "custom">("default");
   const [kmsKeyId, setKmsKeyId] = useState("");
   const [bucketKey, setBucketKey] = useState(true);
 
@@ -277,17 +280,82 @@ export function CreateBucketForm({ action }: CreateBucketFormProps) {
           </label>
 
           {sseAlgo === "aws:kms" && (
-            <div className="ml-6 pt-2">
-              <label className="block text-[13px] font-semibold text-[#16191f] mb-1">
-                AWS KMS key (Optional)
-              </label>
-              <input
-                type="text"
-                placeholder="alias/aws/s3 or custom KMS key ARN"
-                value={kmsKeyId}
-                onChange={(e) => setKmsKeyId(e.target.value)}
-                className="w-full max-w-md text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3]"
-              />
+            <div className="ml-6 pt-2 space-y-3">
+              <div>
+                <label className="block text-[13px] font-semibold text-[#16191f] mb-1">
+                  AWS KMS key selection
+                </label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+                    <input
+                      type="radio"
+                      name="kmsType"
+                      checked={kmsType === "default"}
+                      onChange={() => {
+                        setKmsType("default");
+                        setKmsKeyId("alias/aws/s3");
+                      }}
+                      className="text-[#0972d3]"
+                    />
+                    <span>AWS managed key (aws/s3)</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-[12px]">
+                    <input
+                      type="radio"
+                      name="kmsType"
+                      checked={kmsType === "custom"}
+                      onChange={() => {
+                        setKmsType("custom");
+                        if (kmsKeys.length > 0) {
+                          setKmsKeyId(kmsKeys[0].keyArn || kmsKeys[0].keyId);
+                        }
+                      }}
+                      className="text-[#0972d3]"
+                    />
+                    <span>Choose from your AWS KMS keys</span>
+                  </label>
+                </div>
+              </div>
+
+              {kmsType === "custom" && (
+                <div>
+                  {kmsKeys.length > 0 ? (
+                    <div>
+                      <select
+                        value={kmsKeyId}
+                        onChange={(e) => setKmsKeyId(e.target.value)}
+                        className="w-full max-w-md text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3] bg-white"
+                      >
+                        {kmsKeys.map((k) => (
+                          <option key={k.keyId} value={k.keyArn || k.keyId}>
+                            {k.alias ? `${k.alias} (${k.keyId})` : k.keyId}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-[#f2f8fd] border border-[#d0e6f9] rounded text-[12px] text-[#545b64] max-w-md">
+                      <div>No customer managed KMS keys found in this AWS Region.</div>
+                      <Link
+                        href="/kms/keys/create"
+                        className="text-[#0972d3] hover:underline font-semibold mt-1 inline-block"
+                      >
+                        Create a KMS key in AWS KMS
+                      </Link>
+                    </div>
+                  )}
+                  <div className="mt-2">
+                    <label className="block text-[11px] text-[#545b64] mb-0.5">Or enter custom KMS key ARN</label>
+                    <input
+                      type="text"
+                      placeholder="arn:aws:kms:us-east-1:000000000000:key/..."
+                      value={kmsKeyId}
+                      onChange={(e) => setKmsKeyId(e.target.value)}
+                      className="w-full max-w-md text-[12px] px-2.5 py-1 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3] font-mono"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

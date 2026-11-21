@@ -1,6 +1,6 @@
 import ServiceLayout from "@/components/ServiceLayout";
 import { s3Nav } from "../s3Nav";
-import { fetchBucketDetails, fetchObjects, fetchObjectVersions } from "../actions";
+import { fetchBucketDetails, fetchObjects, fetchObjectVersions, fetchKmsKeysAction } from "../actions";
 import { BucketDetailClient } from "./BucketDetailClient";
 import Link from "next/link";
 
@@ -17,10 +17,11 @@ export default async function BucketPage({ params, searchParams }: BucketPagePro
   const { prefix: rawPrefix } = await searchParams;
   const prefix = rawPrefix || "";
 
-  const [detailsRes, objectsRes, versionsRes] = await Promise.all([
+  const [detailsRes, objectsRes, versionsRes, kmsRes] = await Promise.all([
     fetchBucketDetails(decodedBucketName),
     fetchObjects(decodedBucketName, prefix),
     fetchObjectVersions(decodedBucketName, prefix),
+    fetchKmsKeysAction(),
   ]);
 
   if (!detailsRes.success || !detailsRes.bucket) {
@@ -63,6 +64,7 @@ export default async function BucketPage({ params, searchParams }: BucketPagePro
         objects={objectsRes.objects}
         versions={versionsRes.versions || []}
         currentPrefix={prefix}
+        kmsKeys={kmsRes.keys || []}
       />
     </ServiceLayout>
   );

@@ -9,7 +9,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { S3BucketDetail, S3ObjectSummary } from "../types";
+import type { S3BucketDetail, S3ObjectSummary, KmsKeyOption } from "../types";
 import {
   deleteObject,
   deleteObjects,
@@ -44,6 +44,7 @@ interface BucketDetailClientProps {
   objects: S3ObjectSummary[];
   versions?: S3ObjectSummary[];
   currentPrefix: string;
+  kmsKeys?: KmsKeyOption[];
 }
 
 function formatBytes(bytes: number): string {
@@ -59,6 +60,7 @@ export function BucketDetailClient({
   objects,
   versions = [],
   currentPrefix,
+  kmsKeys = [],
 }: BucketDetailClientProps) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -2306,17 +2308,38 @@ export function BucketDetailClient({
               </div>
 
               {encAlgo === "aws:kms" && (
-                <div>
+                <div className="space-y-2">
                   <label className="block text-[13px] font-semibold text-[#16191f] mb-1">
                     AWS KMS key ARN or alias
                   </label>
+                  {kmsKeys.length > 0 && (
+                    <select
+                      value={kmsKeyIdInput}
+                      onChange={(e) => setKmsKeyIdInput(e.target.value)}
+                      className="w-full text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3] bg-white mb-2"
+                    >
+                      <option value="alias/aws/s3">AWS managed key (aws/s3)</option>
+                      {kmsKeys.map((k) => (
+                        <option key={k.keyId} value={k.keyArn || k.keyId}>
+                          {k.alias ? `${k.alias} (${k.keyId})` : k.keyId}
+                        </option>
+                      ))}
+                    </select>
+                  )}
                   <input
                     type="text"
-                    placeholder="alias/aws/s3 or key ARN"
+                    placeholder="alias/aws/s3 or custom key ARN"
                     value={kmsKeyIdInput}
                     onChange={(e) => setKmsKeyIdInput(e.target.value)}
                     className="w-full text-[13px] px-3 py-1.5 border border-[#aab7b8] rounded focus:outline-none focus:border-[#0972d3]"
                   />
+                  {kmsKeys.length === 0 && (
+                    <div className="text-[12px] text-[#545b64]">
+                      <Link href="/kms/keys/create" className="text-[#0972d3] hover:underline">
+                        Create a customer managed key in AWS KMS
+                      </Link>
+                    </div>
+                  )}
                 </div>
               )}
 

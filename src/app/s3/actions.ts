@@ -5,7 +5,8 @@
 
 "use server";
 
-import { s3 } from "@/lib/aws";
+import { s3, kms } from "@/lib/aws";
+import { ListKeysCommand as ListKmsKeysCommand, ListAliasesCommand as ListKmsAliasesCommand } from "@aws-sdk/client-kms";
 import {
   ListBucketsCommand,
   CreateBucketCommand,
@@ -63,6 +64,7 @@ import type {
   S3AccessPoint,
   S3MultiRegionAccessPoint,
   S3BatchJob,
+  KmsKeyOption,
 } from "./types";
 
 /**
@@ -1368,5 +1370,46 @@ export async function deleteBatchJobAction(id: string) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: msg };
+  }
+}
+
+/**
+ * Fetch live KMS keys from the KMS service to populate S3 encryption dropdowns.
+ */
+export async function fetchKmsKeysAction(): Promise<{
+  success: boolean;
+  keys: KmsKeyOption[];
+  error?: string;
+}> {
+  try {
+    const [keyList, aliasList] = await Promise.all([
+      kms.send(new ListKmsKeysCommand({})),
+      kms.send(new ListKmsAliasesCommand({})),
+    ]);
+
+    const aliasMap = new Map<string, string>();
+    for (const a of aliasList.Aliases || []) {
+      if (a.TargetKeyId && a.AliasName) {
+        aliasMap.set(a.TargetKeyId, a.AliasName);
+      }
+    }
+
+    const options: KmsKeyOption[] = [];
+    const keys = keyList.Keys || [];
+
+    for (const k of keys.slice(0, 30)) {
+      if (!k.KeyId) continue;
+      const alias = aliasMap.get(k.KeyId);
+      options.push({
+        keyId: k.KeyId,
+        keyArn: k.KeyArn || k.KeyId,
+        alias,
+      });
+    }
+
+    return { success: true, keys: options };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, keys: [], error: msg };
   }
 }
