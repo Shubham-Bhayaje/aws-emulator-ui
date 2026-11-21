@@ -1,41 +1,61 @@
 /**
  * [service]/page.tsx – Dynamic service page for all AWS services in the catalog.
  * Renders an authentic AWS Management Console layout and overview.
+ * Zero emojis, Cloudscape enterprise standard, strict 32px button height standard.
  */
 
-import { notFound } from "next/navigation";
+import Link from "next/link";
+import { redirect } from "next/navigation";
 import ServiceLayout from "@/components/ServiceLayout";
 import ComingSoon from "@/components/ComingSoon";
 import { findServiceByHref, findServiceById, ALL_SERVICES } from "@/lib/services-catalog";
+
+export const dynamic = "force-dynamic";
 
 type Props = {
   params: Promise<{ service: string }>;
 };
 
-export async function generateStaticParams() {
-  // Existing statically built top-level directories:
-  const staticDirs = new Set([
-    "s3", "sqs", "dynamodb", "iam", "services", "api",
-    "ec2", "lambda", "elasticbeanstalk", "lightsail", "ecs", "eks",
-    "efs", "glacier", "rds", "elasticache", "redshift", "vpc",
-    "cloudfront", "route53", "apigateway", "sns", "stepfunctions",
-    "eventbridge", "kms", "secretsmanager", "cognito", "cloudwatch",
-    "cloudtrail", "cloudformation", "systems-manager", "kinesis",
-    "athena", "sagemaker", "bedrock", "codecommit", "codebuild", "codepipeline"
-  ]);
-
-  return ALL_SERVICES
-    .filter((s) => !staticDirs.has(s.id))
-    .map((s) => ({ service: s.id }));
-}
-
 export default async function DynamicServicePage(props: Props) {
   const { service: slug } = await props.params;
 
-  const service = findServiceByHref("/" + slug) || findServiceById(slug);
+  let service = findServiceByHref("/" + slug) || findServiceById(slug);
 
   if (!service) {
-    notFound();
+    const cleanSlug = slug.toLowerCase().replace(/[-_\s]+/g, "");
+    const aliasMatch = ALL_SERVICES.find((s) => {
+      if (s.id.toLowerCase().replace(/[-_\s]+/g, "") === cleanSlug) return true;
+      return (s.aliases || []).some(
+        (a) => a.toLowerCase().replace(/[-_\s]+/g, "") === cleanSlug
+      );
+    });
+
+    if (aliasMatch && aliasMatch.href && aliasMatch.href !== "/" + slug) {
+      redirect(aliasMatch.href);
+    }
+    service = aliasMatch;
+  }
+
+  if (!service) {
+    return (
+      <div className="max-w-[1200px] mx-auto p-6 space-y-6">
+        <div className="bg-white border border-[#eaeded] rounded p-8 text-center space-y-4 max-w-xl mx-auto mt-12 shadow-sm">
+          <h2 className="text-[20px] font-bold text-[#16191f]">Service Not Found</h2>
+          <p className="text-[13px] text-[#545b64]">
+            The requested service <code className="bg-[#f2f3f3] px-1.5 py-0.5 rounded font-mono text-[#16191f]">/{slug}</code> is not cataloged in this AWS console environment.
+          </p>
+          <div className="pt-2">
+            <Link
+              href="/services"
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="inline-flex items-center justify-center font-bold text-[13px] px-4 rounded bg-[#ec7211] text-white hover:bg-[#eb5f07] transition-colors"
+            >
+              Browse AWS Services Catalog
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const nav = [

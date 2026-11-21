@@ -48,6 +48,24 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={inter.className}>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if (typeof window !== "undefined" && window.performance && window.performance.measure) {
+                const _origMeasure = window.performance.measure.bind(window.performance);
+                window.performance.measure = function (name, startMarkOrOptions, endMark) {
+                  try {
+                    return _origMeasure(name, startMarkOrOptions, endMark);
+                  } catch (e) {
+                    return undefined;
+                  }
+                };
+              }
+            `,
+          }}
+        />
+      </head>
       <body>
         <TopBar
           accountId={accountId}

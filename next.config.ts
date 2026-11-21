@@ -14,6 +14,56 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       {
+        source: "/certificatemanager",
+        destination: "/acm",
+        permanent: false,
+      },
+      {
+        source: "/certificatemanager/:path*",
+        destination: "/acm/:path*",
+        permanent: false,
+      },
+      {
+        source: "/certificate-manager",
+        destination: "/acm",
+        permanent: false,
+      },
+      {
+        source: "/certificate-manager/:path*",
+        destination: "/acm/:path*",
+        permanent: false,
+      },
+      {
+        source: "/certificate_manager",
+        destination: "/acm",
+        permanent: false,
+      },
+      {
+        source: "/certificate_manager/:path*",
+        destination: "/acm/:path*",
+        permanent: false,
+      },
+      {
+        source: "/acm/home",
+        destination: "/acm",
+        permanent: false,
+      },
+      {
+        source: "/acm/home/:path*",
+        destination: "/acm/:path*",
+        permanent: false,
+      },
+      {
+        source: "/directory-services",
+        destination: "/directoryservice",
+        permanent: false,
+      },
+      {
+        source: "/directory-services/:path*",
+        destination: "/directoryservice/:path*",
+        permanent: false,
+      },
+      {
         source: "/cloudhsm/clusters",
         destination: "/cloudhsm",
         permanent: false,

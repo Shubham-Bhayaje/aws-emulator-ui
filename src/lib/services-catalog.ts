@@ -660,7 +660,7 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "color": "#E7157B",
     "status": "functional",
     "desc": "Provision, manage, and deploy public and private SSL/TLS certificates",
-    "aliases": ["acm", "certificate manager", "certificates", "certificate", "ssl", "tls", "https", "domain validation"]
+    "aliases": ["acm", "certificatemanager", "certificate-manager", "certificate manager", "certificates", "certificate", "ssl", "tls", "https", "domain validation"]
   },
   {
     "id": "acm-pca",
@@ -2671,7 +2671,9 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "href": "/acm",
         "category": "Security, Identity, & Compliance",
         "color": "#E7157B",
-        "desc": "Provision, manage, and deploy public and private SSL/TLS certificates"
+        "status": "functional",
+        "desc": "Provision, manage, and deploy public and private SSL/TLS certificates",
+        "aliases": ["acm", "certificatemanager", "certificate-manager", "certificate manager", "certificates", "certificate", "ssl", "tls", "https", "domain validation"]
       },
       {
         "id": "acm-pca",
