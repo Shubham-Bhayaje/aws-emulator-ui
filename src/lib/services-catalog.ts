@@ -53,12 +53,14 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "s3glacier",
   "sns",
   "dynamodb",
+  "keyspaces",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (!idOrHref) return false;
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "keyspaces" || clean.startsWith("keyspaces/")) return true;
   if (clean === "glacier" || clean.startsWith("glacier/") || clean === "s3-glacier" || clean === "s3glacier") return true;
   if (clean === "systems-manager/parameter-store") return true;
   if (clean === "acm/pca" || clean === "acm-pca" || clean === "pca" || clean === "private-ca") return true;

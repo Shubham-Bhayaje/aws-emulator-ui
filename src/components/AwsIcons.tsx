@@ -138,6 +138,21 @@ export function DynamoDBIcon({ size = 20, className }: IconProps) {
   );
 }
 
+// Keyspaces – Blue Cassandra database icon
+export function KeyspacesIcon({ size = 20, className }: IconProps) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 40 40" className={className} xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="keyspaces-grad" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stopColor="#2E27AD"/><stop offset="100%" stopColor="#527FFF"/></linearGradient></defs>
+      <rect width="40" height="40" rx="4" fill="url(#keyspaces-grad)"/>
+      <ellipse cx="20" cy="11" rx="8" ry="3" stroke="white" strokeWidth="1.5" fill="none"/>
+      <path d="M12 11v18c0 1.66 3.58 3 8 3s8-1.34 8-3V11" stroke="white" strokeWidth="1.5" fill="none"/>
+      <path d="M28 17c0 1.66-3.58 3-8 3s-8-1.34-8-3" stroke="white" strokeWidth="1.2" fill="none"/>
+      <path d="M28 23c0 1.66-3.58 3-8 3s-8-1.34-8-3" stroke="white" strokeWidth="1.2" fill="none"/>
+      <path d="M17 19l6 6M23 19l-6 6" stroke="white" strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  );
+}
+
 // RDS – Blue relational DB
 export function RDSIcon({ size = 20, className }: IconProps) {
   return (
@@ -520,6 +535,9 @@ export function ServiceIcon({
       return <GlacierIcon size={size} className={className} />;
     case "dynamodb":
       return <DynamoDBIcon size={size} className={className} />;
+    case "keyspaces":
+    case "amazonkeyspaces":
+      return <KeyspacesIcon size={size} className={className} />;
     case "rds":
     case "aurora":
     case "rds-custom":

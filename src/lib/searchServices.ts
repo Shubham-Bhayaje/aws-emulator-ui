@@ -573,10 +573,45 @@ export const COMMON_FEATURES: ServiceFeatureItem[] = [
     color: "#FF4F8B",
     aliases: ["create subscription", "subscribe", "new subscription", "add subscription"],
   },
+  // Amazon Keyspaces (for Apache Cassandra)
+  {
+    id: "feat-keyspaces-list",
+    name: "Keyspaces",
+    href: "/keyspaces",
+    serviceId: "keyspaces",
+    serviceName: "Amazon Keyspaces",
+    category: "Database",
+    desc: "Manage Apache Cassandra-compatible keyspaces and tables",
+    color: "#2E27AD",
+    aliases: ["keyspaces", "cassandra", "cql", "keyspace", "nosql"],
+  },
+  {
+    id: "feat-keyspaces-create",
+    name: "Create keyspace",
+    href: "/keyspaces/create",
+    serviceId: "keyspaces",
+    serviceName: "Amazon Keyspaces",
+    category: "Database",
+    desc: "Create a new Amazon Keyspaces keyspace with replication settings",
+    color: "#2E27AD",
+    aliases: ["create keyspace", "new keyspace", "add keyspace"],
+  },
+  {
+    id: "feat-keyspaces-config",
+    name: "Keyspaces configuration",
+    href: "/keyspaces/configuration",
+    serviceId: "keyspaces",
+    serviceName: "Amazon Keyspaces",
+    category: "Database",
+    desc: "View Cassandra endpoints, TLS connectivity, and service quotas",
+    color: "#2E27AD",
+    aliases: ["keyspaces config", "cassandra endpoint", "cql connection"],
+  },
 ];
 
 // Acronym and common synonym expansion dictionary
 const ACRONYM_MAP: Record<string, string[]> = {
+  keyspaces: ["keyspaces", "cassandra", "cql", "database", "tables"],
   sns: ["simple", "notification", "service", "pubsub", "topics"],
   ssm: ["systems", "manager", "parameter", "store"],
   acm: ["certificate", "manager", "ssl", "tls"],

@@ -14,6 +14,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Secrets Manager](Secrets%20Manager.md): Store, retrieve, update, and manage sensitive credentials and API keys with KMS encryption at rest, version staging labels (AWSCURRENT, AWSPREVIOUS), resource permissions, and scheduled recovery windows.
 - [AWS Systems Manager Parameter Store](SSM%20Parameter%20Store.md): Secure, hierarchical storage for configuration data management and secrets management with KMS encryption (SecureString), version history tracking, version staging labels, and resource tagging.
 - [Amazon DynamoDB](DynamoDB.md): Fast and flexible NoSQL database service, global tables inventory, partition and sort keys, on-demand and provisioned capacity modes, item explorer with scan and query engine, Time to Live (TTL), Point-in-time recovery (PITR), on-demand backups, and DynamoDB Streams.
+- [Amazon Keyspaces (for Apache Cassandra)](Keyspaces.md): Scalable, highly available, and managed Apache Cassandra-compatible database service. Manage keyspaces, multi-region replication, tables with dynamic Cassandra column schema builder, on-demand and provisioned capacity modes, KMS encryption at rest, Point-in-time recovery (PITR), and default Time to Live (TTL).
 - [Amazon S3 (Simple Storage Service)](S3.md): Scalable cloud object storage, buckets and prefixes navigation, versioning, default encryption with KMS, granular Block Public Access controls, bucket policies, static website hosting, and lifecycle management.
 - [Amazon S3 Glacier](S3%20Glacier.md): Low-cost cold data storage and archiving, vaults lifecycle management, archive uploads and checksum tracking, asynchronous inventory and archive retrieval jobs, and data retrieval policies.
 - [Amazon SNS (Simple Notification Service)](SNS.md): Fully managed pub/sub messaging service, Standard and FIFO topics, fanout architectures, protocol subscriptions (SQS, Lambda, HTTP/S, Email), message attributes, and subscription filter policies.
@@ -35,6 +36,8 @@ The following table tracks inter-service integrations that are waiting on future
 | Amazon DynamoDB | Amazon Kinesis | DynamoDB Kinesis data stream destination | Enable streaming destination when Amazon Kinesis is built |
 | Console Home | Amazon CloudWatch | CloudWatch Alarms widget | Connect CloudWatch alarms (In alarm, OK, Insufficient data) when Amazon CloudWatch is built |
 | Console Home | AWS Application Manager | Applications widget | Connect AppRegistry and application monitoring when AWS Application Manager is built |
+| Amazon Keyspaces | Amazon CloudWatch | Monitoring metrics and alarms for read/write units and latency | Connect CloudWatch metrics tab when Amazon CloudWatch is built |
+| Amazon Keyspaces | AWS Backup | Centrally managed backup compliance for Keyspaces tables | Connect Keyspaces backup policies when AWS Backup is built |
 
 ---
 
