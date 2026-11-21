@@ -19,6 +19,11 @@ import {
   updateAccessKeyStatusAction,
   deleteAccessKeyAction,
   AccessKeyInfo,
+  listMFADevicesAction,
+  createVirtualMFADeviceAction,
+  enableMFADeviceAction,
+  deactivateMFADeviceAction,
+  MFADeviceInfo,
 } from "../../actions";
 
 export interface AttachedPolicyInfo {
@@ -40,6 +45,7 @@ interface UserDetailProps {
   userGroups?: Array<{ groupName: string; arn: string; createDate: string }>;
   allGroups?: Array<{ groupName: string }>;
   initialAccessKeys?: AccessKeyInfo[];
+  initialMFADevices?: MFADeviceInfo[];
   canAttachPolicy?: boolean;
   canDetachPolicy?: boolean;
   activeIdentityName?: string;
@@ -52,6 +58,7 @@ export function UserDetail({
   userGroups = [],
   allGroups = [],
   initialAccessKeys = [],
+  initialMFADevices = [],
   canAttachPolicy = true,
   canDetachPolicy = true,
   activeIdentityName = "Administrator",
@@ -82,6 +89,21 @@ export function UserDetail({
   } | null>(null);
   const [showSecretKey, setShowSecretKey] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
+
+  // MFA State
+  const [mfaDevices, setMfaDevices] = useState<MFADeviceInfo[]>(initialMFADevices);
+  const [showAssignMfaModal, setShowAssignMfaModal] = useState(false);
+  const [mfaDeviceName, setMfaDeviceName] = useState("");
+  const [mfaStep, setMfaStep] = useState<1 | 2>(1);
+  const [createdDeviceSerial, setCreatedDeviceSerial] = useState("");
+  const [createdBase32Seed, setCreatedBase32Seed] = useState("");
+  const [sampleCode1, setSampleCode1] = useState("");
+  const [sampleCode2, setSampleCode2] = useState("");
+  const [authCode1, setAuthCode1] = useState("");
+  const [authCode2, setAuthCode2] = useState("");
+  const [copiedSeed, setCopiedSeed] = useState(false);
+  const [mfaModalError, setMfaModalError] = useState<string | null>(null);
+  const [isCreatingDevice, setIsCreatingDevice] = useState(false);
 
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
@@ -223,6 +245,93 @@ export function UserDetail({
     });
   }
 
+  function handleOpenAssignMfa() {
+    setMfaDeviceName(`${user.userName}-mfa-${Date.now().toString().slice(-4)}`);
+    setMfaStep(1);
+    setCreatedDeviceSerial("");
+    setCreatedBase32Seed("");
+    setSampleCode1("");
+    setSampleCode2("");
+    setAuthCode1("");
+    setAuthCode2("");
+    setMfaModalError(null);
+    setShowAssignMfaModal(true);
+  }
+
+  async function handleProceedToMfaSetup() {
+    const clean = mfaDeviceName.trim();
+    if (!clean) {
+      setMfaModalError("Device name is required.");
+      return;
+    }
+    setIsCreatingDevice(true);
+    setMfaModalError(null);
+    const res = await createVirtualMFADeviceAction(clean);
+    setIsCreatingDevice(false);
+    if (res.success && res.serialNumber && res.base32Seed) {
+      setCreatedDeviceSerial(res.serialNumber);
+      setCreatedBase32Seed(res.base32Seed);
+      setSampleCode1(res.sampleCode1 || "");
+      setSampleCode2(res.sampleCode2 || "");
+      setMfaStep(2);
+    } else {
+      setMfaModalError(res.error || "Failed to create virtual MFA device.");
+    }
+  }
+
+  function handleAutofillCodes() {
+    if (sampleCode1 && sampleCode2) {
+      setAuthCode1(sampleCode1);
+      setAuthCode2(sampleCode2);
+    }
+  }
+
+  function handleConfirmAssignMfa() {
+    if (!authCode1.trim() || !authCode2.trim()) {
+      setMfaModalError("Please provide both 6-digit authentication codes.");
+      return;
+    }
+    startTransition(async () => {
+      setMfaModalError(null);
+      const res = await enableMFADeviceAction(
+        user.userName,
+        createdDeviceSerial,
+        authCode1.trim(),
+        authCode2.trim()
+      );
+      if (res.success) {
+        setMfaDevices((prev) => [
+          ...prev,
+          {
+            userName: user.userName,
+            serialNumber: createdDeviceSerial,
+            enableDate: new Date().toISOString(),
+          },
+        ]);
+        setShowAssignMfaModal(false);
+        router.refresh();
+        setFeedback(`MFA device successfully assigned to ${user.userName}.`);
+      } else {
+        setMfaModalError(res.error || "Failed to enable MFA device.");
+      }
+    });
+  }
+
+  function handleRemoveMfa(serialNumber: string) {
+    if (!confirm(`Are you sure you want to remove MFA device ${serialNumber}?`)) return;
+    startTransition(async () => {
+      const res = await deactivateMFADeviceAction(user.userName, serialNumber);
+      if (res.success) {
+        setMfaDevices((prev) => prev.filter((d) => d.serialNumber !== serialNumber));
+        router.refresh();
+        setFeedback("MFA device deactivated and removed successfully.");
+      } else {
+        setError(res.error || "Failed to deactivate MFA device.");
+      }
+      setTimeout(() => setFeedback(null), 5000);
+    });
+  }
+
   return (
     <div className="space-y-6 max-w-[1200px]">
       {/* Header and Actions */}
@@ -317,7 +426,7 @@ export function UserDetail({
                 : "border-transparent text-[#545b64] hover:text-[#16191f]"
             }`}
           >
-            Security credentials ({accessKeys.length})
+            Security credentials ({accessKeys.length + mfaDevices.length})
           </button>
           <button
             onClick={() => setActiveTab("details")}
@@ -523,6 +632,88 @@ export function UserDetail({
                     Enabled
                   </span>
                 </div>
+              </div>
+
+              {/* Multi-factor authentication (MFA) Section */}
+              <div className="space-y-3 pt-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#eaeded]">
+                  <div>
+                    <h3 className="text-[14px] font-bold text-[#16191f]">
+                      Multi-factor authentication (MFA) ({mfaDevices.length})
+                    </h3>
+                    <p className="text-[12px] text-[#545b64]">
+                      MFA adds an extra layer of protection on top of user name and password. You can assign up to 8 MFA devices per user.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleOpenAssignMfa}
+                    disabled={isPending}
+                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                    className="h-[32px] px-3 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
+                  >
+                    Assign MFA device
+                  </button>
+                </div>
+
+                {mfaDevices.length === 0 ? (
+                  <div className="p-8 text-center bg-[#fafafa] border border-[#eaeded] rounded-sm">
+                    <p className="text-[13px] font-bold text-[#16191f]">No MFA devices assigned</p>
+                    <p className="text-[12px] text-[#545b64] mt-1 mb-4">
+                      You don't have any MFA devices assigned to this user. Protect this user's credentials by assigning an MFA device.
+                    </p>
+                    <button
+                      onClick={handleOpenAssignMfa}
+                      disabled={isPending}
+                      style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                      className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors shadow-xs"
+                    >
+                      Assign MFA device
+                    </button>
+                  </div>
+                ) : (
+                  <div className="border border-[#eaeded] rounded-sm overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-[13px]">
+                      <thead className="bg-[#fafafa] border-b border-[#eaeded] text-[#545b64] text-[11px] font-semibold uppercase tracking-wider">
+                        <tr>
+                          <th className="py-2.5 px-4">Device name</th>
+                          <th className="py-2.5 px-3">Device type</th>
+                          <th className="py-2.5 px-3">Serial number</th>
+                          <th className="py-2.5 px-3">Assigned date</th>
+                          <th className="py-2.5 px-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-[#eaeded] text-[#16191f]">
+                        {mfaDevices.map((dev) => {
+                          const devName = dev.serialNumber.split("/").pop() || "MFA Device";
+                          return (
+                            <tr key={dev.serialNumber} className="hover:bg-[#fafafa]">
+                              <td className="py-2.5 px-4 font-medium text-[#16191f]">{devName}</td>
+                              <td className="py-2.5 px-3">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#e6f4ea] text-[#137333]">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-[#137333]" />
+                                  Virtual authenticator app
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3 font-mono text-[12px] text-[#545b64]">{dev.serialNumber}</td>
+                              <td className="py-2.5 px-3 text-[#545b64] text-[12px]">
+                                {dev.enableDate ? new Date(dev.enableDate).toLocaleString() : "—"}
+                              </td>
+                              <td className="py-2.5 px-3 text-right">
+                                <button
+                                  onClick={() => handleRemoveMfa(dev.serialNumber)}
+                                  disabled={isPending}
+                                  className="text-[12px] font-bold text-[#d13212] hover:underline"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* Access Keys Section */}
@@ -903,6 +1094,230 @@ export function UserDetail({
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Assign MFA Device Modal */}
+      {showAssignMfaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-sm border border-[#d5dbdb] shadow-xl w-full max-w-lg max-h-[90vh] flex flex-col">
+            <div className="p-5 border-b border-[#eaeded] flex items-center justify-between flex-shrink-0">
+              <div>
+                <h3 className="text-[17px] font-bold text-[#16191f]">
+                  Assign MFA device
+                </h3>
+                <p className="text-[12px] text-[#545b64] mt-0.5">
+                  Configure multi-factor authentication for user {user.userName}.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAssignMfaModal(false)}
+                className="text-[#545b64] hover:text-[#16191f]"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="p-5 overflow-y-auto flex-1 space-y-4 text-[13px]">
+              {mfaModalError && (
+                <div className="p-3 bg-[#fdf3f1] border border-[#d13212] text-[#d13212] rounded-sm text-[12px]">
+                  {mfaModalError}
+                </div>
+              )}
+
+              {mfaStep === 1 ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-[12px] font-bold text-[#16191f] mb-1">
+                      Device name
+                    </label>
+                    <input
+                      type="text"
+                      value={mfaDeviceName}
+                      onChange={(e) => setMfaDeviceName(e.target.value)}
+                      placeholder="e.g. authenticator-app"
+                      className="w-full h-[32px] px-3 border border-[#aab7b8] rounded-sm text-[13px] text-[#16191f] focus:outline-none focus:border-[#0073bb]"
+                    />
+                    <p className="text-[11px] text-[#545b64] mt-1">
+                      Allowed characters are letters, numbers, and hyphens.
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[12px] font-bold text-[#16191f] mb-2">
+                      MFA device type
+                    </label>
+                    <div className="space-y-2">
+                      <label className="flex items-start gap-3 p-3 border border-[#0073bb] bg-[#f2f8fd] rounded-sm cursor-pointer">
+                        <input
+                          type="radio"
+                          name="mfaType"
+                          checked
+                          readOnly
+                          className="mt-0.5 text-[#0073bb]"
+                        />
+                        <div>
+                          <div className="font-bold text-[#16191f]">Authenticator app</div>
+                          <div className="text-[12px] text-[#545b64]">
+                            Use an installed app on your mobile device (e.g. Google Authenticator, Microsoft Authenticator, 1Password, Authy).
+                          </div>
+                        </div>
+                      </label>
+                      <label className="flex items-start gap-3 p-3 border border-[#eaeded] bg-[#fafafa] rounded-sm opacity-60 cursor-not-allowed">
+                        <input
+                          type="radio"
+                          name="mfaType"
+                          disabled
+                          className="mt-0.5"
+                        />
+                        <div>
+                          <div className="font-bold text-[#16191f]">FIDO2 security key</div>
+                          <div className="text-[12px] text-[#545b64]">
+                            YubiKey or other WebAuthn security key (requires browser WebAuthn API).
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="p-3 bg-[#fafafa] border border-[#eaeded] rounded-sm">
+                    <div className="text-[11px] font-bold text-[#545b64] uppercase mb-1">
+                      Device serial
+                    </div>
+                    <div className="font-mono text-[12px] text-[#16191f] break-all">
+                      {createdDeviceSerial}
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-[12px] font-bold text-[#16191f] mb-1">
+                      Step 1: Set up device with secret key
+                    </div>
+                    <p className="text-[12px] text-[#545b64] mb-2">
+                      Enter the secret key into your authenticator app (TOTP RFC 6238):
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={createdBase32Seed}
+                        className="flex-1 font-mono text-[13px] bg-[#f2f3f3] border border-[#d5dbdb] px-3 py-1.5 rounded-sm select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(createdBase32Seed);
+                          setCopiedSeed(true);
+                          setTimeout(() => setCopiedSeed(false), 2000);
+                        }}
+                        style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                        className="h-[32px] px-3 border border-[#aab7b8] rounded-sm text-[12px] font-bold text-[#16191f] bg-white hover:bg-[#f2f3f3]"
+                      >
+                        {copiedSeed ? "Copied" : "Copy"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {sampleCode1 && sampleCode2 && (
+                    <div className="p-3 bg-[#f2f8fd] border border-[#0073bb] rounded-sm">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-bold text-[#0073bb] text-[12px]">
+                          Emulator TOTP Test Helper
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleAutofillCodes}
+                          className="text-[11px] font-bold text-[#ec7211] hover:underline"
+                        >
+                          Autofill Codes
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-[#545b64]">
+                        Valid codes generated from emulator seed: <span className="font-mono font-bold text-[#16191f]">{sampleCode1}</span> and <span className="font-mono font-bold text-[#16191f]">{sampleCode2}</span>
+                      </p>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-[12px] font-bold text-[#16191f] mb-1">
+                      Step 2: Enter two consecutive 6-digit codes
+                    </div>
+                    <p className="text-[12px] text-[#545b64] mb-2">
+                      Type two consecutive authentication codes from your authenticator app:
+                    </p>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#545b64] mb-0.5">
+                          MFA code 1
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={authCode1}
+                          onChange={(e) => setAuthCode1(e.target.value)}
+                          placeholder="123456"
+                          className="w-full h-[32px] px-3 font-mono text-[13px] border border-[#aab7b8] rounded-sm text-[#16191f] focus:outline-none focus:border-[#0073bb]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-[#545b64] mb-0.5">
+                          MFA code 2
+                        </label>
+                        <input
+                          type="text"
+                          maxLength={6}
+                          value={authCode2}
+                          onChange={(e) => setAuthCode2(e.target.value)}
+                          placeholder="654321"
+                          className="w-full h-[32px] px-3 font-mono text-[13px] border border-[#aab7b8] rounded-sm text-[#16191f] focus:outline-none focus:border-[#0073bb]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-[#eaeded] flex items-center justify-end gap-2 flex-shrink-0 bg-[#fafafa]">
+              <button
+                type="button"
+                onClick={() => setShowAssignMfaModal(false)}
+                disabled={isPending || isCreatingDevice}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 border border-[#aab7b8] rounded-sm text-[13px] font-bold text-[#16191f] bg-white hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
+              >
+                Cancel
+              </button>
+
+              {mfaStep === 1 ? (
+                <button
+                  type="button"
+                  onClick={handleProceedToMfaSetup}
+                  disabled={isCreatingDevice || !mfaDeviceName.trim()}
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
+                >
+                  {isCreatingDevice ? "Setting up..." : "Next"}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleConfirmAssignMfa}
+                  disabled={isPending || !authCode1.trim() || !authCode2.trim()}
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
+                >
+                  {isPending ? "Assigning..." : "Assign MFA"}
+                </button>
+              )}
             </div>
           </div>
         </div>

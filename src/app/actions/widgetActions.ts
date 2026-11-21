@@ -13,7 +13,13 @@ import { s3, dynamodb, sqs, iam, sts, sns, glacier } from "@/lib/aws";
 import { ListBucketsCommand, GetBucketEncryptionCommand } from "@aws-sdk/client-s3";
 import { ListTablesCommand, DescribeTableCommand } from "@aws-sdk/client-dynamodb";
 import { ListQueuesCommand } from "@aws-sdk/client-sqs";
-import { ListUsersCommand, ListRolesCommand, ListPoliciesCommand } from "@aws-sdk/client-iam";
+import {
+  ListUsersCommand,
+  ListRolesCommand,
+  ListPoliciesCommand,
+  ListMFADevicesCommand,
+  ListVirtualMFADevicesCommand,
+} from "@aws-sdk/client-iam";
 import { GetCallerIdentityCommand } from "@aws-sdk/client-sts";
 import { ListTopicsCommand } from "@aws-sdk/client-sns";
 import { ListVaultsCommand } from "@aws-sdk/client-glacier";
@@ -142,34 +148,50 @@ export async function runLiveSecurityAudit(): Promise<SecurityAuditResponse> {
 
   try {
     // 1. Audit IAM Users & Root
-    const usersRes = await iam.send(new ListUsersCommand({})).catch(() => ({ Users: [] }));
+    const [usersRes, virtualMfaRes] = await Promise.all([
+      iam.send(new ListUsersCommand({})).catch(() => ({ Users: [] })),
+      iam.send(new ListVirtualMFADevicesCommand({})).catch(() => ({ VirtualMFADevices: [] })),
+    ]);
     const users = usersRes.Users || [];
+    const virtualDevices = virtualMfaRes.VirtualMFADevices || [];
+    const hasRootMfa = virtualDevices.some((d) => d.SerialNumber?.includes("root"));
 
     // Check root account access
-    findings.push({
-      id: "SEC-IAM-01",
-      title: "IAM.1 Root account should have MFA enabled",
-      severity: "CRITICAL",
-      resource: "arn:aws:iam::000000000000:root",
-      remediationHref: "/iam",
-      remediationLabel: "Configure in IAM",
-      reason: "Root user credentials should not have direct console access without multi-factor authentication.",
-    });
-    passedControls--;
+    if (!hasRootMfa) {
+      findings.push({
+        id: "SEC-IAM-01",
+        title: "IAM.1 Root account should have MFA enabled",
+        severity: "CRITICAL",
+        resource: "arn:aws:iam::000000000000:root",
+        remediationHref: "/iam",
+        remediationLabel: "Configure in IAM",
+        reason: "Root user credentials should not have direct console access without multi-factor authentication.",
+      });
+      passedControls--;
+    }
 
     // Check each IAM user for security hygiene
     for (const u of users) {
       evaluatedControls += 2;
-      passedControls += 1; // 1 passed, 1 failed for demo of MFA requirement
-      findings.push({
-        id: `SEC-USER-${u.UserName}`,
-        title: `IAM.2 Console access without active MFA for user: ${u.UserName}`,
-        severity: "HIGH",
-        resource: u.Arn || `arn:aws:iam::000000000000:user/${u.UserName}`,
-        remediationHref: `/iam/users/${u.UserName}`,
-        remediationLabel: `Manage ${u.UserName}`,
-        reason: `User ${u.UserName} does not have an active virtual or hardware MFA device attached.`,
-      });
+      const userMfaRes = await iam
+        .send(new ListMFADevicesCommand({ UserName: u.UserName }))
+        .catch(() => ({ MFADevices: [] }));
+      const hasUserMfa = (userMfaRes.MFADevices || []).length > 0;
+
+      if (hasUserMfa) {
+        passedControls += 2;
+      } else {
+        passedControls += 1;
+        findings.push({
+          id: `SEC-USER-${u.UserName}`,
+          title: `IAM.2 Console access without active MFA for user: ${u.UserName}`,
+          severity: "HIGH",
+          resource: u.Arn || `arn:aws:iam::000000000000:user/${u.UserName}`,
+          remediationHref: `/iam/users/${u.UserName}`,
+          remediationLabel: `Manage ${u.UserName}`,
+          reason: `User ${u.UserName} does not have an active virtual or hardware MFA device attached.`,
+        });
+      }
     }
 
     // 2. Audit S3 Buckets for Encryption

@@ -47,7 +47,14 @@ import {
   ListAccountAliasesCommand,
   CreateAccountAliasCommand,
   DeleteAccountAliasCommand,
+  CreateVirtualMFADeviceCommand,
+  DeleteVirtualMFADeviceCommand,
+  ListVirtualMFADevicesCommand,
+  ListMFADevicesCommand,
+  EnableMFADeviceCommand,
+  DeactivateMFADeviceCommand,
 } from "@aws-sdk/client-iam";
+import crypto from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getActiveIdentity } from "@/lib/identity";
@@ -1109,6 +1116,241 @@ export async function deleteAccountAliasAction(alias: string): Promise<{ success
     await iam.send(new DeleteAccountAliasCommand({ AccountAlias: alias }));
     revalidatePath("/iam");
     revalidatePath("/iam/account-settings");
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+// --- Multi-Factor Authentication (MFA) Actions ---
+
+export interface MFADeviceInfo {
+  userName?: string;
+  serialNumber: string;
+  enableDate: string;
+}
+
+function base32ToBuffer(base32: string): Buffer {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (let i = 0; i < base32.length; i++) {
+    const val = alphabet.indexOf(base32.charAt(i).toUpperCase());
+    if (val === -1) continue;
+    bits += val.toString(2).padStart(5, "0");
+  }
+  const bytes: number[] = [];
+  for (let i = 0; i + 8 <= bits.length; i += 8) {
+    bytes.push(parseInt(bits.substring(i, i + 8), 2));
+  }
+  return Buffer.from(bytes);
+}
+
+function computeTotp(secretBase32: string, timeOffsetSteps: number = 0): string {
+  try {
+    const key = base32ToBuffer(secretBase32);
+    const timeStep = Math.floor(Date.now() / 1000 / 30) + timeOffsetSteps;
+    const timeBuffer = Buffer.alloc(8);
+    timeBuffer.writeBigInt64BE(BigInt(timeStep));
+
+    const hmac = crypto.createHmac("sha1", key).update(timeBuffer).digest();
+    const offset = hmac[hmac.length - 1] & 0xf;
+    const code =
+      (((hmac[offset] & 0x7f) << 24) |
+        ((hmac[offset + 1] & 0xff) << 16) |
+        ((hmac[offset + 2] & 0xff) << 8) |
+        (hmac[offset + 3] & 0xff)) %
+      1000000;
+    return code.toString().padStart(6, "0");
+  } catch {
+    return "123456";
+  }
+}
+
+export async function listMFADevicesAction(userName: string): Promise<{
+  success: boolean;
+  devices: MFADeviceInfo[];
+  error?: string;
+}> {
+  try {
+    const res = await iam.send(new ListMFADevicesCommand({ UserName: userName }));
+    const devices: MFADeviceInfo[] = (res.MFADevices || []).map((d) => ({
+      userName: d.UserName,
+      serialNumber: d.SerialNumber || "",
+      enableDate: d.EnableDate ? new Date(d.EnableDate).toISOString() : "",
+    }));
+    return { success: true, devices };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, devices: [], error: msg };
+  }
+}
+
+export async function createVirtualMFADeviceAction(deviceName: string): Promise<{
+  success: boolean;
+  serialNumber?: string;
+  base32Seed?: string;
+  sampleCode1?: string;
+  sampleCode2?: string;
+  error?: string;
+}> {
+  const clean = deviceName.trim();
+  if (!clean) return { success: false, error: "Device name is required." };
+
+  try {
+    const res = await iam.send(
+      new CreateVirtualMFADeviceCommand({
+        VirtualMFADeviceName: clean,
+      })
+    );
+    const serialNumber = res.VirtualMFADevice?.SerialNumber || "";
+    let base32Seed = "";
+    if (res.VirtualMFADevice?.Base32StringSeed) {
+      base32Seed = Buffer.from(res.VirtualMFADevice.Base32StringSeed).toString("utf8");
+    }
+
+    let sampleCode1 = "";
+    let sampleCode2 = "";
+    if (base32Seed) {
+      sampleCode1 = computeTotp(base32Seed, -1);
+      sampleCode2 = computeTotp(base32Seed, 0);
+    }
+
+    return { success: true, serialNumber, base32Seed, sampleCode1, sampleCode2 };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+export async function enableMFADeviceAction(
+  userName: string,
+  serialNumber: string,
+  code1: string,
+  code2: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await iam.send(
+      new EnableMFADeviceCommand({
+        UserName: userName,
+        SerialNumber: serialNumber,
+        AuthenticationCode1: code1.trim(),
+        AuthenticationCode2: code2.trim(),
+      })
+    );
+    revalidatePath(`/iam/users/${encodeURIComponent(userName)}`);
+    revalidatePath("/iam");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+export async function deactivateMFADeviceAction(
+  userName: string,
+  serialNumber: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await iam.send(
+      new DeactivateMFADeviceCommand({
+        UserName: userName,
+        SerialNumber: serialNumber,
+      })
+    );
+    await iam
+      .send(
+        new DeleteVirtualMFADeviceCommand({
+          SerialNumber: serialNumber,
+        })
+      )
+      .catch(() => {});
+    revalidatePath(`/iam/users/${encodeURIComponent(userName)}`);
+    revalidatePath("/iam");
+    revalidatePath("/");
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+export async function listAllVirtualMFADevicesAction(): Promise<{
+  success: boolean;
+  devices: { serialNumber: string; user?: string; enableDate?: string }[];
+  rootMFAEnabled: boolean;
+  rootSerialNumber?: string;
+  error?: string;
+}> {
+  try {
+    const res = await iam.send(new ListVirtualMFADevicesCommand({}));
+    const devices = (res.VirtualMFADevices || []).map((d) => ({
+      serialNumber: d.SerialNumber || "",
+      user: d.User?.UserName,
+      enableDate: d.EnableDate ? new Date(d.EnableDate).toISOString() : undefined,
+    }));
+    const rootDevice = devices.find(
+      (d) =>
+        d.serialNumber.endsWith(":mfa/root-account-mfa-device") ||
+        d.serialNumber.endsWith("/root") ||
+        d.serialNumber.includes("root")
+    );
+    return {
+      success: true,
+      devices,
+      rootMFAEnabled: !!rootDevice,
+      rootSerialNumber: rootDevice?.serialNumber,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, devices: [], rootMFAEnabled: false, error: msg };
+  }
+}
+
+export async function assignRootMFAAction(): Promise<{
+  success: boolean;
+  serialNumber?: string;
+  base32Seed?: string;
+  sampleCode1?: string;
+  sampleCode2?: string;
+  error?: string;
+}> {
+  try {
+    const res = await iam.send(
+      new CreateVirtualMFADeviceCommand({
+        VirtualMFADeviceName: "root-account-mfa-device",
+      })
+    );
+    const serialNumber = res.VirtualMFADevice?.SerialNumber || "";
+    let base32Seed = "";
+    if (res.VirtualMFADevice?.Base32StringSeed) {
+      base32Seed = Buffer.from(res.VirtualMFADevice.Base32StringSeed).toString("utf8");
+    }
+
+    let sampleCode1 = "";
+    let sampleCode2 = "";
+    if (base32Seed) {
+      sampleCode1 = computeTotp(base32Seed, -1);
+      sampleCode2 = computeTotp(base32Seed, 0);
+    }
+
+    revalidatePath("/iam");
+    revalidatePath("/iam/account-settings");
+    revalidatePath("/");
+    return { success: true, serialNumber, base32Seed, sampleCode1, sampleCode2 };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+export async function removeRootMFAAction(serialNumber: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    await iam.send(new DeleteVirtualMFADeviceCommand({ SerialNumber: serialNumber }));
+    revalidatePath("/iam");
+    revalidatePath("/iam/account-settings");
+    revalidatePath("/");
     return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);

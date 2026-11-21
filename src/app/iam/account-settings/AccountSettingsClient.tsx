@@ -7,15 +7,28 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createAccountAliasAction, deleteAccountAliasAction } from "../actions";
+import {
+  createAccountAliasAction,
+  deleteAccountAliasAction,
+  assignRootMFAAction,
+  removeRootMFAAction,
+} from "../actions";
 
 interface Props {
   accountId: string;
   aliases: string[];
   summary: Record<string, number>;
+  initialRootMFAEnabled?: boolean;
+  initialRootSerialNumber?: string;
 }
 
-export function AccountSettingsClient({ accountId, aliases = [], summary = {} }: Props) {
+export function AccountSettingsClient({
+  accountId,
+  aliases = [],
+  summary = {},
+  initialRootMFAEnabled = false,
+  initialRootSerialNumber = "",
+}: Props) {
   const [currentAliases, setCurrentAliases] = useState<string[]>(aliases);
   const [showAliasModal, setShowAliasModal] = useState(false);
   const [aliasInput, setAliasInput] = useState(aliases[0] || "");
@@ -23,6 +36,14 @@ export function AccountSettingsClient({ accountId, aliases = [], summary = {} }:
   const [feedback, setFeedback] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+
+  // Root MFA State
+  const [rootMFAEnabled, setRootMFAEnabled] = useState(initialRootMFAEnabled);
+  const [rootSerialNumber, setRootSerialNumber] = useState(initialRootSerialNumber);
+  const [showRootMfaModal, setShowRootMfaModal] = useState(false);
+  const [rootBase32Seed, setRootBase32Seed] = useState("");
+  const [rootSample1, setRootSample1] = useState("");
+  const [rootSample2, setRootSample2] = useState("");
 
   const activeAlias = currentAliases[0] || null;
   const signInUrl = `https://${activeAlias || accountId}.signin.aws.amazon.com/console`;
@@ -57,6 +78,41 @@ export function AccountSettingsClient({ accountId, aliases = [], summary = {} }:
         router.refresh();
       } else {
         setFeedback(`Failed to delete alias: ${res.error || "Unknown error"}`);
+      }
+      setTimeout(() => setFeedback(null), 5000);
+    });
+  }
+
+  function handleAssignRootMfa() {
+    startTransition(async () => {
+      const res = await assignRootMFAAction();
+      if (res.success && res.serialNumber) {
+        setRootMFAEnabled(true);
+        setRootSerialNumber(res.serialNumber);
+        setRootBase32Seed(res.base32Seed || "");
+        setRootSample1(res.sampleCode1 || "");
+        setRootSample2(res.sampleCode2 || "");
+        setShowRootMfaModal(true);
+        setFeedback("Root user MFA successfully configured.");
+        router.refresh();
+      } else {
+        setFeedback(`Failed to configure Root MFA: ${res.error || "Unknown error"}`);
+      }
+      setTimeout(() => setFeedback(null), 5000);
+    });
+  }
+
+  function handleRemoveRootMfa() {
+    if (!confirm("Are you sure you want to remove multi-factor authentication for the root user?")) return;
+    startTransition(async () => {
+      const res = await removeRootMFAAction(rootSerialNumber);
+      if (res.success) {
+        setRootMFAEnabled(false);
+        setRootSerialNumber("");
+        setFeedback("Root user MFA removed.");
+        router.refresh();
+      } else {
+        setFeedback(`Failed to remove Root MFA: ${res.error || "Unknown error"}`);
       }
       setTimeout(() => setFeedback(null), 5000);
     });
@@ -173,6 +229,66 @@ export function AccountSettingsClient({ accountId, aliases = [], summary = {} }:
               Direct link for IAM users to sign in to the AWS Management Console for this account.
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* Root User MFA Section */}
+      <div className="bg-white border border-[#d5dbdb] rounded-sm p-6 shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#eaeded] pb-3">
+          <div>
+            <h2 className="text-[16px] font-bold text-[#16191f]">
+              Root user multi-factor authentication (MFA)
+            </h2>
+            <p className="text-[12px] text-[#545b64] mt-0.5">
+              Secure root account credentials against unauthorized console access with hardware or virtual MFA.
+            </p>
+          </div>
+          {rootMFAEnabled ? (
+            <button
+              type="button"
+              onClick={handleRemoveRootMfa}
+              disabled={isPending}
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="h-[32px] px-3 border border-[#d5dbdb] rounded-sm text-[12px] font-bold text-[#d13212] bg-white hover:bg-[#fdf3f1] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50"
+            >
+              Remove root MFA
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleAssignRootMfa}
+              disabled={isPending}
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+              className="h-[32px] px-3 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors disabled:opacity-50 shadow-xs"
+            >
+              Assign root MFA
+            </button>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-6 text-[13px]">
+          <div>
+            <span className="text-[11px] font-bold text-[#545b64] uppercase block mb-1">Status</span>
+            {rootMFAEnabled ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-[#e6f4ea] text-[#137333]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#137333]" />
+                Active
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-[#fdf3f1] text-[#d13212]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d13212]" />
+                Not assigned
+              </span>
+            )}
+          </div>
+          {rootMFAEnabled && rootSerialNumber && (
+            <div>
+              <span className="text-[11px] font-bold text-[#545b64] uppercase block mb-1">MFA Serial number</span>
+              <span className="font-mono text-[12px] text-[#16191f] bg-[#f2f3f3] px-2 py-0.5 rounded-sm">
+                {rootSerialNumber}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -297,6 +413,66 @@ export function AccountSettingsClient({ accountId, aliases = [], summary = {} }:
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* Root MFA Success Modal */}
+      {showRootMfaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-sm border border-[#d5dbdb] shadow-xl w-full max-w-md p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#eaeded] pb-3">
+              <h3 className="text-[17px] font-bold text-[#16191f]">
+                Root user MFA enabled
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowRootMfaModal(false)}
+                className="text-[#545b64] hover:text-[#16191f]"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="space-y-3 text-[13px]">
+              <div className="p-3 bg-[#e6f4ea] border border-[#a2dca0] text-[#137333] rounded-sm text-[12px] font-medium">
+                Root user multi-factor authentication device has been registered and activated.
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-[#545b64] uppercase mb-1">
+                  MFA Serial number
+                </label>
+                <div className="font-mono text-[12px] text-[#16191f] bg-[#f2f3f3] p-2 rounded-sm break-all">
+                  {rootSerialNumber}
+                </div>
+              </div>
+
+              {rootBase32Seed && (
+                <div>
+                  <label className="block text-[11px] font-bold text-[#545b64] uppercase mb-1">
+                    Secret key (Base32)
+                  </label>
+                  <div className="font-mono text-[12px] text-[#16191f] bg-[#f2f3f3] p-2 rounded-sm break-all">
+                    {rootBase32Seed}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="pt-3 border-t border-[#eaeded] flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowRootMfaModal(false)}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="h-[32px] px-4 bg-[#ec7211] text-white rounded-sm text-[13px] font-bold hover:bg-[#eb5f07] whitespace-nowrap inline-flex items-center justify-center transition-colors shadow-xs"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

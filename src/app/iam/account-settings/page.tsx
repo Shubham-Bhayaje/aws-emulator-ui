@@ -5,13 +5,16 @@
 
 import ServiceLayout from "@/components/ServiceLayout";
 import { iamNav } from "../page";
-import { fetchAccountDetails } from "../actions";
+import { fetchAccountDetails, listAllVirtualMFADevicesAction } from "../actions";
 import { AccountSettingsClient } from "./AccountSettingsClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function AccountSettingsPage() {
-  const details = await fetchAccountDetails();
+  const [details, mfaRes] = await Promise.all([
+    fetchAccountDetails(),
+    listAllVirtualMFADevicesAction(),
+  ]);
 
   return (
     <ServiceLayout serviceName="IAM" serviceColor="#BD0816" navItems={iamNav}>
@@ -19,6 +22,8 @@ export default async function AccountSettingsPage() {
         accountId={details.accountId}
         aliases={details.aliases}
         summary={details.summary}
+        initialRootMFAEnabled={mfaRes.rootMFAEnabled}
+        initialRootSerialNumber={mfaRes.rootSerialNumber}
       />
     </ServiceLayout>
   );

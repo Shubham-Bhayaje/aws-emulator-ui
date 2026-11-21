@@ -14,7 +14,7 @@ import {
   ListPoliciesCommand,
   ListGroupsCommand,
 } from "@aws-sdk/client-iam";
-import { fetchAccountDetails } from "./actions";
+import { fetchAccountDetails, listAllVirtualMFADevicesAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -34,13 +34,16 @@ export default async function IAMDashboardPage() {
   let policyCount = 0;
   let customPolicyCount = 0;
 
-  const [usersRes, groupsRes, rolesRes, policiesRes, accountDetails] = await Promise.all([
+  const [usersRes, groupsRes, rolesRes, policiesRes, accountDetails, mfaRes] = await Promise.all([
     iam.send(new ListUsersCommand({})).catch(() => ({ Users: [] })),
     iam.send(new ListGroupsCommand({})).catch(() => ({ Groups: [] })),
     iam.send(new ListRolesCommand({})).catch(() => ({ Roles: [] })),
     iam.send(new ListPoliciesCommand({ Scope: "All", MaxItems: 100 })).catch(() => ({ Policies: [] })),
     fetchAccountDetails(),
+    listAllVirtualMFADevicesAction(),
   ]);
+
+  const rootMFAEnabled = mfaRes.rootMFAEnabled;
 
   userCount = usersRes.Users?.length ?? 0;
   groupCount = groupsRes.Groups?.length ?? 0;
@@ -214,6 +217,38 @@ export default async function IAMDashboardPage() {
                 </div>
               </div>
 
+              <div className="pt-2 border-t border-[#eaeded]">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="text-[11px] text-[#545b64] font-bold uppercase">
+                    Root user MFA
+                  </div>
+                  {rootMFAEnabled ? (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#e6f4ea] text-[#137333]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#137333]" />
+                      Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#fdf3f1] text-[#d13212]">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#d13212]" />
+                      Not assigned
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-[11px] text-[#545b64]">
+                    {rootMFAEnabled
+                      ? "Multi-factor authentication is active for root."
+                      : "Add MFA to protect root credentials."}
+                  </p>
+                  <Link
+                    href="/iam/account-settings"
+                    className="text-[11px] font-bold text-[#0073bb] hover:underline whitespace-nowrap ml-2"
+                  >
+                    {rootMFAEnabled ? "Manage" : "Assign MFA"}
+                  </Link>
+                </div>
+              </div>
+
               <div className="pt-2 border-t border-[#eaeded] text-[11px] text-[#545b64]">
                 Connected to AWS Emulator (127.0.0.1:9297) with full live IAM service enforcement.
               </div>
@@ -232,13 +267,52 @@ export default async function IAMDashboardPage() {
                 Evaluate your AWS account against core IAM security benchmarks.
               </p>
             </div>
-            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#e6f4ea] text-[#137333]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#137333]" />
-              Account healthy
-            </span>
+            {rootMFAEnabled ? (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#e6f4ea] text-[#137333]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#137333]" />
+                Account healthy
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-semibold bg-[#fdf3f1] text-[#d13212]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#d13212]" />
+                1 recommendation
+              </span>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-[12px]">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-[12px]">
+            <div
+              className={`p-4 border rounded-sm flex flex-col justify-between ${
+                rootMFAEnabled ? "bg-[#f2f8fd] border-[#cbe2f2]" : "bg-[#fdf3f1] border-[#f5b8ad]"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <div className={`font-bold ${rootMFAEnabled ? "text-[#0073bb]" : "text-[#d13212]"}`}>
+                    Root account MFA
+                  </div>
+                  {rootMFAEnabled ? (
+                    <span className="text-[10px] font-bold text-[#137333] bg-[#e6f4ea] px-1.5 py-0.2 rounded">
+                      Passed
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-[#d13212] bg-[#fdf3f1] px-1.5 py-0.2 rounded">
+                      Critical
+                    </span>
+                  )}
+                </div>
+                <p className="text-[#545b64] leading-relaxed mb-2">
+                  Enable multi-factor authentication (MFA) to protect the root account against unauthorized console access.
+                </p>
+              </div>
+              <Link
+                href="/iam/account-settings"
+                className="text-[11px] font-bold text-[#0073bb] hover:underline"
+              >
+                {rootMFAEnabled ? "View MFA settings →" : "Assign root MFA →"}
+              </Link>
+            </div>
+
             <div className="p-4 bg-[#f2f8fd] border border-[#cbe2f2] rounded-sm">
               <div className="font-bold text-[#0073bb] mb-1">Least privilege permissions</div>
               <p className="text-[#545b64] leading-relaxed">

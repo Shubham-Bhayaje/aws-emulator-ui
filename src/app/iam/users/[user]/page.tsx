@@ -16,7 +16,7 @@ import { UserDetail, UserDetailMeta } from "./UserDetail";
 import { iamNav } from "../../page";
 import { getActiveIdentity } from "@/lib/identity";
 import { evaluatePermissions } from "@/lib/permissions";
-import { fetchUserGroups, listAccessKeysAction } from "../../actions";
+import { fetchUserGroups, listAccessKeysAction, listMFADevicesAction, MFADeviceInfo } from "../../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +33,12 @@ export default async function UserDetailPage({ params }: PageProps) {
   let userGroups: Array<{ groupName: string; arn: string; createDate: string }> = [];
   let allGroups: Array<{ groupName: string }> = [];
   let initialAccessKeys: Array<{ accessKeyId: string; status: "Active" | "Inactive"; createDate: string }> = [];
+  let initialMFADevices: MFADeviceInfo[] = [];
   let error: string | null = null;
   const identity = await getActiveIdentity();
 
   try {
-    const [userRes, attachedRes, policiesRes, userGroupsRes, allGroupsRes, accessKeysRes] =
+    const [userRes, attachedRes, policiesRes, userGroupsRes, allGroupsRes, accessKeysRes, mfaDevicesRes] =
       await Promise.all([
         iam.send(new GetUserCommand({ UserName: userName })),
         iam.send(new ListAttachedUserPoliciesCommand({ UserName: userName })),
@@ -45,6 +46,7 @@ export default async function UserDetailPage({ params }: PageProps) {
         fetchUserGroups(userName),
         iam.send(new ListGroupsCommand({})).catch(() => ({ Groups: [] })),
         listAccessKeysAction(userName),
+        listMFADevicesAction(userName),
       ]);
 
     const u = userRes.User;
@@ -75,6 +77,7 @@ export default async function UserDetailPage({ params }: PageProps) {
       userGroups = userGroupsRes.groups || [];
       allGroups = (allGroupsRes.Groups || []).map((g) => ({ groupName: g.GroupName || "" }));
       initialAccessKeys = accessKeysRes.accessKeys || [];
+      initialMFADevices = mfaDevicesRes.devices || [];
     }
   } catch (err: unknown) {
     error = err instanceof Error ? err.message : String(err);
@@ -97,6 +100,7 @@ export default async function UserDetailPage({ params }: PageProps) {
           userGroups={userGroups}
           allGroups={allGroups}
           initialAccessKeys={initialAccessKeys}
+          initialMFADevices={initialMFADevices}
           canAttachPolicy={canAttachPolicy}
           canDetachPolicy={canDetachPolicy}
           activeIdentityName={identity.name}
