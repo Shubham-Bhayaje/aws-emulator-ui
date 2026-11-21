@@ -311,7 +311,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                       const isBuilt = isServiceFullyBuilt(s.id) || s.status === "functional";
                       return (
                         <button
-                          key={s.href}
+                          key={s.id}
                           onClick={() => handleServiceClick(s.name, s.href)}
                           className="w-full text-left px-4 py-[6px] text-[13px] text-[#0073bb] hover:bg-[#f2f3f3] flex items-center justify-between gap-2.5 group transition-colors"
                         >
@@ -406,7 +406,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                         const isSelected = activeSearchIndex === idx;
                         return (
                           <button
-                            key={s.href}
+                            key={s.id || `${s.href}-${idx}`}
                             onClick={() => handleServiceClick(s.name, s.href)}
                             onMouseEnter={() => setActiveSearchIndex(idx)}
                             className={`w-full text-left px-3 py-2 flex items-center gap-3 border-b border-[#eaeded]/60 group transition-colors ${
