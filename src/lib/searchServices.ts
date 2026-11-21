@@ -652,10 +652,35 @@ export const COMMON_FEATURES: ServiceFeatureItem[] = [
     color: "#2E27AD",
     aliases: ["influxdb", "influx", "flux", "timestream influxdb"],
   },
+  // Amazon Kinesis Data Streams
+  {
+    id: "feat-kinesis-streams",
+    name: "Kinesis data streams",
+    href: "/kinesis",
+    serviceId: "kinesis",
+    serviceName: "Amazon Kinesis Data Streams",
+    category: "Analytics",
+    desc: "Real-time streaming data ingestion, shards, and consumer processing",
+    color: "#8C4FFF",
+    aliases: ["kinesis", "data streams", "streaming", "kinesis streams", "shards", "kds"],
+  },
+  {
+    id: "feat-kinesis-create-stream",
+    name: "Create data stream",
+    href: "/kinesis/streams/create",
+    serviceId: "kinesis",
+    serviceName: "Amazon Kinesis Data Streams",
+    category: "Analytics",
+    desc: "Create a new Kinesis data stream with on-demand or provisioned capacity",
+    color: "#8C4FFF",
+    aliases: ["create stream", "new stream", "create data stream", "kinesis create"],
+  },
 ];
 
 // Acronym and common synonym expansion dictionary
 const ACRONYM_MAP: Record<string, string[]> = {
+  kinesis: ["kinesis", "kds", "streams", "streaming", "shards", "analytics", "records", "data streams"],
+  kds: ["kinesis", "data", "streams"],
   timestream: ["timestream", "timeseries", "telemetry", "database", "influxdb", "metrics"],
   keyspaces: ["keyspaces", "cassandra", "cql", "database", "tables"],
   sns: ["simple", "notification", "service", "pubsub", "topics"],

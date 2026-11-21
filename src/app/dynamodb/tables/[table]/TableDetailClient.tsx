@@ -10,6 +10,7 @@ import {
   KmsKeyOption,
   LambdaFunctionOption,
   S3BucketOption,
+  KinesisStreamOption,
 } from "../../types";
 import {
   deleteTableAction,
@@ -25,6 +26,8 @@ import {
   deleteBackupAction,
   tagResourceAction,
   untagResourceAction,
+  enableKinesisDestinationAction,
+  disableKinesisDestinationAction,
 } from "../../actions";
 import { attributeValueToPlain, plainToAttributeValue } from "../../dynamo-utils";
 
@@ -35,6 +38,7 @@ interface TableDetailClientProps {
   kmsKeys: KmsKeyOption[];
   lambdaFunctions: LambdaFunctionOption[];
   s3Buckets: S3BucketOption[];
+  kinesisStreams?: KinesisStreamOption[];
 }
 
 function formatBytes(bytes: number): string {
@@ -52,6 +56,7 @@ export default function TableDetailClient({
   kmsKeys,
   lambdaFunctions,
   s3Buckets,
+  kinesisStreams = [],
 }: TableDetailClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -122,6 +127,39 @@ export default function TableDetailClient({
   const [selectedLambdaArn, setSelectedLambdaArn] = useState(lambdaFunctions[0]?.FunctionArn || "");
   const [showS3ExportModal, setShowS3ExportModal] = useState(false);
   const [selectedS3Bucket, setSelectedS3Bucket] = useState(s3Buckets[0]?.Name || "");
+
+  // Kinesis Destination Modal
+  const [showKinesisModal, setShowKinesisModal] = useState(false);
+  const [selectedKinesisArn, setSelectedKinesisArn] = useState(kinesisStreams[0]?.StreamArn || "");
+  const [isUpdatingKinesis, startKinesisTransition] = useTransition();
+
+  function handleEnableKinesisDestination() {
+    if (!selectedKinesisArn) return;
+    setError(null);
+    startKinesisTransition(async () => {
+      const res = await enableKinesisDestinationAction(table.name, selectedKinesisArn);
+      if (res.success) {
+        setShowKinesisModal(false);
+        setSuccessBanner("Kinesis data stream destination enabled.");
+        router.refresh();
+      } else {
+        setError(res.error || "Failed to enable Kinesis streaming destination.");
+      }
+    });
+  }
+
+  function handleDisableKinesisDestination(streamArn: string) {
+    setError(null);
+    startKinesisTransition(async () => {
+      const res = await disableKinesisDestinationAction(table.name, streamArn);
+      if (res.success) {
+        setSuccessBanner("Kinesis data stream destination disabled.");
+        router.refresh();
+      } else {
+        setError(res.error || "Failed to disable Kinesis streaming destination.");
+      }
+    });
+  }
 
   // Tags Modal
   const [showTagsModal, setShowTagsModal] = useState(false);
@@ -1220,17 +1258,54 @@ export default function TableDetailClient({
             </button>
           </div>
 
-          {/* Amazon Kinesis Streaming */}
-          <div className="bg-white border border-[#eaeded] rounded p-5 shadow-sm opacity-60">
+          {/* Amazon Kinesis Streaming Destination */}
+          <div className="bg-white border border-[#eaeded] rounded p-5 shadow-sm flex items-start justify-between">
             <div className="space-y-1">
-              <h2 className="text-[16px] font-bold text-[#16191f]">Amazon Kinesis data stream destination</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-[16px] font-bold text-[#16191f]">Amazon Kinesis data stream destination</h2>
+                {(table.kinesisDestinations || []).length > 0 ? (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[#edf7ed] text-[#1d8102]">
+                    Active
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[#f2f3f3] text-[#545b64]">
+                    Disabled
+                  </span>
+                )}
+              </div>
               <p className="text-[13px] text-[#545b64]">
                 Stream item-level mutations to an Amazon Kinesis data stream for real-time analytics.
               </p>
-              <div className="pt-2 text-[12px] text-[#879596] italic">
-                Available after Amazon Kinesis is built
-              </div>
+              {(table.kinesisDestinations || []).length > 0 ? (
+                <div className="pt-2 text-[12px] space-y-1">
+                  {table.kinesisDestinations!.map((kd) => (
+                    <div key={kd.StreamArn} className="flex items-center gap-3">
+                      <span className="font-mono text-[#16191f]">{kd.StreamArn}</span>
+                      <button
+                        onClick={() => handleDisableKinesisDestination(kd.StreamArn)}
+                        disabled={isUpdatingKinesis}
+                        className="text-[#d13212] font-bold hover:underline text-[12px]"
+                      >
+                        Disable
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="pt-2 text-[12px] text-[#545b64]">
+                  Capture table activity and replicate it directly into Kinesis Data Streams.
+                </div>
+              )}
             </div>
+            {(table.kinesisDestinations || []).length === 0 && (
+              <button
+                onClick={() => setShowKinesisModal(true)}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-3 text-[13px] font-bold rounded border border-[#545b64] text-[#16191f] bg-white hover:bg-[#f2f3f3] transition-colors"
+              >
+                Manage streaming to Kinesis
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -1989,6 +2064,73 @@ export default function TableDetailClient({
               >
                 Save tags
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: Kinesis Streaming Destination */}
+      {showKinesisModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white border border-[#eaeded] rounded-lg shadow-xl max-w-lg w-full p-6 space-y-4">
+            <h3 className="text-[18px] font-bold text-[#16191f]">
+              Manage streaming to Amazon Kinesis
+            </h3>
+            <p className="text-[13px] text-[#545b64]">
+              Select an Amazon Kinesis data stream destination to replicate table changes in real time.
+            </p>
+
+            {kinesisStreams.length === 0 ? (
+              <div className="p-4 bg-[#fafafa] border border-[#eaeded] rounded text-[13px] text-[#545b64] space-y-2">
+                <div>No Amazon Kinesis data streams found in this Region.</div>
+                <Link
+                  href="/kinesis/streams/create"
+                  className="inline-block text-[#0073bb] font-bold hover:underline"
+                >
+                  Create a data stream in Amazon Kinesis &rarr;
+                </Link>
+              </div>
+            ) : (
+              <div>
+                <label className="block text-[12px] font-bold text-[#16191f]">
+                  Destination Kinesis data stream <span className="text-[#d13212]">*</span>
+                </label>
+                <select
+                  value={selectedKinesisArn}
+                  onChange={(e) => setSelectedKinesisArn(e.target.value)}
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px" }}
+                  className="mt-1 w-full px-3 text-[13px] border border-[#eaeded] rounded bg-white"
+                >
+                  {kinesisStreams.map((s) => (
+                    <option key={s.StreamArn} value={s.StreamArn}>
+                      {s.StreamName} ({s.StreamArn})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 pt-3 border-t border-[#eaeded]">
+              <button
+                type="button"
+                onClick={() => setShowKinesisModal(false)}
+                disabled={isUpdatingKinesis}
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="px-4 text-[13px] font-bold rounded border border-[#545b64] text-[#16191f] bg-white hover:bg-[#f2f3f3]"
+              >
+                Cancel
+              </button>
+              {kinesisStreams.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleEnableKinesisDestination}
+                  disabled={isUpdatingKinesis || !selectedKinesisArn}
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className="px-5 text-[13px] font-bold rounded bg-[#ec7211] text-white hover:bg-[#eb5f07] disabled:opacity-50"
+                >
+                  {isUpdatingKinesis ? "Enabling..." : "Turn on stream"}
+                </button>
+              )}
             </div>
           </div>
         </div>

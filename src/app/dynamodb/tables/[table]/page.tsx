@@ -6,6 +6,7 @@ import {
   getKmsKeysAction,
   getLambdaFunctionsAction,
   getS3BucketsAction,
+  getKinesisStreamsAction,
 } from "../../actions";
 import TableDetailClient from "./TableDetailClient";
 
@@ -19,7 +20,7 @@ export default async function TableDetailPage(props: Props) {
   const { table: rawTable } = await props.params;
   const tableName = decodeURIComponent(rawTable);
 
-  const [detailRes, scanRes, backupsRes, kmsKeys, lambdaFunctions, s3Buckets] =
+  const [detailRes, scanRes, backupsRes, kmsKeys, lambdaFunctions, s3Buckets, kinesisStreams] =
     await Promise.all([
       getTableDetailAction(tableName),
       scanTableAction({ tableName, limit: 100 }),
@@ -27,6 +28,7 @@ export default async function TableDetailPage(props: Props) {
       getKmsKeysAction(),
       getLambdaFunctionsAction(),
       getS3BucketsAction(),
+      getKinesisStreamsAction(),
     ]);
 
   if (!detailRes.table) {
@@ -78,6 +80,7 @@ export default async function TableDetailPage(props: Props) {
       kmsKeys={kmsKeys}
       lambdaFunctions={lambdaFunctions}
       s3Buckets={s3Buckets}
+      kinesisStreams={kinesisStreams}
     />
   );
 }

@@ -40,6 +40,7 @@ import { SNSClient } from "@aws-sdk/client-sns";
 import { KeyspacesClient } from "@aws-sdk/client-keyspaces";
 import { TimestreamWriteClient } from "@aws-sdk/client-timestream-write";
 import { TimestreamQueryClient } from "@aws-sdk/client-timestream-query";
+import { KinesisClient } from "@aws-sdk/client-kinesis";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -212,6 +213,13 @@ export const timestreamQuery = new TimestreamQueryClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });
+
+// --- Amazon Kinesis Data Streams ---
+export const kinesis = new KinesisClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
 
 
 

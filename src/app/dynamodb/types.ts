@@ -84,7 +84,18 @@ export interface TableDetail extends TableSummary {
   timeToLive?: TimeToLiveDescription;
   continuousBackups?: ContinuousBackupsDescription;
   streamSpecification?: StreamSpecification;
+  kinesisDestinations?: KinesisDestinationSummary[];
   tags: { Key: string; Value: string }[];
+}
+
+export interface KinesisDestinationSummary {
+  StreamArn: string;
+  DestinationStatus?: "ENABLING" | "ACTIVE" | "DISABLING" | "ENABLE_FAILED" | "UPDATING" | string;
+}
+
+export interface KinesisStreamOption {
+  StreamName: string;
+  StreamArn: string;
 }
 
 export interface BackupSummary {

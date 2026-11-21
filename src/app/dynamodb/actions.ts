@@ -1,6 +1,6 @@
 "use server";
 
-import { dynamodb, kms, lambda, s3 } from "@/lib/aws";
+import { dynamodb, kms, lambda, s3, kinesis } from "@/lib/aws";
 import {
   ListTablesCommand,
   DescribeTableCommand,
@@ -23,10 +23,14 @@ import {
   ListTagsOfResourceCommand,
   TagResourceCommand,
   UntagResourceCommand,
+  DescribeKinesisStreamingDestinationCommand,
+  EnableKinesisStreamingDestinationCommand,
+  DisableKinesisStreamingDestinationCommand,
   ScalarAttributeType,
   KeyType,
   AttributeValue,
 } from "@aws-sdk/client-dynamodb";
+import { ListStreamsCommand } from "@aws-sdk/client-kinesis";
 import { ListAliasesCommand, ListKeysCommand, DescribeKeyCommand } from "@aws-sdk/client-kms";
 import { ListFunctionsCommand } from "@aws-sdk/client-lambda";
 import { ListBucketsCommand } from "@aws-sdk/client-s3";
@@ -43,6 +47,8 @@ import {
   KmsKeyOption,
   LambdaFunctionOption,
   S3BucketOption,
+  KinesisDestinationSummary,
+  KinesisStreamOption,
 } from "./types";
 import { unmarshalAttribute, marshalAttribute, plainToAttributeValue } from "./dynamo-utils";
 
@@ -201,6 +207,18 @@ export async function getTableDetailAction(tableName: string): Promise<{
       }
     } catch { /* ignore */ }
 
+    // Fetch Kinesis Destinations
+    let kinesisDestinations: KinesisDestinationSummary[] = [];
+    try {
+      const kinRes = await dynamodb.send(
+        new DescribeKinesisStreamingDestinationCommand({ TableName: tableName })
+      );
+      kinesisDestinations = (kinRes.KinesisDataStreamDestinations || []).map((kd) => ({
+        StreamArn: kd.StreamArn || "",
+        DestinationStatus: kd.DestinationStatus,
+      }));
+    } catch { /* ignore */ }
+
     const keySchema: KeySchemaElement[] = (t.KeySchema || []).map((k) => {
       const attr = t.AttributeDefinitions?.find((a) => a.AttributeName === k.AttributeName);
       return {
@@ -275,6 +293,7 @@ export async function getTableDetailAction(tableName: string): Promise<{
         StreamViewType: t.StreamSpecification.StreamViewType as any,
         LatestStreamArn: t.LatestStreamArn,
       } : undefined,
+      kinesisDestinations,
       tags,
     };
 
@@ -887,3 +906,57 @@ export async function getS3BucketsAction(): Promise<S3BucketOption[]> {
     return [];
   }
 }
+
+// 21. Fetch Kinesis Data Streams for DynamoDB destination
+export async function getKinesisStreamsAction(): Promise<KinesisStreamOption[]> {
+  try {
+    const res = await kinesis.send(new ListStreamsCommand({}));
+    return (res.StreamNames || []).map((name) => ({
+      StreamName: name,
+      StreamArn: `arn:aws:kinesis:us-east-1:000000000000:stream/${name}`,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+// 22. Enable Kinesis streaming destination
+export async function enableKinesisDestinationAction(
+  tableName: string,
+  streamArn: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await dynamodb.send(
+      new EnableKinesisStreamingDestinationCommand({
+        TableName: tableName,
+        StreamArn: streamArn,
+      })
+    );
+    revalidatePath(`/dynamodb/tables/${encodeURIComponent(tableName)}`);
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+// 23. Disable Kinesis streaming destination
+export async function disableKinesisDestinationAction(
+  tableName: string,
+  streamArn: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await dynamodb.send(
+      new DisableKinesisStreamingDestinationCommand({
+        TableName: tableName,
+        StreamArn: streamArn,
+      })
+    );
+    revalidatePath(`/dynamodb/tables/${encodeURIComponent(tableName)}`);
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+

@@ -11,7 +11,7 @@ import {
   DescribeTableCommand,
   DeleteTableCommand,
   WriteRecordsCommand,
-  Record as TimestreamRecord,
+  _Record as TimestreamRecord,
 } from "@aws-sdk/client-timestream-write";
 import { ListKeysCommand, DescribeKeyCommand, ListAliasesCommand } from "@aws-sdk/client-kms";
 import { revalidatePath } from "next/cache";
