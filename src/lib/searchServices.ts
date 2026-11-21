@@ -675,10 +675,45 @@ export const COMMON_FEATURES: ServiceFeatureItem[] = [
     color: "#8C4FFF",
     aliases: ["create stream", "new stream", "create data stream", "kinesis create"],
   },
+  // Amazon Elastic Container Registry (ECR)
+  {
+    id: "feat-ecr-repositories",
+    name: "ECR repositories",
+    href: "/ecr/repositories",
+    serviceId: "ecr",
+    serviceName: "Amazon Elastic Container Registry",
+    category: "Containers",
+    desc: "Store, manage, and deploy Docker container images and OCI artifacts",
+    color: "#FF9900",
+    aliases: ["ecr", "repositories", "docker", "images", "container registry", "private repositories"],
+  },
+  {
+    id: "feat-ecr-create-repo",
+    name: "Create ECR repository",
+    href: "/ecr/repositories/create",
+    serviceId: "ecr",
+    serviceName: "Amazon Elastic Container Registry",
+    category: "Containers",
+    desc: "Create a new private or public container image repository",
+    color: "#FF9900",
+    aliases: ["create repository", "new repository", "create ecr", "new ecr repo"],
+  },
+  {
+    id: "feat-ecr-registry-settings",
+    name: "ECR registry settings",
+    href: "/ecr/registry-settings",
+    serviceId: "ecr",
+    serviceName: "Amazon Elastic Container Registry",
+    category: "Containers",
+    desc: "Configure container vulnerability scanning, replication, and pull through cache rules",
+    color: "#FF9900",
+    aliases: ["registry settings", "ecr settings", "pull through cache", "ecr replication"],
+  },
 ];
 
 // Acronym and common synonym expansion dictionary
 const ACRONYM_MAP: Record<string, string[]> = {
+  ecr: ["elastic", "container", "registry", "docker", "images", "repositories", "oci", "containers"],
   kinesis: ["kinesis", "kds", "streams", "streaming", "shards", "analytics", "records", "data streams"],
   kds: ["kinesis", "data", "streams"],
   timestream: ["timestream", "timeseries", "telemetry", "database", "influxdb", "metrics"],

@@ -42,6 +42,7 @@ import { TimestreamWriteClient } from "@aws-sdk/client-timestream-write";
 import { TimestreamQueryClient } from "@aws-sdk/client-timestream-query";
 import { KinesisClient } from "@aws-sdk/client-kinesis";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
+import { ECRClient } from "@aws-sdk/client-ecr";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
@@ -225,6 +226,13 @@ export const kinesis = new KinesisClient({
 
 // --- Amazon CloudWatch Logs ---
 export const cloudwatchLogs = new CloudWatchLogsClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  requestHandler: new NodeHttpHandler(),
+});
+
+// --- Amazon Elastic Container Registry (ECR) ---
+export const ecr = new ECRClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
   requestHandler: new NodeHttpHandler(),

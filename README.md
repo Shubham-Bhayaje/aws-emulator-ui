@@ -82,6 +82,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | **AWS Systems Manager Parameter Store** | Management & Governance | Built | [Parameter Store Guide](docs/SSM%20Parameter%20Store.md) | 2026-11-21 |
 | **Amazon CloudWatch Logs** | Management & Governance | Built | [CloudWatch Logs Guide](docs/CloudWatch%20Logs.md) | 2026-11-21 |
 | **Amazon DynamoDB** | Database | Built | [DynamoDB Guide](docs/DynamoDB.md) | 2026-11-21 |
+| **Amazon Elastic Container Registry (ECR)** | Containers | Built | [ECR Guide](docs/ECR.md) | 2026-11-22 |
 | **Amazon Kinesis Data Streams** | Analytics | Built | [Kinesis Guide](docs/Kinesis%20Data%20Streams.md) | 2026-11-21 |
 | **Amazon Keyspaces** | Database | Built | [Keyspaces Guide](docs/Keyspaces.md) | 2026-11-21 |
 | **Amazon Timestream** | Database | Built | [Timestream Guide](docs/Timestream.md) | 2026-11-21 |
@@ -109,6 +110,9 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 - **Analytics & Real-Time Streaming**:
   - **Amazon Kinesis Data Streams**: Massively scalable and durable real-time streaming data service, global streams inventory with Region summary metrics (Total Data Streams, Open Shards, On-Demand Streams, Encrypted Streams), name search filter, Create Data Stream wizard with On-demand vs Provisioned capacity modes, interactive shard capacity estimator calculator, data retention period (24 to 8,760 hours / up to 365 days), live KMS customer managed key dropdown, comprehensive stream details with 6 interactive tabs (Configuration, Shards inventory table with hash key ranges, Data viewer with interactive live PutRecord ingestion utility and GetRecords stream browser supporting Trim Horizon / Latest / Sequence Number iterators, Enhanced fan-out consumers registration with dedicated 2 MB/sec throughput per shard, Monitoring with shard-level metrics toggles, and Tags), edit capacity mode and resharding, edit retention period, edit server-side encryption, and integrated DynamoDB streaming destinations.
+
+- **Containers**:
+  - **Amazon Elastic Container Registry (ECR)**: Fully managed Docker and OCI container image registry, global private repositories inventory with Region summary metrics (Total repositories, Immutable tags, Scan on push, KMS encrypted), name search filter, Create repository wizard with visibility settings (Private vs Public), tag immutability toggle (Mutable vs Immutable), automated vulnerability scan on push toggle, KMS customer managed key integration, and resource tags editor, comprehensive repository detail view with 4 interactive tabs (Images table with tag badges, size, push timestamp, scan status, and sha256 digests; Permissions with resource policy JSON editor; Lifecycle policy with automated age and count-based image expiration rules; Tags manager), View Push Commands modal with step-by-step Docker CLI authentication and build/tag/push commands for macOS/Linux and Windows, Public Repositories showcase gallery, and Registry Settings view managing vulnerability scanning configuration and pull through cache rules (Amazon ECR Public, Docker Hub, Quay, GitHub Container Registry).
 
 - **Security, Identity, & Compliance**:
   - **AWS IAM**: Users, roles with trust policies, policy inspector with syntax-highlighted JSON documents.
@@ -598,6 +602,39 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 </details>
 
+<details>
+<summary><strong>Amazon Elastic Container Registry (ECR)</strong> (25/25 operations verified)</summary>
+
+| API Action | CLI Command | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| `DescribeRepositories` | `aws ecr describe-repositories` | Supported | Private repositories inventory table and summary cards |
+| `CreateRepository` | `aws ecr create-repository` | Supported | Create repository wizard with visibility, tag immutability, scan, KMS |
+| `DeleteRepository` | `aws ecr delete-repository` | Supported | Delete repository modal with force delete toggle |
+| `PutImageTagMutability` | `aws ecr put-image-tag-mutability` | Supported | Edit repository modal and repository detail view |
+| `PutImageScanningConfiguration` | `aws ecr put-image-scanning-configuration` | Supported | Edit repository modal scan on push toggle |
+| `DescribeImages` | `aws ecr describe-images` | Supported | Repository images tab with tag badges, size, and digest |
+| `ListImages` | `aws ecr list-images` | Supported | Repository images listing |
+| `BatchDeleteImage` | `aws ecr batch-delete-image` | Supported | Delete image action with confirmation modal |
+| `GetRepositoryPolicy` | `aws ecr get-repository-policy` | Supported | Permissions tab displaying resource policy JSON |
+| `SetRepositoryPolicy` | `aws ecr set-repository-policy` | Supported | Edit policy JSON modal with syntax validation |
+| `DeleteRepositoryPolicy` | `aws ecr delete-repository-policy` | Supported | Clear repository policy action |
+| `GetLifecyclePolicy` | `aws ecr get-lifecycle-policy` | Supported | Lifecycle policy tab displaying rules and raw JSON |
+| `PutLifecyclePolicy` | `aws ecr put-lifecycle-policy` | Supported | Create rule and edit lifecycle policy JSON modal |
+| `DeleteLifecyclePolicy` | `aws ecr delete-lifecycle-policy` | Supported | Delete lifecycle policy action |
+| `ListTagsForResource` | `aws ecr list-tags-for-resource` | Supported | Tags tab displaying key-value metadata |
+| `TagResource` | `aws ecr tag-resource` | Supported | Manage tags modal adding/updating resource tags |
+| `UntagResource` | `aws ecr untag-resource` | Supported | Manage tags modal removing resource tags |
+| `GetAuthorizationToken` | `aws ecr get-authorization-token` | Supported | Authorization token retrieval and Docker CLI login pipe |
+| `DescribeRegistry` | `aws ecr describe-registry` | Supported | Registry settings view with registry ID and replication rules |
+| `GetRegistryScanningConfiguration` | `aws ecr get-registry-scanning-configuration` | Supported | Registry settings scanning configuration tab |
+| `PutRegistryScanningConfiguration` | `aws ecr put-registry-scanning-configuration` | Supported | Switch between Basic and Enhanced vulnerability scanning |
+| `PutReplicationConfiguration` | `aws ecr put-replication-configuration` | Supported | Cross-region and cross-account replication rules |
+| `DescribePullThroughCacheRules` | `aws ecr describe-pull-through-cache-rules` | Supported | Pull through cache rules table |
+| `CreatePullThroughCacheRule` | `aws ecr create-pull-through-cache-rule` | Supported | Add pull through cache rule modal |
+| `DeletePullThroughCacheRule` | `aws ecr delete-pull-through-cache-rule` | Supported | Delete pull through cache rule action |
+
+</details>
+
 ---
 
 ## Configuration & Environment Variables
@@ -625,6 +662,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 ## Changelog
 
+- **2026-11-22** - **Amazon Elastic Container Registry (ECR)**: Full implementation of Amazon ECR Management Console with private repositories inventory, Region summary metric cards (Total repositories, Immutable tags, Scan on push, KMS encrypted), Create repository wizard with visibility settings, tag immutability, automated scan on push, live AWS KMS customer managed key dropdown, and tags editor, comprehensive repository detail view with 4 interactive tabs (Images inventory with digest copy, size, push timestamps, and delete image modal; Permissions with interactive JSON resource policy editor; Lifecycle policy with rule cards and JSON editor; Tags manager), View Push Commands modal with platform-specific Docker CLI authentication and build/tag/push commands for macOS/Linux and Windows, Public Repositories showcase gallery, Registry Settings view managing vulnerability scanning configuration and pull through cache rules (Amazon ECR Public, Docker Hub, Quay, GitHub Container Registry), comprehensive learner documentation (`docs/ECR.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon CloudWatch Logs**: Full implementation of Amazon CloudWatch Logs Management Console with log groups inventory, Region summary metric cards (Log groups, Log streams, Ingested volume, Active metric filters), name prefix and log class search filters, Create log group wizard with retention settings (1 day to 10 years / Never expire) and live AWS KMS customer managed key dropdown, comprehensive log group details with 5 interactive tabs (Log streams inventory table with creation and last event times, Search log group with live time window selector and filter pattern evaluation, Metric filters with dynamic pattern matching and metric transformations, Subscription filters to Amazon Kinesis and AWS Lambda, and Tags manager), dedicated log stream monospace terminal viewer with live search and PutLogEvents simulator, Live Tail real-time event streaming terminal with pattern highlighting and auto-scrolling, CloudWatch Logs Insights query editor with sample query templates and results parser, navigation stubs for CloudWatch Alarms and Metrics, comprehensive learner documentation (`docs/CloudWatch Logs.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon Kinesis Data Streams**: Full implementation of Amazon Kinesis Data Streams Management Console with global data streams inventory, Region summary metrics (Total Data Streams, Open Shards, On-Demand Streams, Encrypted Streams), name search filter, Create Data Stream wizard with On-demand vs Provisioned capacity modes, interactive shard capacity calculator, data retention period (24 to 8760 hours / up to 365 days), live KMS customer managed key dropdown, comprehensive stream details with 6 interactive tabs (Configuration, Shards inventory table with hash key ranges, Data viewer with interactive live PutRecord ingestion utility and GetRecords stream browser supporting Trim Horizon / Latest / Sequence Number iterators, Enhanced fan-out consumers registration with dedicated 2 MB/sec throughput per shard, Monitoring with shard-level metrics toggles, and Tags), edit capacity mode and resharding, edit retention period, edit server-side encryption, unblocked DynamoDB Kinesis data stream destination integration, comprehensive learner documentation (`docs/Kinesis Data Streams.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon Timestream**: Full implementation of Amazon Timestream Management Console with global databases inventory, Region summary metrics (Total Databases, Total Tables, Default KMS, Customer KMS), name search filter, Create Database wizard (Standard & Sample database) with live KMS customer managed key dropdown, database details with active tables inventory and configuration, Create Table wizard with dual storage tiering (Memory store retention in hours/days and Magnetic store retention in days/months/years) and late-arriving magnetic store writes toggle, comprehensive table details with storage tiering breakdown, interactive live Write Records ingestion utility executing real time-series data writes via AWS SDK, Monitoring tab, SQL query editor with sample queries, and InfluxDB instances overview, comprehensive learner documentation (`docs/Timestream.md`), and Action Support Matrix audit.
