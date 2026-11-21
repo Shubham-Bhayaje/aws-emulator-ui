@@ -2,6 +2,7 @@
  * ConsoleHome.tsx – Interactive Console Home Dashboard matching the official AWS Management Console.
  * Manages widget positioning, visibility, reset to default layout, and "+ Add widgets" modal.
  * Zero emojis, Cloudscape enterprise styling.
+ * Strict 32px button height standard.
  */
 
 "use client";
@@ -12,6 +13,8 @@ import SecurityWidget from "./widgets/SecurityWidget";
 import WelcomeWidget from "./WelcomeWidget";
 import CostAndUsageWidget from "./widgets/CostAndUsageWidget";
 import HealthWidget from "./widgets/HealthWidget";
+import BuildASolutionWidget from "./widgets/BuildASolutionWidget";
+import ExploreAwsWidget from "./widgets/ExploreAwsWidget";
 import AddWidgetsModal, { WidgetVisibility } from "./widgets/AddWidgetsModal";
 
 const DEFAULT_VISIBILITY: WidgetVisibility = {
@@ -20,6 +23,8 @@ const DEFAULT_VISIBILITY: WidgetVisibility = {
   welcome: true,
   costAndUsage: true,
   awsHealth: true,
+  buildASolution: true,
+  exploreAws: true,
 };
 
 export default function ConsoleHome() {
@@ -31,7 +36,7 @@ export default function ConsoleHome() {
     try {
       const saved = localStorage.getItem("aws_console_home_widgets");
       if (saved) {
-        setVisibility(JSON.parse(saved));
+        setVisibility({ ...DEFAULT_VISIBILITY, ...JSON.parse(saved) });
       }
     } catch { /* ignore */ }
   }, []);
@@ -90,7 +95,7 @@ export default function ConsoleHome() {
             <button
               onClick={handleResetDefaults}
               className="p-1 hover:text-[#16191f] rounded hover:bg-[#f2f3f3]"
-              title="Layout history"
+              title="Reset layout"
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" />
@@ -102,7 +107,8 @@ export default function ConsoleHome() {
           <button
             type="button"
             onClick={handleResetDefaults}
-            className="px-3.5 py-[5px] text-[13px] border border-[#545b64] rounded-sm text-[#16191f] hover:bg-[#f2f3f3] font-normal transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="inline-flex items-center justify-center px-3.5 text-[13px] border border-[#545b64] rounded-sm text-[#16191f] bg-white hover:bg-[#f2f3f3] font-normal transition-colors"
           >
             Reset to default layout
           </button>
@@ -110,7 +116,8 @@ export default function ConsoleHome() {
           <button
             type="button"
             onClick={() => setShowAddModal(true)}
-            className="px-3.5 py-[5px] text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-medium transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="inline-flex items-center justify-center px-3.5 text-[13px] bg-[#ec7211] text-white rounded-sm hover:bg-[#eb5f07] font-bold transition-colors"
           >
             + Add widgets
           </button>
@@ -138,17 +145,32 @@ export default function ConsoleHome() {
         )}
       </div>
 
-      {/* Bottom Row Grid: Cost and usage (8/12) | AWS Health (4/12) */}
+      {/* Middle Row Grid: Cost and usage (7/12) | AWS Health (5/12) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
         {visibility.costAndUsage && (
-          <div className={`${visibility.awsHealth ? "lg:col-span-8" : "lg:col-span-12"} col-span-12`}>
+          <div className={`${visibility.awsHealth ? "lg:col-span-7" : "lg:col-span-12"} col-span-12`}>
             <CostAndUsageWidget onRemove={() => handleRemoveWidget("costAndUsage")} />
           </div>
         )}
 
         {visibility.awsHealth && (
-          <div className={`${visibility.costAndUsage ? "lg:col-span-4" : "lg:col-span-12"} col-span-12`}>
+          <div className={`${visibility.costAndUsage ? "lg:col-span-5" : "lg:col-span-12"} col-span-12`}>
             <HealthWidget onRemove={() => handleRemoveWidget("awsHealth")} />
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Row Grid: Build a solution (7/12) | Explore AWS (5/12) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        {visibility.buildASolution && (
+          <div className={`${visibility.exploreAws ? "lg:col-span-7" : "lg:col-span-12"} col-span-12`}>
+            <BuildASolutionWidget onRemove={() => handleRemoveWidget("buildASolution")} />
+          </div>
+        )}
+
+        {visibility.exploreAws && (
+          <div className={`${visibility.buildASolution ? "lg:col-span-5" : "lg:col-span-12"} col-span-12`}>
+            <ExploreAwsWidget onRemove={() => handleRemoveWidget("exploreAws")} />
           </div>
         )}
       </div>
@@ -177,7 +199,8 @@ export default function ConsoleHome() {
             <div className="text-[13px] text-[#545b64] space-y-2 leading-relaxed">
               <p>
                 <strong>Console Home</strong> is your personalized dashboard for the AWS Management Console.
-                You can customize widgets, monitor costs and budgets, evaluate security posture, and monitor service health.
+                You can customize widgets, monitor costs and budgets, evaluate security posture, explore architectural
+                guidance, and monitor live service health.
               </p>
               <p>
                 Click <strong>+ Add widgets</strong> to enable or disable widgets, or <strong>Reset to default layout</strong>
@@ -187,7 +210,8 @@ export default function ConsoleHome() {
             <div className="flex justify-end pt-2 border-t border-[#eaeded]">
               <button
                 onClick={() => setShowConsoleInfoModal(false)}
-                className="px-4 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e]"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="inline-flex items-center justify-center font-bold text-[13px] px-4 rounded bg-[#ec7211] text-white hover:bg-[#eb5f07]"
               >
                 Close
               </button>

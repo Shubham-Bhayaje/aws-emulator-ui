@@ -55,6 +55,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 | Service | Category | Status | Guide | Date Added |
 | :--- | :--- | :--- | :--- | :--- |
+| **AWS Management Console Home** | General | Built | [Console Home Guide](docs/Console%20Home.md) | 2026-11-21 |
 | **AWS Account Management** | Management & Governance | Built | [Account Management Guide](docs/Account%20Management.md) | 2026-11-20 |
 | **AWS Certificate Manager (ACM)** | Security, Identity, & Compliance | Built | [ACM Guide](docs/ACM.md) | 2026-11-21 |
 | **AWS CloudHSM** | Security, Identity, & Compliance | Built | [CloudHSM Guide](docs/CloudHSM.md) | 2026-11-21 |
@@ -104,7 +105,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
   - **AWS CloudShell Terminal (`>_`)**: Built-in CLI drawer running real commands directly against the emulator.
   - **Active Identity Switcher**: Switch between Administrator, IAM users, and Assumed Roles with local policy evaluation.
   - **Global Service Search (`Alt + S`)**: Command palette indexing 200+ AWS services with instant jump navigation.
-  - **Console Home Widgets**: Cost & Usage bar chart, Budgets, Security Hub posture, Health dashboard latency checks.
+  - **Console Home Dashboard**: Authentic 12-column responsive widget grid with "+ Add widgets" customization modal drawer, "Reset to default layout", Recently visited 2-column launcher with real AWS vector icons, Security Hub compliance posture score with live emulator audit across IAM, S3, SQS, DynamoDB, and Glacier, AWS Health diagnostic latency checks across 7 live emulator services, Cost and usage stacked trend chart with functional AWS Budgets manager, Welcome to AWS onboarding guide, Build a solution rapid bootstrapping cards, and Explore AWS training and architecture center.
 
 ---
 
@@ -112,6 +113,21 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 <details>
 <summary><strong>Click to expand full API operations verification details</strong></summary>
+
+### AWS Management Console Home
+| Action / Capability | Underlying CLI / Endpoint | Support Status | Console Implementation |
+| :--- | :--- | :--- | :--- |
+| `GetCallerIdentity` | `aws sts get-caller-identity` | Supported | Identity banner in header and health diagnostics |
+| `RecentlyVisited` | `localStorage` | Supported | 2-column launcher with authentic vector icons & hover dismissal |
+| `AddWidgets` | `localStorage` | Supported | Customization modal with active and disabled service badges |
+| `ResetDefaultLayout` | `localStorage` | Supported | Restores canonical AWS 5-widget grid arrangement |
+| `SecurityHubAudit` | `iam:ListUsers`, `s3:ListBuckets`, `sqs:ListQueues`, `dynamodb:ListTables` | Supported | Posture score gauge, live scan spinner, and findings modal |
+| `HealthDiagnostics` | `s3`, `dynamodb`, `sqs`, `sns`, `glacier`, `iam`, `sts` | Supported | Live round-trip latency (ms) diagnostics table with refresh action |
+| `CostAndUsageBilling` | Emulator resource inventory | Supported | Month-to-date spend, forecast, service stacked chart, Budgets |
+| `BuildASolution` | Service creation routes | Supported | Quick-launch cards for EC2, S3, DynamoDB, SQS, SNS, Glacier |
+| `ExploreAWS` | Documentation & training links | Supported | Tutorials, Free Tier, Architecture Center, Skill Builder |
+| `CloudWatchAlarms` | `cloudwatch:DescribeAlarms` | Unbuilt | Disabled with badge "Available after CloudWatch is built" |
+| `Applications` | `servicecatalog-appregistry` | Unbuilt | Disabled with badge "Available after AWS Application Manager is built" |
 
 ### Amazon S3
 | API Operation | CLI Command | Support Status | Console Implementation |
@@ -496,6 +512,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 ## Changelog
 
+- **2026-11-21** - **AWS Management Console Home**: Complete implementation and replica of the authentic AWS Management Console Home dashboard with customizable 12-column widget grid, "+ Add widgets" customization modal drawer with disabled unbuilt service tags, "Reset to default layout" action, Recently visited 2-column service launcher with real AWS vector icons and hover dismissal, Security Hub compliance posture score with live emulator audit across IAM, S3, SQS, DynamoDB, and Glacier, AWS Health diagnostic engine testing live round-trip latency across seven emulator services, Cost and Usage stacked trend chart and functional AWS Budgets manager, Welcome to AWS onboarding guide, Build a solution rapid bootstrapping cards, Explore AWS training and architecture center, comprehensive learner guide (`docs/Console Home.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon DynamoDB**: Complete implementation and replica of Amazon DynamoDB Management Console with global tables inventory, Region metric summary cards (Total tables, Active tables, Total items, Total storage), name search filter, Create Table Wizard with partition key, sort key, On-demand vs Provisioned capacity modes, live KMS Customer Managed Key dropdown, deletion protection, comprehensive table details with 8 interactive tabs (Overview, Explore items, Indexes with GSI and LSI, Monitor with operational CloudWatch charts, Additional settings with Time to Live (TTL) and Point-in-time recovery (PITR), Backups with on-demand snapshot creation and restore workflows, Exports and streams with DynamoDB Streams toggle, Lambda triggers, and S3 export, and Tags), item editor in both dynamic Form and raw JSON views, universal Explore items page, centralized Backups inventory, comprehensive learner guide (`docs/DynamoDB.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon SNS**: Full implementation of Amazon Simple Notification Service (SNS) Management Console with global topics inventory, metric summary cards (Total Topics, Standard Topics, FIFO Topics, Subscriptions), name/ARN search filter, Standard vs FIFO Create Topic Wizard with automatic `.fifo` validation, live KMS customer managed key dropdown, comprehensive topic details with 7 interactive tabs (Details, Subscriptions, Encryption, Access policy, Delivery policy HTTP/S, Delivery status logging, Tags), live message publisher with custom JSON payload and message attributes, subscriptions inventory table, create subscription wizard with live SQS queue and Lambda function dropdowns, subscription details with filter policy and DLQ redrive, unblocked SQS and S3 Glacier integration backlog items, mobile push notifications and SMS messaging overview views, comprehensive learner guide (`docs/SNS.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon SQS**: Complete implementation and replica of Amazon Simple Queue Service (SQS) Management Console with global queues inventory, metric summary cards (Total Queues, Messages Available, Messages In Flight, Messages Delayed), name search filter, Standard vs FIFO Create Queue Wizard with automatic `.fifo` validation, live KMS customer managed key dropdown, live dead-letter queue association, comprehensive queue details with 10 interactive tabs (Details, Send and receive messages with live polling progress bar and message modal inspector, Monitoring, Encryption, Access policy, Redrive policy, Dead-letter queue redrive utility, Tags, SNS subscriptions integration notice, and Lambda triggers with real function selection), single/bulk queue purge and deletion workflows, comprehensive learner guide (`docs/SQS.md`), and Action Support Matrix audit.

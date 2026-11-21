@@ -2,6 +2,7 @@
  * AddWidgetsModal.tsx – Modal dialog allowing users to customize and add/remove
  * widgets on the AWS Console Home dashboard.
  * Zero emojis, Cloudscape enterprise design.
+ * Strict 32px button height standard.
  */
 
 "use client";
@@ -12,6 +13,8 @@ export interface WidgetVisibility {
   security: boolean;
   awsHealth: boolean;
   welcome: boolean;
+  buildASolution: boolean;
+  exploreAws: boolean;
 }
 
 interface AddWidgetsModalProps {
@@ -31,7 +34,7 @@ export default function AddWidgetsModal({
 }: AddWidgetsModalProps) {
   if (!isOpen) return null;
 
-  const widgetDefinitions: {
+  const activeWidgetDefinitions: {
     key: keyof WidgetVisibility;
     title: string;
     description: string;
@@ -67,6 +70,41 @@ export default function AddWidgetsModal({
       description: "Real-time visibility into AWS service events, operational notifications, and local emulator status.",
       category: "Operations",
     },
+    {
+      key: "buildASolution",
+      title: "Build a solution",
+      description: "Quick-start templates and hands-on guidance across compute, storage, database, and messaging.",
+      category: "Solutions",
+    },
+    {
+      key: "exploreAws",
+      title: "Explore AWS",
+      description: "Curated learning paths, architecture blueprints, hands-on tutorials, and Free Tier details.",
+      category: "Documentation",
+    },
+  ];
+
+  const unbuiltWidgetDefinitions: {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    unavailableMessage: string;
+  }[] = [
+    {
+      id: "cloudwatch-alarms",
+      title: "CloudWatch Alarms",
+      description: "Monitor real-time operational alarm status (In alarm, OK, Insufficient data) across AWS resources.",
+      category: "Operations",
+      unavailableMessage: "Available after CloudWatch is built",
+    },
+    {
+      id: "applications",
+      title: "Applications",
+      description: "Monitor business applications, resource groups, and deployment health via AWS Application Manager.",
+      category: "Management & Governance",
+      unavailableMessage: "Available after AWS Application Manager is built",
+    },
   ];
 
   return (
@@ -91,7 +129,7 @@ export default function AddWidgetsModal({
 
         {/* Widget List */}
         <div className="p-6 overflow-y-auto flex-1 space-y-3.5">
-          {widgetDefinitions.map((w) => {
+          {activeWidgetDefinitions.map((w) => {
             const isAdded = visibility[w.key];
             return (
               <div
@@ -101,7 +139,7 @@ export default function AddWidgetsModal({
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
                     <span className="font-bold text-[13px] text-[#16191f]">{w.title}</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#f2f3f3] text-[#545b64] font-medium">
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[#f2f3f3] text-[#545b64] font-medium border border-[#eaeded]">
                       {w.category}
                     </span>
                   </div>
@@ -111,9 +149,10 @@ export default function AddWidgetsModal({
                 <button
                   type="button"
                   onClick={() => onToggleWidget(w.key)}
-                  className={`px-3 py-1 text-[12px] rounded-sm font-medium shrink-0 transition-colors ${
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                  className={`inline-flex items-center justify-center px-3.5 text-[12px] rounded-sm font-bold shrink-0 transition-colors ${
                     isAdded
-                      ? "border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3]"
+                      ? "border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] bg-white"
                       : "bg-[#ec7211] text-white hover:bg-[#eb5f07]"
                   }`}
                 >
@@ -122,6 +161,31 @@ export default function AddWidgetsModal({
               </div>
             );
           })}
+
+          {/* Unbuilt Optional Widgets (Disabled per Step 0) */}
+          {unbuiltWidgetDefinitions.map((uw) => (
+            <div
+              key={uw.id}
+              className="p-3.5 border border-[#eaeded] bg-[#fafafa] rounded-sm flex items-start justify-between gap-4 opacity-75"
+            >
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-[13px] text-[#545b64]">{uw.title}</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-[#eaeded] text-[#545b64] font-medium">
+                    {uw.category}
+                  </span>
+                </div>
+                <p className="text-[12px] text-[#879596] leading-relaxed">{uw.description}</p>
+              </div>
+
+              <span
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                className="inline-flex items-center justify-center px-3 text-[11px] font-medium rounded-sm border border-[#d5dbdb] text-[#545b64] bg-[#f2f3f3] cursor-not-allowed shrink-0"
+              >
+                {uw.unavailableMessage}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* Footer */}
@@ -137,7 +201,8 @@ export default function AddWidgetsModal({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e]"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            className="inline-flex items-center justify-center px-4 text-[13px] bg-[#0073bb] text-white rounded-sm font-bold hover:bg-[#005a9e] transition-colors"
           >
             Done
           </button>

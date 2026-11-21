@@ -4,6 +4,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 
 ## Available Guides
 
+- [AWS Management Console Home](Console%20Home.md): Central customizable dashboard for cloud monitoring, operational health telemetry, security compliance posture (Security Hub), cost and usage tracking, quick-start solution templates, and recent service navigation.
 - [AWS Account Management](Account%20Management.md): Manage account details, primary and alternate contacts (Billing, Operations, Security), AWS Region opt-in availability, and account closure.
 - [AWS Certificate Manager (ACM)](ACM.md): Provision, request, and manage SSL/TLS certificates, validate domain ownership via DNS (Route 53 CNAME) or email, import third-party X.509 certificates and private keys, inspect certificate PEM bodies, and toggle Certificate Transparency logging.
 - [AWS CloudHSM](CloudHSM.md): Dedicated hardware security module (HSM) cluster management inside Amazon VPC, multi-AZ HSM provisioning, cluster CSR export, cluster initialization workflow, automated backup retention, and teardown safety controls.
@@ -32,6 +33,8 @@ The following table tracks inter-service integrations that are waiting on future
 | Amazon S3 | Amazon SNS / SQS | S3 Event Notifications destination (Bucket Events) | Add SNS and SQS destinations to bucket event configuration |
 | Amazon DynamoDB | AWS Backup | Continuous compliance and automated backup plans | Connect scheduled backup policies when AWS Backup is built |
 | Amazon DynamoDB | Amazon Kinesis | DynamoDB Kinesis data stream destination | Enable streaming destination when Amazon Kinesis is built |
+| Console Home | Amazon CloudWatch | CloudWatch Alarms widget | Connect CloudWatch alarms (In alarm, OK, Insufficient data) when Amazon CloudWatch is built |
+| Console Home | AWS Application Manager | Applications widget | Connect AppRegistry and application monitoring when AWS Application Manager is built |
 
 ---
 
