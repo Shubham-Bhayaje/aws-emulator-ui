@@ -163,7 +163,7 @@ export async function runLiveSecurityAudit(): Promise<SecurityAuditResponse> {
         title: "IAM.1 Root account should have MFA enabled",
         severity: "CRITICAL",
         resource: "arn:aws:iam::000000000000:root",
-        remediationHref: "/iam",
+        remediationHref: "/iam/account-settings",
         remediationLabel: "Configure in IAM",
         reason: "Root user credentials should not have direct console access without multi-factor authentication.",
       });

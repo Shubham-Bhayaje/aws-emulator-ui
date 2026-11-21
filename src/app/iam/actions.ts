@@ -1360,15 +1360,37 @@ export async function assignRootMFAAction(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await iam.send(
-      new CreateVirtualMFADeviceCommand({
-        VirtualMFADeviceName: "root-account-mfa-device",
-      })
-    );
-    const serialNumber = res.VirtualMFADevice?.SerialNumber || "";
+    let serialNumber = "";
     let base32Seed = "";
-    if (res.VirtualMFADevice?.Base32StringSeed) {
-      base32Seed = Buffer.from(res.VirtualMFADevice.Base32StringSeed).toString("utf8");
+
+    try {
+      const res = await iam.send(
+        new CreateVirtualMFADeviceCommand({
+          VirtualMFADeviceName: "root-account-mfa-device",
+        })
+      );
+      serialNumber = res.VirtualMFADevice?.SerialNumber || "";
+      if (res.VirtualMFADevice?.Base32StringSeed) {
+        base32Seed = Buffer.from(res.VirtualMFADevice.Base32StringSeed).toString("utf8");
+      }
+    } catch (createErr: unknown) {
+      const errMsg = createErr instanceof Error ? createErr.message : String(createErr);
+      if (
+        errMsg.includes("already exists") ||
+        (createErr as { name?: string })?.name === "EntityAlreadyExistsException"
+      ) {
+        const listRes = await iam.send(new ListVirtualMFADevicesCommand({}));
+        const existingRoot = listRes.VirtualMFADevices?.find((d) =>
+          d.SerialNumber?.includes("root")
+        );
+        if (existingRoot) {
+          serialNumber = existingRoot.SerialNumber || "";
+        } else {
+          throw createErr;
+        }
+      } else {
+        throw createErr;
+      }
     }
 
     let sampleCode1 = "";
