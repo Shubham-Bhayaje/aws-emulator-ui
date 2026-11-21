@@ -596,6 +596,8 @@ export function ServiceIcon({
     case "cognito":
       return <CognitoIcon size={size} className={className} />;
     case "cloudwatch":
+    case "cloudwatch-logs":
+    case "logs":
       return <CloudWatchIcon size={size} className={className} />;
     case "cloudtrail":
       return <CloudTrailIcon size={size} className={className} />;

@@ -41,6 +41,7 @@ import { KeyspacesClient } from "@aws-sdk/client-keyspaces";
 import { TimestreamWriteClient } from "@aws-sdk/client-timestream-write";
 import { TimestreamQueryClient } from "@aws-sdk/client-timestream-query";
 import { KinesisClient } from "@aws-sdk/client-kinesis";
+import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
@@ -217,6 +218,13 @@ export const timestreamQuery = new TimestreamQueryClient({
 
 // --- Amazon Kinesis Data Streams ---
 export const kinesis = new KinesisClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  requestHandler: new NodeHttpHandler(),
+});
+
+// --- Amazon CloudWatch Logs ---
+export const cloudwatchLogs = new CloudWatchLogsClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
   requestHandler: new NodeHttpHandler(),

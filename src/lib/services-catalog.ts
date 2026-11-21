@@ -70,6 +70,7 @@ export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (clean === "acm/pca" || clean === "acm-pca" || clean === "pca" || clean === "private-ca") return true;
   if (clean === "cloudhsm" || clean.startsWith("cloudhsm/")) return true;
   if (clean === "directoryservice" || clean.startsWith("directoryservice/") || clean === "directory-service" || clean === "ds") return true;
+  if (clean === "cloudwatch" || clean.startsWith("cloudwatch/") || clean === "logs" || clean.startsWith("logs/")) return true;
   return false;
 }
 
@@ -813,10 +814,23 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "id": "cloudwatch",
     "name": "Amazon CloudWatch",
     "shortName": "CloudWatch",
-    "href": "/cloudwatch",
+    "href": "/cloudwatch/logs",
     "category": "Management & Governance",
-    "color": "#545b64",
-    "desc": "Observability and monitoring for AWS resources and applications in real time"
+    "color": "#E7157B",
+    "status": "functional",
+    "desc": "Observability and monitoring for AWS resources and applications with CloudWatch Logs, metrics, and alarms",
+    "aliases": ["cloudwatch", "cloudwatch logs", "logs", "log groups", "log streams", "metrics", "alarms", "cwl"]
+  },
+  {
+    "id": "cloudwatch-logs",
+    "name": "CloudWatch Logs",
+    "shortName": "Logs",
+    "href": "/cloudwatch/logs",
+    "category": "Management & Governance",
+    "color": "#E7157B",
+    "status": "functional",
+    "desc": "Monitor, store, and access your log files from AWS resources",
+    "aliases": ["cloudwatch logs", "logs", "log groups", "log streams", "cwl", "insights", "live tail"]
   },
   {
     "id": "cloudtrail",

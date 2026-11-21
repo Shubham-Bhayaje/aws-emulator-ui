@@ -80,6 +80,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | **AWS Private Certificate Authority (Private CA)** | Security, Identity, & Compliance | Built | [Private CA Guide](docs/Private%20CA.md) | 2026-11-21 |
 | **AWS Secrets Manager** | Security, Identity, & Compliance | Built | [Secrets Manager Guide](docs/Secrets%20Manager.md) | 2026-11-21 |
 | **AWS Systems Manager Parameter Store** | Management & Governance | Built | [Parameter Store Guide](docs/SSM%20Parameter%20Store.md) | 2026-11-21 |
+| **Amazon CloudWatch Logs** | Management & Governance | Built | [CloudWatch Logs Guide](docs/CloudWatch%20Logs.md) | 2026-11-21 |
 | **Amazon DynamoDB** | Database | Built | [DynamoDB Guide](docs/DynamoDB.md) | 2026-11-21 |
 | **Amazon Kinesis Data Streams** | Analytics | Built | [Kinesis Guide](docs/Kinesis%20Data%20Streams.md) | 2026-11-21 |
 | **Amazon Keyspaces** | Database | Built | [Keyspaces Guide](docs/Keyspaces.md) | 2026-11-21 |
@@ -120,6 +121,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
   - **AWS RAM**: Resource shares, resource associations, cross-account sharing workflows.
 
 - **Management & Governance**:
+  - **Amazon CloudWatch Logs**: Centralized cloud logging service, global log groups inventory with Region summary metrics (Total Log Groups, Stored Bytes, Metric Filters, Infrequent Access), name search filter, Create Log Group modal (Standard vs Infrequent Access, retention setting from 1 day to 10 years, and live KMS customer managed key dropdown), comprehensive log group details with 5 interactive tabs (Log streams inventory with multi-select and deletion, Search log group with live time-range event filtering and pattern search, Metric filters creating CloudWatch metrics from log patterns, Subscription filters streaming records into Amazon Kinesis and AWS Lambda, and Tags manager), dedicated log stream terminal viewer with Put log event ingestion simulator, Live Tail real-time event streaming terminal with auto-scrolling, and CloudWatch Logs Insights query runner with sample templates.
   - **AWS Systems Manager Parameter Store**: Secure, hierarchical storage for configuration data and secrets, multi-tier support (Standard vs Advanced), String/StringList/SecureString data types, KMS encryption with live reveal/decrypt controls, full version history with staging labels, tags management, and bulk deletion.
   - **AWS Account Management**: Display name, primary/alternate contacts, 32-region opt-in manager, account closure checklist.
   - **AWS Resource Groups & Tag Editor**: Global multi-service resource discovery, bulk tagging/untagging with diff review, tag autocompletion, query-based resource groups.
@@ -567,6 +569,33 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | `DeregisterStreamConsumer` | `aws kinesis deregister-stream-consumer` | Supported | Deregister consumer confirmation dialog |
 | `DeleteStream` | `aws kinesis delete-stream` | Supported | Delete data stream confirmation modal |
 
+### Amazon CloudWatch Logs
+| API Operation | CLI Command | Support Status | Console Implementation |
+| :--- | :--- | :--- | :--- |
+| `DescribeLogGroups` | `aws logs describe-log-groups` | Supported | Log groups inventory table on `/cloudwatch/logs` with prefix search |
+| `CreateLogGroup` | `aws logs create-log-group` | Supported | Create log group modal with Standard/Infrequent Access and KMS selection |
+| `DeleteLogGroup` | `aws logs delete-log-group` | Supported | Single/bulk delete modal requiring `delete` text confirmation |
+| `PutRetentionPolicy` | `aws logs put-retention-policy` | Supported | Edit retention setting modal (1 day to 10 years) |
+| `DeleteRetentionPolicy` | `aws logs delete-retention-policy` | Supported | Clear retention to *Never expire* |
+| `DescribeLogStreams` | `aws logs describe-log-streams` | Supported | Log streams inventory table on log group details page |
+| `CreateLogStream` | `aws logs create-log-stream` | Supported | Create log stream modal |
+| `DeleteLogStream` | `aws logs delete-log-stream` | Supported | Single/bulk delete log streams modal |
+| `GetLogEvents` | `aws logs get-log-events` | Supported | Dedicated log stream terminal viewer on `/cloudwatch/logs/stream` |
+| `PutLogEvents` | `aws logs put-log-events` | Supported | Interactive Put log event simulator modal in stream viewer |
+| `FilterLogEvents` | `aws logs filter-log-events` | Supported | Search log group tab with time-range and pattern filters |
+| `ListTagsForResource` | `aws logs list-tags-for-resource` | Supported | Tags tab displaying key-value metadata |
+| `TagResource` | `aws logs tag-resource` | Supported | Manage tags modal adding/updating resource tags |
+| `UntagResource` | `aws logs untag-resource` | Supported | Manage tags modal removing resource tags |
+| `DescribeMetricFilters` | `aws logs describe-metric-filters` | Supported | Metric filters tab listing active metric transformations |
+| `PutMetricFilter` | `aws logs put-metric-filter` | Supported | Create metric filter modal configuring namespace and metric names |
+| `DeleteMetricFilter` | `aws logs delete-metric-filter` | Supported | Delete metric filter action |
+| `DescribeSubscriptionFilters` | `aws logs describe-subscription-filters` | Supported | Subscription filters tab listing real-time streaming rules |
+| `PutSubscriptionFilter` | `aws logs put-subscription-filter` | Supported | Create subscription filter modal with real Kinesis stream & Lambda dropdowns |
+| `DeleteSubscriptionFilter` | `aws logs delete-subscription-filter` | Supported | Delete subscription filter action |
+| `CreateExportTask` | `aws logs create-export-task` | Unsupported | Notice modal: "Not supported by local emulator engine" |
+| `StartLiveTail` | Polling via `FilterLogEvents` | Supported | Dedicated Live Tail terminal view on `/cloudwatch/logs/live-tail` |
+| `StartQuery` | Native `FilterLogEvents` parsing | Supported | CloudWatch Logs Insights query editor on `/cloudwatch/logs/insights` |
+
 </details>
 
 ---
@@ -596,6 +625,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 ## Changelog
 
+- **2026-11-21** - **Amazon CloudWatch Logs**: Full implementation of Amazon CloudWatch Logs Management Console with log groups inventory, Region summary metric cards (Log groups, Log streams, Ingested volume, Active metric filters), name prefix and log class search filters, Create log group wizard with retention settings (1 day to 10 years / Never expire) and live AWS KMS customer managed key dropdown, comprehensive log group details with 5 interactive tabs (Log streams inventory table with creation and last event times, Search log group with live time window selector and filter pattern evaluation, Metric filters with dynamic pattern matching and metric transformations, Subscription filters to Amazon Kinesis and AWS Lambda, and Tags manager), dedicated log stream monospace terminal viewer with live search and PutLogEvents simulator, Live Tail real-time event streaming terminal with pattern highlighting and auto-scrolling, CloudWatch Logs Insights query editor with sample query templates and results parser, navigation stubs for CloudWatch Alarms and Metrics, comprehensive learner documentation (`docs/CloudWatch Logs.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon Kinesis Data Streams**: Full implementation of Amazon Kinesis Data Streams Management Console with global data streams inventory, Region summary metrics (Total Data Streams, Open Shards, On-Demand Streams, Encrypted Streams), name search filter, Create Data Stream wizard with On-demand vs Provisioned capacity modes, interactive shard capacity calculator, data retention period (24 to 8760 hours / up to 365 days), live KMS customer managed key dropdown, comprehensive stream details with 6 interactive tabs (Configuration, Shards inventory table with hash key ranges, Data viewer with interactive live PutRecord ingestion utility and GetRecords stream browser supporting Trim Horizon / Latest / Sequence Number iterators, Enhanced fan-out consumers registration with dedicated 2 MB/sec throughput per shard, Monitoring with shard-level metrics toggles, and Tags), edit capacity mode and resharding, edit retention period, edit server-side encryption, unblocked DynamoDB Kinesis data stream destination integration, comprehensive learner documentation (`docs/Kinesis Data Streams.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon Timestream**: Full implementation of Amazon Timestream Management Console with global databases inventory, Region summary metrics (Total Databases, Total Tables, Default KMS, Customer KMS), name search filter, Create Database wizard (Standard & Sample database) with live KMS customer managed key dropdown, database details with active tables inventory and configuration, Create Table wizard with dual storage tiering (Memory store retention in hours/days and Magnetic store retention in days/months/years) and late-arriving magnetic store writes toggle, comprehensive table details with storage tiering breakdown, interactive live Write Records ingestion utility executing real time-series data writes via AWS SDK, Monitoring tab, SQL query editor with sample queries, and InfluxDB instances overview, comprehensive learner documentation (`docs/Timestream.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon Keyspaces (for Apache Cassandra)**: Full implementation of Amazon Keyspaces Management Console with global keyspaces inventory, Region summary metrics (Total, User, System), User vs System keyspace toggle, Create Keyspace wizard (Single-Region & Multi-Region replication), keyspace detail view with active Cassandra tables inventory and Tags, Create Table wizard with dynamic interactive Cassandra column schema builder supporting all CQL data types, partition key (HASH) and clustering column (ASC/DESC) designations, On-demand vs Provisioned capacity modes, live KMS Customer Managed Key integration, Point-in-time recovery (PITR), and default TTL, comprehensive table detail view with Overview, Edit settings (add schema columns, update capacity throughput, toggle PITR/TTL), and Tags tabs, Configuration page detailing regional TLS 1.2+ endpoints (port 9142) and service quotas, comprehensive learner documentation (`docs/Keyspaces.md`), and Action Support Matrix audit.

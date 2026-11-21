@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StreamSummaryItem } from "../types";
@@ -27,11 +27,6 @@ export default function StreamsClient({
   const [searchQuery, setSearchQuery] = useState("");
   const [error, setError] = useState<string | null>(initialError || null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
-  const [isMounted, setIsMounted] = useState(false);
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
 
   // Actions menu
   const [showActionsDropdown, setShowActionsDropdown] = useState(false);
@@ -74,6 +69,23 @@ export default function StreamsClient({
       return `${hours} hours (${days} day${days > 1 ? "s" : ""})`;
     }
     return `${hours} hours`;
+  }
+
+  function formatStreamDate(isoString?: string): string {
+    if (!isoString) return "—";
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return "—";
+      const year = d.getUTCFullYear();
+      const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const day = String(d.getUTCDate()).padStart(2, "0");
+      const hours = String(d.getUTCHours()).padStart(2, "0");
+      const mins = String(d.getUTCMinutes()).padStart(2, "0");
+      const secs = String(d.getUTCSeconds()).padStart(2, "0");
+      return `${year}-${month}-${day} ${hours}:${mins}:${secs} UTC`;
+    } catch {
+      return "—";
+    }
   }
 
   function getStatusBadge(status: string) {
@@ -360,12 +372,8 @@ export default function StreamsClient({
                           <span className="text-[#545b64]">None</span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-[#545b64]" suppressHydrationWarning>
-                        {s.StreamCreationTimestamp
-                          ? isMounted
-                            ? new Date(s.StreamCreationTimestamp).toLocaleString()
-                            : new Date(s.StreamCreationTimestamp).toISOString().replace("T", " ").substring(0, 19) + " UTC"
-                          : "—"}
+                      <td className="px-4 py-3 text-[#545b64]">
+                        {formatStreamDate(s.StreamCreationTimestamp)}
                       </td>
                     </tr>
                   );
