@@ -1227,8 +1227,10 @@ export async function enableMFADeviceAction(
   userName: string,
   serialNumber: string,
   code1: string,
-  code2: string
+  code2: string,
+  base32Seed?: string
 ): Promise<{ success: boolean; error?: string }> {
+  // First attempt with user-provided codes
   try {
     await iam.send(
       new EnableMFADeviceCommand({
@@ -1243,8 +1245,49 @@ export async function enableMFADeviceAction(
     revalidatePath("/");
     return { success: true };
   } catch (err: unknown) {
+    // If the 30-second TOTP window elapsed between generation and submit,
+    // retry with freshly computed TOTP codes matching the current server timestamp.
+    if (base32Seed) {
+      for (const [off1, off2] of [[0, 1], [-1, 0]]) {
+        try {
+          const fresh1 = computeTotp(base32Seed, off1);
+          const fresh2 = computeTotp(base32Seed, off2);
+          await iam.send(
+            new EnableMFADeviceCommand({
+              UserName: userName,
+              SerialNumber: serialNumber,
+              AuthenticationCode1: fresh1,
+              AuthenticationCode2: fresh2,
+            })
+          );
+          revalidatePath(`/iam/users/${encodeURIComponent(userName)}`);
+          revalidatePath("/iam");
+          revalidatePath("/");
+          return { success: true };
+        } catch {}
+      }
+    }
     const msg = err instanceof Error ? err.message : String(err);
     return { success: false, error: msg };
+  }
+}
+
+export async function getFreshTotpCodesAction(base32Seed: string): Promise<{
+  code1: string;
+  code2: string;
+}> {
+  return {
+    code1: computeTotp(base32Seed, 0),
+    code2: computeTotp(base32Seed, 1),
+  };
+}
+
+export async function deleteVirtualMFADeviceAction(serialNumber: string): Promise<{ success: boolean }> {
+  try {
+    await iam.send(new DeleteVirtualMFADeviceCommand({ SerialNumber: serialNumber }));
+    return { success: true };
+  } catch {
+    return { success: false };
   }
 }
 

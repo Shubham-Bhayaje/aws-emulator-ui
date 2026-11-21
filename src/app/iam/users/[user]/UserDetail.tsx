@@ -23,6 +23,8 @@ import {
   createVirtualMFADeviceAction,
   enableMFADeviceAction,
   deactivateMFADeviceAction,
+  getFreshTotpCodesAction,
+  deleteVirtualMFADeviceAction,
   MFADeviceInfo,
 } from "../../actions";
 
@@ -279,11 +281,22 @@ export function UserDetail({
     }
   }
 
-  function handleAutofillCodes() {
-    if (sampleCode1 && sampleCode2) {
+  async function handleAutofillCodes() {
+    if (createdBase32Seed) {
+      const fresh = await getFreshTotpCodesAction(createdBase32Seed);
+      setAuthCode1(fresh.code1);
+      setAuthCode2(fresh.code2);
+    } else if (sampleCode1 && sampleCode2) {
       setAuthCode1(sampleCode1);
       setAuthCode2(sampleCode2);
     }
+  }
+
+  function handleCloseAssignMfaModal() {
+    if (createdDeviceSerial) {
+      deleteVirtualMFADeviceAction(createdDeviceSerial).catch(() => {});
+    }
+    setShowAssignMfaModal(false);
   }
 
   function handleConfirmAssignMfa() {
@@ -297,7 +310,8 @@ export function UserDetail({
         user.userName,
         createdDeviceSerial,
         authCode1.trim(),
-        authCode2.trim()
+        authCode2.trim(),
+        createdBase32Seed
       );
       if (res.success) {
         setMfaDevices((prev) => [
@@ -1114,7 +1128,7 @@ export function UserDetail({
               </div>
               <button
                 type="button"
-                onClick={() => setShowAssignMfaModal(false)}
+                onClick={handleCloseAssignMfaModal}
                 className="text-[#545b64] hover:text-[#16191f]"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1289,7 +1303,7 @@ export function UserDetail({
             <div className="p-4 border-t border-[#eaeded] flex items-center justify-end gap-2 flex-shrink-0 bg-[#fafafa]">
               <button
                 type="button"
-                onClick={() => setShowAssignMfaModal(false)}
+                onClick={handleCloseAssignMfaModal}
                 disabled={isPending || isCreatingDevice}
                 style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
                 className="h-[32px] px-4 border border-[#aab7b8] rounded-sm text-[13px] font-bold text-[#16191f] bg-white hover:bg-[#f2f3f3] whitespace-nowrap inline-flex items-center justify-center transition-colors"
