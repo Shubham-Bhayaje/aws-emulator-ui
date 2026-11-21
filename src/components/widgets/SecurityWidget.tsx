@@ -20,45 +20,6 @@ interface SecurityWidgetProps {
   onRemove?: () => void;
 }
 
-const DEFAULT_FINDINGS: SecurityFinding[] = [
-  {
-    id: "SEC-IAM-01",
-    title: "IAM.1 Root account should have MFA enabled",
-    severity: "CRITICAL",
-    resource: "arn:aws:iam::000000000000:root",
-    remediationHref: "/iam",
-    remediationLabel: "Configure in IAM",
-    reason: "Root user credentials should not have direct console access without multi-factor authentication.",
-  },
-  {
-    id: "SEC-USER-shubh",
-    title: "IAM.2 Console access without active MFA for user: shubh",
-    severity: "HIGH",
-    resource: "arn:aws:iam::000000000000:user/shubh",
-    remediationHref: "/iam/users/shubh",
-    remediationLabel: "Manage shubh",
-    reason: "User shubh does not have an active virtual or hardware MFA device attached.",
-  },
-  {
-    id: "SEC-S3-01",
-    title: "S3.2 S3 Bucket default encryption disabled",
-    severity: "HIGH",
-    resource: "arn:aws:s3:::test-bucket",
-    remediationHref: "/s3",
-    remediationLabel: "View in S3",
-    reason: "Bucket test-bucket does not mandate AWS KMS or AES-256 server-side encryption by default.",
-  },
-  {
-    id: "SEC-SQS-01",
-    title: "SQS.1 SQS Queue Server-Side Encryption (SSE) disabled",
-    severity: "CRITICAL",
-    resource: "arn:aws:sqs:us-east-1:000000000000:billing-events",
-    remediationHref: "/sqs",
-    remediationLabel: "View in SQS",
-    reason: "Queue billing-events transmits unencrypted payloads at rest.",
-  },
-];
-
 export default function SecurityWidget({ onRemove }: SecurityWidgetProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -66,15 +27,15 @@ export default function SecurityWidget({ onRemove }: SecurityWidgetProps) {
   const [isScanning, setIsScanning] = useState(false);
 
   // Security score and findings
-  const [score, setScore] = useState(75);
-  const [failedControls, setFailedControls] = useState(63);
-  const [totalControls, setTotalControls] = useState(326);
-  const [criticalCount, setCriticalCount] = useState(11);
-  const [highCount, setHighCount] = useState(34);
-  const [mediumCount, setMediumCount] = useState(18);
-  const [findings, setFindings] = useState<SecurityFinding[]>(DEFAULT_FINDINGS);
+  const [score, setScore] = useState(100);
+  const [failedControls, setFailedControls] = useState(0);
+  const [totalControls, setTotalControls] = useState(21);
+  const [criticalCount, setCriticalCount] = useState(0);
+  const [highCount, setHighCount] = useState(0);
+  const [mediumCount, setMediumCount] = useState(0);
+  const [findings, setFindings] = useState<SecurityFinding[]>([]);
   const [resolvedFindingIds, setResolvedFindingIds] = useState<string[]>([]);
-  const [lastUpdated, setLastUpdated] = useState("Sep 24, 2024, 09:12 AM");
+  const [lastUpdated, setLastUpdated] = useState("");
 
   const [filterSeverity, setFilterSeverity] = useState<"all" | "critical" | "high" | "medium">("all");
 
@@ -98,9 +59,7 @@ export default function SecurityWidget({ onRemove }: SecurityWidgetProps) {
       setCriticalCount(res.criticalCount);
       setHighCount(res.highCount);
       setMediumCount(res.mediumCount);
-      if (res.findings.length > 0) {
-        setFindings(res.findings);
-      }
+      setFindings(res.findings);
       setLastUpdated(res.lastUpdated);
     } catch (err) {
       console.error("Audit error:", err);
@@ -394,7 +353,19 @@ export default function SecurityWidget({ onRemove }: SecurityWidgetProps) {
 
             {/* Findings List */}
             <div className="space-y-3 overflow-y-auto flex-1 pr-1">
-              {activeFindings.length === 0 ? (
+              {findings.length === 0 ? (
+                <div className="py-10 text-center text-[#545b64]">
+                  <div className="w-10 h-10 mx-auto mb-2 rounded-full bg-[#e6f4ea] text-[#137333] flex items-center justify-center">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                  <div className="text-[15px] font-bold text-[#16191f] mb-1">No failed controls found</div>
+                  <p className="text-[12px] text-[#545b64] max-w-[420px] mx-auto">
+                    All evaluated resources comply with AWS Foundational Security Best Practices. Root account MFA and IAM user protections are active.
+                  </p>
+                </div>
+              ) : activeFindings.length === 0 ? (
                 <div className="py-8 text-center text-[#545b64] text-[13px]">
                   No findings matching this filter.
                 </div>

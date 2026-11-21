@@ -254,8 +254,8 @@ export async function runLiveSecurityAudit(): Promise<SecurityAuditResponse> {
   const mediumCount = findings.filter((f) => f.severity === "MEDIUM").length;
 
   const scorePercentage = Math.max(
-    50,
-    Math.min(95, Math.round((passedControls / Math.max(evaluatedControls, 1)) * 100))
+    0,
+    Math.min(100, Math.round((passedControls / Math.max(evaluatedControls, 1)) * 100))
   );
 
   return {
