@@ -13,7 +13,8 @@ import { useRouter } from "next/navigation";
 import {
   S3Icon, SQSIcon, DynamoDBIcon, IAMIcon, ServiceIcon
 } from "./AwsIcons";
-import { SERVICE_CATEGORIES, ALL_SERVICES } from "@/lib/services-catalog";
+import { SERVICE_CATEGORIES, ALL_SERVICES, isServiceFullyBuilt } from "@/lib/services-catalog";
+import { searchServicesAndFeatures } from "@/lib/searchServices";
 import SwitchIdentityModal from "./SwitchIdentityModal";
 import CloudShellTerminal from "./CloudShellTerminal";
 import { ActiveIdentity } from "@/lib/permissions";
@@ -65,6 +66,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
   const [servicesSearchQuery, setServicesSearchQuery] = useState("");
   const [globalSearch, setGlobalSearch] = useState("");
   const [searchFocused, setSearchFocused] = useState(false);
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [selectedRegion, setSelectedRegion] = useState(initialRegion || "us-east-1");
 
   // Notifications State
@@ -168,32 +170,79 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
   const filteredCategories = useMemo(() => {
     if (!servicesSearchQuery.trim()) return SERVICE_CATEGORIES;
     const q = servicesSearchQuery.toLowerCase().trim();
+    const tokens = q.split(/\s+/).filter(Boolean);
+
     return SERVICE_CATEGORIES
       .map((cat) => ({
         ...cat,
-        services: cat.services.filter(
-          (s) =>
-            s.name.toLowerCase().includes(q) ||
-            s.shortName.toLowerCase().includes(q) ||
-            s.desc.toLowerCase().includes(q) ||
-            cat.category.toLowerCase().includes(q)
-        ),
+        services: cat.services.filter((s) => {
+          const aliasStr = (s.aliases || []).join(" ").toLowerCase();
+          const target = `${s.name} ${s.shortName} ${aliasStr} ${s.desc} ${cat.category}`.toLowerCase();
+          return tokens.every((t) => target.includes(t)) || target.includes(q);
+        }),
       }))
       .filter((cat) => cat.services.length > 0);
   }, [servicesSearchQuery]);
 
-  // Global search matching results (across all 200+ services)
-  const globalSearchResults = useMemo(() => {
-    if (!globalSearch.trim()) return [];
-    const q = globalSearch.toLowerCase().trim();
-    return ALL_SERVICES.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.shortName.toLowerCase().includes(q) ||
-        s.desc.toLowerCase().includes(q) ||
-        s.category.toLowerCase().includes(q)
-    ).slice(0, 10);
+  // Global search matching results (across all 200+ services and features)
+  const searchResult = useMemo(() => {
+    return searchServicesAndFeatures(globalSearch);
   }, [globalSearch]);
+
+  const flatSearchItems = useMemo(() => {
+    return [
+      ...searchResult.services.map((s) => ({
+        type: "service" as const,
+        name: s.name,
+        href: s.href,
+        id: s.id,
+        shortName: s.shortName,
+        category: s.category,
+        desc: s.desc,
+        color: s.color,
+        status: s.status,
+      })),
+      ...searchResult.features.map((f) => ({
+        type: "feature" as const,
+        name: f.name,
+        href: f.href,
+        id: f.id,
+        shortName: f.serviceName,
+        category: f.category,
+        desc: f.desc,
+        color: f.color,
+        status: "functional",
+        parentService: f.serviceName,
+      })),
+    ];
+  }, [searchResult]);
+
+  const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!searchFocused) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (flatSearchItems.length > 0) {
+        setActiveSearchIndex((prev) => (prev + 1) % flatSearchItems.length);
+      }
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (flatSearchItems.length > 0) {
+        setActiveSearchIndex((prev) => (prev - 1 + flatSearchItems.length) % flatSearchItems.length);
+      }
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (flatSearchItems.length > 0 && flatSearchItems[activeSearchIndex]) {
+        const item = flatSearchItems[activeSearchIndex];
+        handleServiceClick(item.name, item.href);
+      } else if (flatSearchItems.length > 0) {
+        handleServiceClick(flatSearchItems[0].name, flatSearchItems[0].href);
+      }
+    } else if (e.key === "Escape") {
+      setSearchFocused(false);
+      searchInputRef.current?.blur();
+    }
+  };
 
   const currentRegionObj = availableRegions.find((r) => r.id === selectedRegion) || availableRegions[0];
 
@@ -252,19 +301,29 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                     <div className="px-4 pt-3 pb-1 text-[11px] font-bold text-[#545b64] uppercase tracking-wider">
                       {cat.category}
                     </div>
-                    {cat.services.map((s) => (
-                      <button
-                        key={s.href}
-                        onClick={() => handleServiceClick(s.name, s.href)}
-                        className="w-full text-left px-4 py-[6px] text-[13px] text-[#0073bb] hover:bg-[#f2f3f3] flex items-center gap-2.5 group transition-colors"
-                      >
-                        <ServiceIcon id={s.id} shortName={s.shortName} color={s.color} size={16} />
-                        <div className="min-w-0">
-                          <div className="group-hover:text-[#ec7211] font-medium text-[#16191f]">{s.name}</div>
-                          <div className="text-[11px] text-[#545b64] truncate">{s.desc}</div>
-                        </div>
-                      </button>
-                    ))}
+                    {cat.services.map((s) => {
+                      const isBuilt = isServiceFullyBuilt(s.id) || s.status === "functional";
+                      return (
+                        <button
+                          key={s.href}
+                          onClick={() => handleServiceClick(s.name, s.href)}
+                          className="w-full text-left px-4 py-[6px] text-[13px] text-[#0073bb] hover:bg-[#f2f3f3] flex items-center justify-between gap-2.5 group transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <ServiceIcon id={s.id} shortName={s.shortName} color={s.color} size={16} />
+                            <div className="min-w-0">
+                              <div className="group-hover:text-[#ec7211] font-medium text-[#16191f] truncate">{s.name}</div>
+                              <div className="text-[11px] text-[#545b64] truncate">{s.desc}</div>
+                            </div>
+                          </div>
+                          {isBuilt && (
+                            <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#e7f4e4] text-[#1d8102] border border-[#a2dca0]">
+                              Built
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 ))}
                 {filteredCategories.length === 0 && (
@@ -301,15 +360,20 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
               value={globalSearch}
               onChange={(e) => {
                 setGlobalSearch(e.target.value);
+                setActiveSearchIndex(0);
                 setSearchFocused(true);
               }}
               onFocus={() => setSearchFocused(true)}
+              onKeyDown={handleSearchKeyDown}
               className="w-full border border-[#5f6b7a] rounded-md pl-9 pr-8 py-[5px] text-[13px] text-white placeholder-[#8d9ba8] focus:outline-none focus:border-white focus:ring-1 focus:ring-white/40 transition-all"
               style={{ backgroundColor: "#0d1b2a" }}
             />
             {globalSearch && (
               <button
-                onClick={() => setGlobalSearch("")}
+                onClick={() => {
+                  setGlobalSearch("");
+                  setActiveSearchIndex(0);
+                }}
                 className="absolute right-2.5 text-[#8d9ba8] hover:text-white p-0.5"
                 title="Clear"
               >
@@ -323,32 +387,129 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
 
           {/* Search Dropdown / Palette */}
           {searchFocused && (
-            <div className="absolute top-[38px] left-0 right-0 bg-white border border-[#d5dbdb] shadow-2xl rounded-b-md z-50 overflow-hidden max-h-[380px] overflow-y-auto">
+            <div className="absolute top-[38px] left-0 right-0 bg-white border border-[#d5dbdb] shadow-2xl rounded-b-md z-50 overflow-hidden max-h-[460px] overflow-y-auto">
               {globalSearch.trim() ? (
                 <div>
-                  <div className="px-3 py-2 bg-[#fafafa] border-b border-[#eaeded] text-[11px] font-semibold text-[#545b64] uppercase tracking-wide">
-                    Services ({globalSearchResults.length})
-                  </div>
-                  {globalSearchResults.map((s) => (
-                    <button
-                      key={s.href}
-                      onClick={() => handleServiceClick(s.name, s.href)}
-                      className="w-full text-left px-3 py-2 hover:bg-[#f2f3f3] flex items-center gap-3 border-b border-[#eaeded]/60 group transition-colors"
-                    >
-                      <ServiceIcon id={s.id} shortName={s.shortName} color={s.color} size={16} />
-                      <div className="min-w-0 flex-1">
-                        <div className="text-[13px] font-medium text-[#16191f] group-hover:text-[#ec7211] flex items-center gap-2">
-                          {s.name}
-                          <span className="text-[11px] text-[#545b64] font-normal">in {s.category}</span>
-                        </div>
-                        <div className="text-[11px] text-[#545b64] truncate">{s.desc}</div>
+                  {/* Services Section */}
+                  {searchResult.services.length > 0 && (
+                    <div>
+                      <div className="px-3 py-1.5 bg-[#fafafa] border-b border-[#eaeded] text-[11px] font-semibold text-[#545b64] uppercase tracking-wide">
+                        Services ({searchResult.services.length})
                       </div>
-                      <span className="text-[11px] text-[#0073bb] group-hover:underline">Open</span>
-                    </button>
-                  ))}
-                  {globalSearchResults.length === 0 && (
-                    <div className="px-4 py-8 text-center text-[#545b64] text-[13px]">
-                      No services found for &quot;{globalSearch}&quot;
+                      {searchResult.services.map((s, idx) => {
+                        const isSelected = activeSearchIndex === idx;
+                        return (
+                          <button
+                            key={s.href}
+                            onClick={() => handleServiceClick(s.name, s.href)}
+                            onMouseEnter={() => setActiveSearchIndex(idx)}
+                            className={`w-full text-left px-3 py-2 flex items-center gap-3 border-b border-[#eaeded]/60 group transition-colors ${
+                              isSelected
+                                ? "bg-[#f2f8fd] border-l-4 border-l-[#ec7211]"
+                                : "hover:bg-[#fafafa]"
+                            }`}
+                          >
+                            <ServiceIcon id={s.id} shortName={s.shortName} color={s.color} size={16} />
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-medium text-[#16191f] group-hover:text-[#ec7211] flex items-center gap-2">
+                                <span>{s.name}</span>
+                                {(isServiceFullyBuilt(s.id) || s.status === "functional") && (
+                                  <span className="shrink-0 px-1.5 py-0.2 rounded text-[10px] font-bold bg-[#e7f4e4] text-[#1d8102] border border-[#a2dca0]">
+                                    Built
+                                  </span>
+                                )}
+                                <span className="text-[11px] text-[#545b64] font-normal truncate">
+                                  in {s.category}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-[#545b64] truncate">{s.desc}</div>
+                            </div>
+                            <span className="text-[11px] text-[#0972d3] group-hover:underline">Open</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Features Section */}
+                  {searchResult.features.length > 0 && (
+                    <div>
+                      <div className="px-3 py-1.5 bg-[#fafafa] border-b border-[#eaeded] text-[11px] font-semibold text-[#545b64] uppercase tracking-wide">
+                        Features ({searchResult.features.length})
+                      </div>
+                      {searchResult.features.map((f, fIdx) => {
+                        const overallIndex = searchResult.services.length + fIdx;
+                        const isSelected = activeSearchIndex === overallIndex;
+                        return (
+                          <button
+                            key={f.id}
+                            onClick={() => handleServiceClick(f.name, f.href)}
+                            onMouseEnter={() => setActiveSearchIndex(overallIndex)}
+                            className={`w-full text-left px-3 py-2 flex items-center gap-3 border-b border-[#eaeded]/60 group transition-colors ${
+                              isSelected
+                                ? "bg-[#f2f8fd] border-l-4 border-l-[#ec7211]"
+                                : "hover:bg-[#fafafa]"
+                            }`}
+                          >
+                            <div className="w-4 h-4 rounded flex items-center justify-center text-[10px] font-bold bg-[#eaeded] text-[#545b64]">
+                              &#8627;
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-[13px] font-medium text-[#16191f] group-hover:text-[#ec7211] flex items-center gap-2">
+                                <span>{f.name}</span>
+                                <span className="text-[11px] text-[#545b64] font-normal truncate">
+                                  in {f.serviceName}
+                                </span>
+                              </div>
+                              <div className="text-[11px] text-[#545b64] truncate">{f.desc}</div>
+                            </div>
+                            <span className="text-[11px] text-[#0972d3] group-hover:underline">Jump</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Empty state */}
+                  {searchResult.totalMatches === 0 && (
+                    <div className="px-4 py-6 text-center space-y-3">
+                      <div className="text-[#545b64] text-[13px]">
+                        No services or features found for &quot;<strong>{globalSearch}</strong>&quot;
+                      </div>
+                      <div className="text-[11px] text-[#879596]">
+                        Try searching by service name, abbreviation (SSM, KMS, IAM, ACM, S3, EC2), or feature.
+                      </div>
+                      <div className="flex flex-wrap items-center justify-center gap-1.5 pt-1">
+                        {[
+                          { label: "Parameter Store", query: "Parameter Store" },
+                          { label: "Secrets Manager", query: "Secrets Manager" },
+                          { label: "KMS Keys", query: "KMS" },
+                          { label: "Certificates (ACM)", query: "ACM" },
+                          { label: "S3 Buckets", query: "S3" },
+                          { label: "EC2", query: "EC2" },
+                          { label: "IAM", query: "IAM" },
+                        ].map((sug) => (
+                          <button
+                            key={sug.label}
+                            type="button"
+                            onClick={() => {
+                              setGlobalSearch(sug.query);
+                              searchInputRef.current?.focus();
+                            }}
+                            className="text-[11px] bg-[#f2f3f3] hover:bg-[#eaeded] text-[#16191f] px-2.5 py-1 rounded border border-[#d5dbdb] transition-colors"
+                          >
+                            {sug.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Footer Bar */}
+                  {searchResult.totalMatches > 0 && (
+                    <div className="p-2 bg-[#fafafa] border-t border-[#eaeded] text-[11px] text-[#879596] flex items-center justify-between">
+                      <span>Navigate with <kbd className="bg-[#eaeded] px-1 py-0.5 rounded text-[#16191f]">↑</kbd> <kbd className="bg-[#eaeded] px-1 py-0.5 rounded text-[#16191f]">↓</kbd> • Press <kbd className="bg-[#eaeded] px-1 py-0.5 rounded text-[#16191f]">Enter</kbd> to select</span>
+                      <span>Press <kbd className="bg-[#eaeded] px-1 py-0.5 rounded text-[#16191f]">Esc</kbd> to dismiss</span>
                     </div>
                   )}
                 </div>
@@ -359,7 +520,12 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                   </div>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
+                      { name: "Parameter Store", href: "/systems-manager/parameter-store", icon: <ServiceIcon id="systems-manager" shortName="SSM" color="#C925D1" size={14} /> },
+                      { name: "Secrets Manager", href: "/secretsmanager", icon: <ServiceIcon id="secretsmanager" shortName="SM" color="#DD3522" size={14} /> },
+                      { name: "KMS", href: "/kms", icon: <ServiceIcon id="kms" shortName="KMS" color="#E7157B" size={14} /> },
+                      { name: "Certificate Manager", href: "/acm", icon: <ServiceIcon id="acm" shortName="ACM" color="#E7157B" size={14} /> },
                       { name: "S3", href: "/s3", icon: <S3Icon size={14} /> },
+                      { name: "EC2", href: "/ec2", icon: <ServiceIcon id="ec2" shortName="EC2" color="#FF9900" size={14} /> },
                       { name: "SQS", href: "/sqs", icon: <SQSIcon size={14} /> },
                       { name: "DynamoDB", href: "/dynamodb", icon: <DynamoDBIcon size={14} /> },
                       { name: "IAM", href: "/iam", icon: <IAMIcon size={14} /> },

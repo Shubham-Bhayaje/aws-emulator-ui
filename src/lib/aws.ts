@@ -30,6 +30,9 @@ import { ResourceGroupsClient } from "@aws-sdk/client-resource-groups";
 import { AccountClient } from "@aws-sdk/client-account";
 import { ACMClient } from "@aws-sdk/client-acm";
 import { Route53Client } from "@aws-sdk/client-route-53";
+import { SecretsManagerClient } from "@aws-sdk/client-secrets-manager";
+import { SSMClient } from "@aws-sdk/client-ssm";
+import { ACMPCAClient } from "@aws-sdk/client-acm-pca";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -140,6 +143,24 @@ export const acm = new ACMClient({
 
 // --- Route 53 (DNS) ---
 export const route53 = new Route53Client({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- Secrets Manager ---
+export const secretsManager = new SecretsManagerClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- SSM (Systems Manager / Parameter Store) ---
+export const ssm = new SSMClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- ACM-PCA (AWS Private Certificate Authority) ---
+export const acmPca = new ACMPCAClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });

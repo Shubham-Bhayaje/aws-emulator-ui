@@ -8,6 +8,7 @@
 import { revalidatePath } from "next/cache";
 import { acm, route53 } from "@/lib/aws";
 import {
+  ACMClient,
   ListCertificatesCommand,
   DescribeCertificateCommand,
   RequestCertificateCommand,
@@ -21,6 +22,7 @@ import {
   ResendValidationEmailCommand,
 } from "@aws-sdk/client-acm";
 import {
+  Route53Client,
   ListHostedZonesCommand,
   ChangeResourceRecordSetsCommand,
 } from "@aws-sdk/client-route-53";
@@ -34,6 +36,19 @@ import {
 } from "./types";
 import { formatAcmDate } from "./dateUtils";
 
+const ENDPOINT = "https://127.0.0.1:9297";
+const DEFAULT_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
+
+function getAcmClient(): ACMClient {
+  if (acm && typeof (acm as any).send === "function") return acm;
+  return new ACMClient({ endpoint: ENDPOINT, region: DEFAULT_REGION });
+}
+
+function getRoute53Client(): Route53Client {
+  if (route53 && typeof (route53 as any).send === "function") return route53;
+  return new Route53Client({ endpoint: ENDPOINT, region: DEFAULT_REGION });
+}
+
 /**
  * Fetch list of all certificates.
  */
@@ -43,7 +58,7 @@ export async function fetchCertificatesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const listRes = await acm.send(new ListCertificatesCommand({}));
+    const listRes = await getAcmClient().send(new ListCertificatesCommand({}));
     const rawList = listRes.CertificateSummaryList || [];
 
     const summaries: ACMCertificateSummary[] = [];
@@ -96,8 +111,8 @@ export async function fetchCertificateDetailAction(idOrArn: string): Promise<{
     }
 
     const [descRes, tagsRes] = await Promise.all([
-      acm.send(new DescribeCertificateCommand({ CertificateArn: arn })),
-      acm.send(new ListTagsForCertificateCommand({ CertificateArn: arn })).catch(() => ({ Tags: [] })),
+      getAcmClient().send(new DescribeCertificateCommand({ CertificateArn: arn })),
+      getAcmClient().send(new ListTagsForCertificateCommand({ CertificateArn: arn })).catch(() => ({ Tags: [] })),
     ]);
 
     const cert = descRes.Certificate;
@@ -110,7 +125,7 @@ export async function fetchCertificateDetailAction(idOrArn: string): Promise<{
 
     if (cert.Status === "ISSUED") {
       try {
-        const getRes = await acm.send(new GetCertificateCommand({ CertificateArn: arn }));
+        const getRes = await getAcmClient().send(new GetCertificateCommand({ CertificateArn: arn }));
         certificatePem = getRes.Certificate || "";
         certificateChainPem = getRes.CertificateChain || "";
       } catch {
@@ -204,7 +219,7 @@ export async function requestCertificateAction(input: RequestCertificateInput): 
       .filter((t) => t.key.trim().length > 0)
       .map((t) => ({ Key: t.key.trim(), Value: t.value.trim() }));
 
-    const res = await acm.send(
+    const res = await getAcmClient().send(
       new RequestCertificateCommand({
         DomainName: input.domainName.trim(),
         SubjectAlternativeNames:
@@ -257,7 +272,7 @@ export async function importCertificateAction(input: ImportCertificateInput): Pr
       .filter((t) => t.key.trim().length > 0)
       .map((t) => ({ Key: t.key.trim(), Value: t.value.trim() }));
 
-    const res = await acm.send(
+    const res = await getAcmClient().send(
       new ImportCertificateCommand({
         Certificate: Buffer.from(input.certificatePem.trim()),
         PrivateKey: Buffer.from(input.privateKeyPem.trim()),
@@ -290,7 +305,7 @@ export async function deleteCertificateAction(certificateArn: string): Promise<{
   error?: string;
 }> {
   try {
-    await acm.send(new DeleteCertificateCommand({ CertificateArn: certificateArn }));
+    await getAcmClient().send(new DeleteCertificateCommand({ CertificateArn: certificateArn }));
     revalidatePath("/acm");
     return { success: true };
   } catch (err: unknown) {
@@ -307,7 +322,7 @@ export async function addTagsAction(
   tags: Array<{ Key: string; Value: string }>
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await acm.send(
+    await getAcmClient().send(
       new AddTagsToCertificateCommand({
         CertificateArn: certificateArn,
         Tags: tags,
@@ -330,7 +345,7 @@ export async function removeTagsAction(
   tagKeys: string[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await acm.send(
+    await getAcmClient().send(
       new RemoveTagsFromCertificateCommand({
         CertificateArn: certificateArn,
         Tags: tagKeys.map((k) => ({ Key: k })),
@@ -353,7 +368,7 @@ export async function updateCertificateOptionsAction(
   loggingPreference: "ENABLED" | "DISABLED"
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await acm.send(
+    await getAcmClient().send(
       new UpdateCertificateOptionsCommand({
         CertificateArn: certificateArn,
         Options: {
@@ -378,7 +393,7 @@ export async function resendValidationEmailAction(
   validationDomain: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    await acm.send(
+    await getAcmClient().send(
       new ResendValidationEmailCommand({
         CertificateArn: certificateArn,
         Domain: domain,
@@ -402,7 +417,7 @@ export async function fetchHostedZonesAction(): Promise<{
   error?: string;
 }> {
   try {
-    const res = await route53.send(new ListHostedZonesCommand({}));
+    const res = await getRoute53Client().send(new ListHostedZonesCommand({}));
     const rawList = res.HostedZones || [];
 
     const hostedZones: HostedZoneItem[] = rawList.map((z) => ({
@@ -435,7 +450,7 @@ export async function createRoute53RecordsAction(
   hostedZoneId: string
 ): Promise<{ success: boolean; count?: number; error?: string }> {
   try {
-    const desc = await acm.send(new DescribeCertificateCommand({ CertificateArn: certificateArn }));
+    const desc = await getAcmClient().send(new DescribeCertificateCommand({ CertificateArn: certificateArn }));
     const cert = desc.Certificate;
     if (!cert) return { success: false, error: "Certificate not found." };
 
@@ -457,7 +472,7 @@ export async function createRoute53RecordsAction(
       },
     }));
 
-    await route53.send(
+    await getRoute53Client().send(
       new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {

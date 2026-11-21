@@ -55,16 +55,9 @@ export default async function DynamicServicePage(props: Props) {
           <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#f2f3f3] text-[#545b64] border border-[#d5dbdb]">
             {service.category}
           </span>
-          {service.status === "functional" && (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#f2f8f0] text-[#1d8102] border border-[#d4e8cc]">
-              Active
-            </span>
-          )}
-          {service.status === "emulator" && (
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#f2f8fd] text-[#0073bb] border border-[#cbe2f2]">
-              Emulator Ready
-            </span>
-          )}
+          <span className="text-[11px] font-semibold px-2 py-0.5 rounded bg-[#f2f3f3] text-[#545b64] border border-[#d5dbdb]">
+            Coming Soon
+          </span>
         </div>
         <p className="text-[13px] text-[#545b64] max-w-3xl leading-relaxed">
           {service.desc}

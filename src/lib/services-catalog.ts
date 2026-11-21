@@ -11,12 +11,48 @@ export interface ServiceDefinition {
   category: string;
   desc: string;
   color?: string;
-  status?: "functional" | "emulator" | "preview";
+  status?: "functional" | "emulator" | "preview" | "mock" | "coming-soon";
+  aliases?: string[];
 }
 
 export interface ServiceCategory {
   category: string;
   services: ServiceDefinition[];
+}
+
+/**
+ * Set of service IDs that are 100% built, fully functional, and verified with the local AWS emulator.
+ * Strict exact IDs only – never partial or substring matches.
+ */
+export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
+  "ec2",
+  "lambda",
+  "s3",
+  "dynamodb",
+  "sqs",
+  "iam",
+  "kms",
+  "acm",
+  "acm-pca",
+  "pca",
+  "private-ca",
+  "secretsmanager",
+  "systems-manager",
+  "ssm-parameter-store",
+  "organizations",
+  "ram",
+  "resource-groups",
+  "service-quotas",
+  "account",
+]);
+
+export function isServiceFullyBuilt(idOrHref: string): boolean {
+  if (!idOrHref) return false;
+  const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
+  if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "systems-manager/parameter-store") return true;
+  if (clean === "acm/pca" || clean === "acm-pca" || clean === "pca" || clean === "private-ca") return true;
+  return false;
 }
 
 export const ALL_SERVICES: ServiceDefinition[] = [
@@ -28,7 +64,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Compute",
     "color": "#FF9900",
     "status": "functional",
-    "desc": "Virtual servers in the cloud with scalable capacity"
+    "desc": "Virtual servers in the cloud with scalable capacity",
+    "aliases": ["ec2", "instances", "virtual machines", "virtual machine", "servers", "vms", "compute", "ami"]
   },
   {
     "id": "lambda",
@@ -219,7 +256,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Storage",
     "color": "#3F8624",
     "status": "functional",
-    "desc": "Scalable object storage in the cloud with industry-leading durability"
+    "desc": "Scalable object storage in the cloud with industry-leading durability",
+    "aliases": ["s3", "buckets", "bucket", "object storage", "objects", "blobs", "amazon s3"]
   },
   {
     "id": "efs",
@@ -318,8 +356,9 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/dynamodb",
     "category": "Database",
     "color": "#2E27AD",
-    "status": "emulator",
-    "desc": "Managed NoSQL key-value and document database with single-digit millisecond latency"
+    "status": "functional",
+    "desc": "Managed NoSQL key-value and document database with single-digit millisecond latency",
+    "aliases": ["dynamo", "dynamodb", "nosql", "tables", "table", "key-value database", "items", "ddb"]
   },
   {
     "id": "rds",
@@ -562,8 +601,9 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/iam",
     "category": "Security, Identity, & Compliance",
     "color": "#E7157B",
-    "status": "emulator",
-    "desc": "Securely manage access to AWS services, users, groups, and IAM policies"
+    "status": "functional",
+    "desc": "Securely manage access to AWS services, users, groups, and IAM policies",
+    "aliases": ["iam", "identity", "users", "roles", "policies", "permissions", "access management"]
   },
   {
     "id": "identity-center",
@@ -589,8 +629,10 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "shortName": "Secrets Manager",
     "href": "/secretsmanager",
     "category": "Security, Identity, & Compliance",
-    "color": "#E7157B",
-    "desc": "Rotate, manage, and retrieve database credentials, API keys, and other secrets"
+    "color": "#DD3522",
+    "status": "functional",
+    "desc": "Rotate, manage, and retrieve database credentials, API keys, and other secrets",
+    "aliases": ["secrets", "secret", "credentials", "passwords", "api keys", "secrets manager", "sm", "rotation", "tokens"]
   },
   {
     "id": "kms",
@@ -600,7 +642,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Security, Identity, & Compliance",
     "color": "#E7157B",
     "status": "functional",
-    "desc": "Managed creation and centralized control of cryptographic keys used to protect data"
+    "desc": "Managed creation and centralized control of cryptographic keys used to protect data",
+    "aliases": ["kms", "keys", "key", "encryption", "decrypt", "cmk", "cryptographic keys", "key management"]
   },
   {
     "id": "acm",
@@ -609,7 +652,20 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/acm",
     "category": "Security, Identity, & Compliance",
     "color": "#E7157B",
-    "desc": "Provision, manage, and deploy public and private SSL/TLS certificates"
+    "status": "functional",
+    "desc": "Provision, manage, and deploy public and private SSL/TLS certificates",
+    "aliases": ["acm", "certificate manager", "certificates", "certificate", "ssl", "tls", "https", "domain validation"]
+  },
+  {
+    "id": "acm-pca",
+    "name": "AWS Private Certificate Authority",
+    "shortName": "Private CA",
+    "href": "/acm/pca",
+    "category": "Security, Identity, & Compliance",
+    "color": "#E7157B",
+    "status": "functional",
+    "desc": "Create and manage private certificate authorities to issue private X.509 certificates",
+    "aliases": ["acm-pca", "pca", "private ca", "private certificate authority", "ca", "root ca", "subordinate ca", "sub ca", "certificate authority", "issue certificate", "crl", "x.509"]
   },
   {
     "id": "guardduty",
@@ -727,7 +783,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Security, Identity, & Compliance",
     "color": "#E7157B",
     "status": "functional",
-    "desc": "Simple, secure service to share AWS resources across AWS accounts or within your Organization"
+    "desc": "Simple, secure service to share AWS resources across AWS accounts or within your Organization",
+    "aliases": ["ram", "resource sharing", "share resources", "resource access manager", "cross account"]
   },
   {
     "id": "cloudwatch",
@@ -762,8 +819,21 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "shortName": "Systems Manager",
     "href": "/systems-manager",
     "category": "Management & Governance",
-    "color": "#545b64",
-    "desc": "Unified operational hub for managing hybrid cloud nodes and applications"
+    "color": "#C925D1",
+    "status": "functional",
+    "desc": "Unified operational hub for managing hybrid cloud nodes, Parameter Store, Fleet Manager, and applications",
+    "aliases": ["ssm", "systems manager", "parameter store", "fleet manager", "session manager", "run command", "patch manager"]
+  },
+  {
+    "id": "ssm-parameter-store",
+    "name": "AWS Systems Manager Parameter Store",
+    "shortName": "Parameter Store",
+    "href": "/systems-manager/parameter-store",
+    "category": "Management & Governance",
+    "color": "#C925D1",
+    "status": "functional",
+    "desc": "Secure, hierarchical storage for configuration data management and secrets management",
+    "aliases": ["ssm", "parameter store", "parameters", "parameter", "config store", "systems manager parameter store", "ssm parameter store", "securestring"]
   },
   {
     "id": "organizations",
@@ -773,7 +843,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Management & Governance",
     "color": "#C925D1",
     "status": "functional",
-    "desc": "Centralized management and governance for multiple AWS accounts with policy enforcement"
+    "desc": "Centralized management and governance for multiple AWS accounts with policy enforcement",
+    "aliases": ["organizations", "org", "scp", "member accounts", "multi account", "service control policies"]
   },
   {
     "id": "service-quotas",
@@ -783,7 +854,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Management & Governance",
     "color": "#C925D1",
     "status": "functional",
-    "desc": "View and manage quotas for AWS services from a central location as your workloads grow"
+    "desc": "View and manage quotas for AWS services from a central location as your workloads grow",
+    "aliases": ["service quotas", "quotas", "limits", "quota requests", "request increase", "increase limit"]
   },
   {
     "id": "resource-groups",
@@ -793,7 +865,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Management & Governance",
     "color": "#C925D1",
     "status": "functional",
-    "desc": "Organize AWS resources, manage tags across services and Regions, and automate tasks on resource collections"
+    "desc": "Organize AWS resources, manage tags across services and Regions, and automate tasks on resource collections",
+    "aliases": ["resource groups", "tags", "tag editor", "tagging", "bulk tagging", "find resources by tag"]
   },
   {
     "id": "account",
@@ -803,7 +876,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Management & Governance",
     "color": "#C925D1",
     "status": "functional",
-    "desc": "Manage account information, primary and alternate contacts, AWS Region availability, and account settings"
+    "desc": "Manage account information, primary and alternate contacts, AWS Region availability, and account settings",
+    "aliases": ["account", "account management", "contacts", "alternate contacts", "regions", "opt-in regions", "close account"]
   },
   {
     "id": "controltower",
@@ -1344,7 +1418,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Application Integration",
     "color": "#FF4F8B",
     "status": "functional",
-    "desc": "Fully managed message queuing service for standard and FIFO message queues"
+    "desc": "Fully managed message queuing service for standard and FIFO message queues",
+    "aliases": ["sqs", "queues", "queue", "message queue", "messaging", "fifo", "dlq"]
   },
   {
     "id": "sns",
@@ -2565,7 +2640,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "shortName": "Secrets Manager",
         "href": "/secretsmanager",
         "category": "Security, Identity, & Compliance",
-        "color": "#E7157B",
+        "color": "#DD3522",
+        "status": "functional",
         "desc": "Rotate, manage, and retrieve database credentials, API keys, and other secrets"
       },
       {
@@ -2586,6 +2662,15 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "category": "Security, Identity, & Compliance",
         "color": "#E7157B",
         "desc": "Provision, manage, and deploy public and private SSL/TLS certificates"
+      },
+      {
+        "id": "acm-pca",
+        "name": "AWS Private Certificate Authority",
+        "shortName": "Private CA",
+        "href": "/acm/pca",
+        "category": "Security, Identity, & Compliance",
+        "color": "#E7157B",
+        "desc": "Create and manage private certificate authorities to issue private X.509 certificates"
       },
       {
         "id": "guardduty",
@@ -2743,8 +2828,21 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "shortName": "Systems Manager",
         "href": "/systems-manager",
         "category": "Management & Governance",
-        "color": "#545b64",
-        "desc": "Unified operational hub for managing hybrid cloud nodes and applications"
+        "color": "#C925D1",
+        "status": "functional",
+        "desc": "Unified operational hub for managing hybrid cloud nodes, Parameter Store, Fleet Manager, and applications",
+        "aliases": ["ssm", "systems manager", "parameter store", "fleet manager", "session manager", "run command", "patch manager"]
+      },
+      {
+        "id": "ssm-parameter-store",
+        "name": "AWS Systems Manager Parameter Store",
+        "shortName": "Parameter Store",
+        "href": "/systems-manager/parameter-store",
+        "category": "Management & Governance",
+        "color": "#C925D1",
+        "status": "functional",
+        "desc": "Secure, hierarchical storage for configuration data management and secrets management",
+        "aliases": ["ssm", "parameter store", "parameters", "parameter", "config store", "systems manager parameter store", "ssm parameter store", "securestring"]
       },
       {
         "id": "organizations",
@@ -4024,4 +4122,23 @@ export function findServiceByHref(href: string): ServiceDefinition | undefined {
 
 export function findServiceById(id: string): ServiceDefinition | undefined {
   return ALL_SERVICES.find((s) => s.id.toLowerCase() === id.toLowerCase());
+}
+
+// Automatically ensure only genuinely built services have status: "functional", and clear any erroneous status
+for (const s of ALL_SERVICES) {
+  if (isServiceFullyBuilt(s.id) || isServiceFullyBuilt(s.href)) {
+    s.status = "functional";
+  } else {
+    delete s.status;
+  }
+}
+
+for (const cat of SERVICE_CATEGORIES) {
+  for (const s of cat.services) {
+    if (isServiceFullyBuilt(s.id) || isServiceFullyBuilt(s.href)) {
+      s.status = "functional";
+    } else {
+      delete s.status;
+    }
+  }
 }

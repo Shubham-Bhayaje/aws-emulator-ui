@@ -560,6 +560,7 @@ export function ServiceIcon({
     case "cloudformation":
       return <CloudFormationIcon size={size} className={className} />;
     case "systems-manager":
+    case "ssm-parameter-store":
       return <SystemsManagerIcon size={size} className={className} />;
     case "kinesis":
     case "kinesis-firehose":
