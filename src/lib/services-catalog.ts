@@ -816,7 +816,7 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "id": "cloudwatch",
     "name": "Amazon CloudWatch",
     "shortName": "CloudWatch",
-    "href": "/cloudwatch/logs",
+    "href": "/cloudwatch",
     "category": "Management & Governance",
     "color": "#E7157B",
     "status": "functional",

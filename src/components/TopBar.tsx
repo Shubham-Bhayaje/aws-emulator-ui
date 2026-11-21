@@ -406,7 +406,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                         const isSelected = activeSearchIndex === idx;
                         return (
                           <button
-                            key={s.id || `${s.href}-${idx}`}
+                            key={`search-svc-${s.id}-${idx}`}
                             onClick={() => handleServiceClick(s.name, s.href)}
                             onMouseEnter={() => setActiveSearchIndex(idx)}
                             className={`w-full text-left px-3 py-2 flex items-center gap-3 border-b border-[#eaeded]/60 group transition-colors ${
@@ -448,7 +448,7 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
                         const isSelected = activeSearchIndex === overallIndex;
                         return (
                           <button
-                            key={f.id}
+                            key={`search-feat-${f.id}-${fIdx}`}
                             onClick={() => handleServiceClick(f.name, f.href)}
                             onMouseEnter={() => setActiveSearchIndex(overallIndex)}
                             className={`w-full text-left px-3 py-2 flex items-center gap-3 border-b border-[#eaeded]/60 group transition-colors ${
