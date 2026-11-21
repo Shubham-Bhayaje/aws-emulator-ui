@@ -6,7 +6,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { kms } from "@/lib/aws";
+import { kms, iam, sts } from "@/lib/aws";
 import {
   ListKeysCommand,
   ListAliasesCommand,
@@ -14,6 +14,8 @@ import {
   CreateKeyCommand,
   CreateAliasCommand,
   DeleteAliasCommand,
+  UpdateAliasCommand,
+  UpdateKeyDescriptionCommand,
   EnableKeyCommand,
   DisableKeyCommand,
   ScheduleKeyDeletionCommand,
@@ -26,340 +28,23 @@ import {
   ListResourceTagsCommand,
   TagResourceCommand,
   UntagResourceCommand,
+  DescribeCustomKeyStoresCommand,
   EncryptCommand,
   DecryptCommand,
   GenerateDataKeyCommand,
+  KeyUsageType,
+  KeySpec,
 } from "@aws-sdk/client-kms";
-
-export interface KMSKeySummary {
-  keyId: string;
-  arn: string;
-  aliases: string[];
-  description: string;
-  keyState: string;
-  enabled: boolean;
-  creationDate: string;
-  keyUsage: string;
-  keySpec: string;
-  keyManager: "CUSTOMER" | "AWS";
-  origin: string;
-  deletionDate?: string;
-  multiRegion: boolean;
-}
-
-export interface KMSKeyDetail extends KMSKeySummary {
-  keyPolicy?: string;
-  keyRotationEnabled?: boolean;
-  tags?: Array<{ key: string; value: string }>;
-  encryptionAlgorithms?: string[];
-}
-
-/**
- * Standard AWS Managed Keys Catalog with real AWS policies and metadata.
- */
-const AWS_MANAGED_KEYS_CATALOG: Record<
-  string,
-  {
-    serviceName: string;
-    shortName: string;
-    alias: string;
-    description: string;
-    policy: object;
-  }
-> = {
-  "aws-s3-default-key": {
-    serviceName: "Amazon S3",
-    shortName: "s3",
-    alias: "alias/aws/s3",
-    description: "Default key that protects my Amazon S3 objects when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-s3-2",
-      Statement: [
-        {
-          Sid: "Allow access through Amazon S3 for all principals in the account that are authorized to use S3",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: [
-            "kms:Encrypt",
-            "kms:Decrypt",
-            "kms:ReEncrypt*",
-            "kms:GenerateDataKey*",
-            "kms:DescribeKey",
-          ],
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": "s3.us-east-1.amazonaws.com",
-              "kms:CallerAccount": "000000000000",
-            },
-          },
-        },
-        {
-          Sid: "Allow direct access to key metadata to the account",
-          Effect: "Allow",
-          Principal: { AWS: "arn:aws:iam::000000000000:root" },
-          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-  "aws-ebs-default-key": {
-    serviceName: "Amazon EBS",
-    shortName: "ebs",
-    alias: "alias/aws/ebs",
-    description: "Default key that protects my Amazon Elastic Block Store (EBS) volumes when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-ebs-2",
-      Statement: [
-        {
-          Sid: "Allow access through Amazon EBS for all principals in the account that are authorized to use EBS",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: [
-            "kms:Encrypt",
-            "kms:Decrypt",
-            "kms:ReEncrypt*",
-            "kms:GenerateDataKey*",
-            "kms:CreateGrant",
-            "kms:DescribeKey",
-          ],
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": "ec2.us-east-1.amazonaws.com",
-              "kms:CallerAccount": "000000000000",
-            },
-          },
-        },
-        {
-          Sid: "Allow direct access to key metadata to the account",
-          Effect: "Allow",
-          Principal: { AWS: "arn:aws:iam::000000000000:root" },
-          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-  "aws-rds-default-key": {
-    serviceName: "Amazon RDS",
-    shortName: "rds",
-    alias: "alias/aws/rds",
-    description: "Default key that protects my Amazon Relational Database Service (RDS) databases when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-rds-2",
-      Statement: [
-        {
-          Sid: "Allow access through Amazon RDS for all principals in the account that are authorized to use RDS",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: [
-            "kms:Encrypt",
-            "kms:Decrypt",
-            "kms:ReEncrypt*",
-            "kms:GenerateDataKey*",
-            "kms:CreateGrant",
-            "kms:DescribeKey",
-          ],
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": "rds.us-east-1.amazonaws.com",
-              "kms:CallerAccount": "000000000000",
-            },
-          },
-        },
-        {
-          Sid: "Allow direct access to key metadata to the account",
-          Effect: "Allow",
-          Principal: { AWS: "arn:aws:iam::000000000000:root" },
-          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-  "aws-lambda-default-key": {
-    serviceName: "AWS Lambda",
-    shortName: "lambda",
-    alias: "alias/aws/lambda",
-    description: "Default key that protects my AWS Lambda function environment variables and code when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-lambda-2",
-      Statement: [
-        {
-          Sid: "Allow access through AWS Lambda for all principals in the account that are authorized to use Lambda",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: ["kms:Encrypt", "kms:Decrypt", "kms:CreateGrant", "kms:DescribeKey"],
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": "lambda.us-east-1.amazonaws.com",
-              "kms:CallerAccount": "000000000000",
-            },
-          },
-        },
-        {
-          Sid: "Allow direct access to key metadata to the account",
-          Effect: "Allow",
-          Principal: { AWS: "arn:aws:iam::000000000000:root" },
-          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-  "aws-dynamodb-default-key": {
-    serviceName: "Amazon DynamoDB",
-    shortName: "dynamodb",
-    alias: "alias/aws/dynamodb",
-    description: "Default key that protects my Amazon DynamoDB tables and backups when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-dynamodb-2",
-      Statement: [
-        {
-          Sid: "Allow access through DynamoDB",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: [
-            "kms:Encrypt",
-            "kms:Decrypt",
-            "kms:ReEncrypt*",
-            "kms:GenerateDataKey*",
-            "kms:DescribeKey",
-          ],
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": "dynamodb.us-east-1.amazonaws.com",
-              "kms:CallerAccount": "000000000000",
-            },
-          },
-        },
-        {
-          Sid: "Allow direct access to key metadata to the account",
-          Effect: "Allow",
-          Principal: { AWS: "arn:aws:iam::000000000000:root" },
-          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-  "aws-sqs-default-key": {
-    serviceName: "Amazon SQS",
-    shortName: "sqs",
-    alias: "alias/aws/sqs",
-    description: "Default key that protects my Amazon Simple Queue Service (SQS) message queues when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-sqs-2",
-      Statement: [
-        {
-          Sid: "Allow access through Amazon SQS",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"],
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": "sqs.us-east-1.amazonaws.com",
-              "kms:CallerAccount": "000000000000",
-            },
-          },
-        },
-        {
-          Sid: "Allow direct access to key metadata to the account",
-          Effect: "Allow",
-          Principal: { AWS: "arn:aws:iam::000000000000:root" },
-          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-  "aws-sns-default-key": {
-    serviceName: "Amazon SNS",
-    shortName: "sns",
-    alias: "alias/aws/sns",
-    description: "Default key that protects my Amazon SNS topics when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-sns-2",
-      Statement: [
-        {
-          Sid: "Allow access through Amazon SNS",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"],
-          Resource: "*",
-          Condition: {
-            StringEquals: {
-              "kms:ViaService": "sns.us-east-1.amazonaws.com",
-              "kms:CallerAccount": "000000000000",
-            },
-          },
-        },
-        {
-          Sid: "Allow direct access to key metadata to the account",
-          Effect: "Allow",
-          Principal: { AWS: "arn:aws:iam::000000000000:root" },
-          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-  "aws-secretsmanager-default-key": {
-    serviceName: "AWS Secrets Manager",
-    shortName: "secretsmanager",
-    alias: "alias/aws/secretsmanager",
-    description: "Default key that protects my AWS Secrets Manager secrets when no other key is specified",
-    policy: {
-      Version: "2012-10-17",
-      Id: "auto-secretsmanager-2",
-      Statement: [
-        {
-          Sid: "Allow access through Secrets Manager",
-          Effect: "Allow",
-          Principal: { AWS: "*" },
-          Action: ["kms:Encrypt", "kms:Decrypt", "kms:GenerateDataKey*", "kms:DescribeKey"],
-          Resource: "*",
-        },
-      ],
-    },
-  },
-};
-
-/**
- * Helper to match an input string to an AWS Managed Key catalog entry.
- */
-function findAWSManagedKeyEntry(identifier: string) {
-  const norm = identifier.toLowerCase().trim();
-  if (AWS_MANAGED_KEYS_CATALOG[norm]) {
-    return { keyId: norm, entry: AWS_MANAGED_KEYS_CATALOG[norm] };
-  }
-  for (const [keyId, item] of Object.entries(AWS_MANAGED_KEYS_CATALOG)) {
-    if (
-      norm === item.alias.toLowerCase() ||
-      norm === item.alias.replace(/^alias\//, "").toLowerCase() ||
-      norm === item.shortName.toLowerCase() ||
-      norm === `aws/${item.shortName}` ||
-      norm === `alias/aws/${item.shortName}` ||
-      norm === keyId.toLowerCase()
-    ) {
-      return { keyId, entry: item };
-    }
-  }
-  return null;
-}
+import { ListUsersCommand, ListRolesCommand } from "@aws-sdk/client-iam";
+import { GetCallerIdentityCommand } from "@aws-sdk/client-sts";
+import {
+  KMSKeySummary,
+  KMSKeyDetail,
+  CustomKeyStoreItem,
+  IAMPrincipal,
+  CreateKeyInput,
+} from "./types";
+import { formatKmsDate } from "./dateUtils";
 
 /**
  * Fetch Customer Managed Keys (CMKs).
@@ -378,7 +63,6 @@ export async function fetchCustomerManagedKeys(): Promise<{
     const rawKeys = keysRes.Keys || [];
     const rawAliases = aliasesRes.Aliases || [];
 
-    // Map TargetKeyId -> aliases
     const aliasMap: Record<string, string[]> = {};
     for (const a of rawAliases) {
       if (a.TargetKeyId && a.AliasName) {
@@ -389,7 +73,6 @@ export async function fetchCustomerManagedKeys(): Promise<{
 
     const keySummaries: KMSKeySummary[] = [];
 
-    // Fetch DescribeKey for each key
     for (const k of rawKeys) {
       if (!k.KeyId) continue;
       try {
@@ -407,13 +90,16 @@ export async function fetchCustomerManagedKeys(): Promise<{
             description: meta.Description || "",
             keyState: meta.KeyState || "Enabled",
             enabled: meta.Enabled ?? true,
-            creationDate: meta.CreationDate ? new Date(meta.CreationDate).toLocaleString() : "—",
+            creationDate: formatKmsDate(meta.CreationDate),
             keyUsage: meta.KeyUsage || "ENCRYPT_DECRYPT",
             keySpec: meta.KeySpec || meta.CustomerMasterKeySpec || "SYMMETRIC_DEFAULT",
             keyManager: "CUSTOMER",
             origin: meta.Origin || "AWS_KMS",
-            deletionDate: meta.DeletionDate ? new Date(meta.DeletionDate).toLocaleString() : undefined,
+            deletionDate: meta.DeletionDate ? formatKmsDate(meta.DeletionDate) : undefined,
             multiRegion: meta.MultiRegion ?? false,
+            encryptionAlgorithms: meta.EncryptionAlgorithms,
+            signingAlgorithms: meta.SigningAlgorithms,
+            macAlgorithms: meta.MacAlgorithms,
           });
         }
       } catch (e) {
@@ -436,7 +122,7 @@ export async function fetchCustomerManagedKeys(): Promise<{
 }
 
 /**
- * Fetch AWS Managed Keys (default keys created by services).
+ * Fetch AWS Managed Keys (keys managed by AWS services).
  */
 export async function fetchAWSManagedKeys(): Promise<{
   keys: KMSKeySummary[];
@@ -444,71 +130,55 @@ export async function fetchAWSManagedKeys(): Promise<{
   error?: string;
 }> {
   try {
-    const aliasesRes = await kms.send(new ListAliasesCommand({}));
+    const [keysRes, aliasesRes] = await Promise.all([
+      kms.send(new ListKeysCommand({})),
+      kms.send(new ListAliasesCommand({})),
+    ]);
+
+    const rawKeys = keysRes.Keys || [];
     const rawAliases = aliasesRes.Aliases || [];
 
-    const awsAliases = rawAliases.filter(
-      (a) => a.AliasName?.startsWith("alias/aws/")
-    );
-
-    const keys: KMSKeySummary[] = [];
-
-    for (const a of awsAliases) {
-      if (!a.TargetKeyId) continue;
-      try {
-        const desc = await kms.send(new DescribeKeyCommand({ KeyId: a.TargetKeyId }));
-        const meta = desc.KeyMetadata;
-        if (meta) {
-          keys.push({
-            keyId: meta.KeyId || a.TargetKeyId,
-            arn: meta.Arn || "",
-            aliases: [a.AliasName || ""],
-            description: meta.Description || `Default key for ${a.AliasName?.replace("alias/aws/", "").toUpperCase()}`,
-            keyState: meta.KeyState || "Enabled",
-            enabled: meta.Enabled ?? true,
-            creationDate: meta.CreationDate ? new Date(meta.CreationDate).toLocaleString() : "—",
-            keyUsage: meta.KeyUsage || "ENCRYPT_DECRYPT",
-            keySpec: meta.KeySpec || meta.CustomerMasterKeySpec || "SYMMETRIC_DEFAULT",
-            keyManager: "AWS",
-            origin: "AWS_KMS",
-            multiRegion: meta.MultiRegion ?? false,
-          });
-        }
-      } catch {
-        keys.push({
-          keyId: a.TargetKeyId,
-          arn: a.AliasArn || "",
-          aliases: [a.AliasName || ""],
-          description: `Default key for ${a.AliasName?.replace("alias/aws/", "").toUpperCase()}`,
-          keyState: "Enabled",
-          enabled: true,
-          creationDate: "—",
-          keyUsage: "ENCRYPT_DECRYPT",
-          keySpec: "SYMMETRIC_DEFAULT",
-          keyManager: "AWS",
-          origin: "AWS_KMS",
-          multiRegion: false,
-        });
+    const aliasMap: Record<string, string[]> = {};
+    for (const a of rawAliases) {
+      if (a.TargetKeyId && a.AliasName) {
+        if (!aliasMap[a.TargetKeyId]) aliasMap[a.TargetKeyId] = [];
+        aliasMap[a.TargetKeyId].push(a.AliasName);
       }
     }
 
-    // Populate standard AWS managed keys from catalog
-    for (const [id, def] of Object.entries(AWS_MANAGED_KEYS_CATALOG)) {
-      if (!keys.some((k) => k.aliases.includes(def.alias))) {
-        keys.push({
-          keyId: id,
-          arn: `arn:aws:kms:us-east-1:000000000000:${def.alias}`,
-          aliases: [def.alias],
-          description: def.description,
-          keyState: "Enabled",
-          enabled: true,
-          creationDate: "01/01/2026, 00:00:00",
-          keyUsage: "ENCRYPT_DECRYPT",
-          keySpec: "SYMMETRIC_DEFAULT",
-          keyManager: "AWS",
-          origin: "AWS_KMS",
-          multiRegion: false,
-        });
+    const keys: KMSKeySummary[] = [];
+
+    for (const k of rawKeys) {
+      if (!k.KeyId) continue;
+      try {
+        const desc = await kms.send(new DescribeKeyCommand({ KeyId: k.KeyId }));
+        const meta = desc.KeyMetadata;
+        if (!meta) continue;
+
+        const isAws = meta.KeyManager === "AWS" || (aliasMap[k.KeyId] && aliasMap[k.KeyId].some(a => a.startsWith("alias/aws/")));
+
+        if (isAws) {
+          keys.push({
+            keyId: meta.KeyId || k.KeyId,
+            arn: meta.Arn || "",
+            aliases: aliasMap[meta.KeyId || k.KeyId] || [],
+            description: meta.Description || "",
+            keyState: meta.KeyState || "Enabled",
+            enabled: meta.Enabled ?? true,
+            creationDate: formatKmsDate(meta.CreationDate),
+            keyUsage: meta.KeyUsage || "ENCRYPT_DECRYPT",
+            keySpec: meta.KeySpec || meta.CustomerMasterKeySpec || "SYMMETRIC_DEFAULT",
+            keyManager: "AWS",
+            origin: meta.Origin || "AWS_KMS",
+            deletionDate: meta.DeletionDate ? formatKmsDate(meta.DeletionDate) : undefined,
+            multiRegion: meta.MultiRegion ?? false,
+            encryptionAlgorithms: meta.EncryptionAlgorithms,
+            signingAlgorithms: meta.SigningAlgorithms,
+            macAlgorithms: meta.MacAlgorithms,
+          });
+        }
+      } catch (e) {
+        console.error(`Error describing AWS key ${k.KeyId}:`, e);
       }
     }
 
@@ -535,34 +205,6 @@ export async function fetchKeyDetails(keyId: string): Promise<{
   error?: string;
 }> {
   try {
-    // 1. Check if the keyId matches an AWS Managed Key from catalog
-    const managedEntry = findAWSManagedKeyEntry(keyId);
-    if (managedEntry) {
-      const { entry, keyId: canonicalId } = managedEntry;
-      return {
-        success: true,
-        key: {
-          keyId: canonicalId,
-          arn: `arn:aws:kms:us-east-1:000000000000:${entry.alias}`,
-          aliases: [entry.alias],
-          description: entry.description,
-          keyState: "Enabled",
-          enabled: true,
-          creationDate: "01/01/2026, 00:00:00",
-          keyUsage: "ENCRYPT_DECRYPT",
-          keySpec: "SYMMETRIC_DEFAULT",
-          keyManager: "AWS",
-          origin: "AWS_KMS",
-          multiRegion: false,
-          keyRotationEnabled: true,
-          keyPolicy: JSON.stringify(entry.policy, null, 2),
-          tags: [{ key: "aws:service", value: entry.shortName }],
-          encryptionAlgorithms: ["SYMMETRIC_DEFAULT"],
-        },
-      };
-    }
-
-    // 2. Otherwise query live emulator KMS
     const [descRes, aliasesRes, policyRes, rotationRes, tagsRes] = await Promise.all([
       kms.send(new DescribeKeyCommand({ KeyId: keyId })),
       kms.send(new ListAliasesCommand({ KeyId: keyId })).catch(() => ({ Aliases: [] })),
@@ -603,17 +245,23 @@ export async function fetchKeyDetails(keyId: string): Promise<{
         description: meta.Description || "",
         keyState: meta.KeyState || "Enabled",
         enabled: meta.Enabled ?? true,
-        creationDate: meta.CreationDate ? new Date(meta.CreationDate).toLocaleString() : "—",
+        creationDate: formatKmsDate(meta.CreationDate),
         keyUsage: meta.KeyUsage || "ENCRYPT_DECRYPT",
         keySpec: meta.KeySpec || meta.CustomerMasterKeySpec || "SYMMETRIC_DEFAULT",
         keyManager: meta.KeyManager === "AWS" ? "AWS" : "CUSTOMER",
         origin: meta.Origin || "AWS_KMS",
-        deletionDate: meta.DeletionDate ? new Date(meta.DeletionDate).toLocaleString() : undefined,
+        deletionDate: meta.DeletionDate ? formatKmsDate(meta.DeletionDate) : undefined,
         multiRegion: meta.MultiRegion ?? false,
         keyPolicy: formattedPolicy,
         keyRotationEnabled: rotationRes.KeyRotationEnabled ?? false,
+        nextRotationDate: rotationRes.NextRotationDate ? formatKmsDate(rotationRes.NextRotationDate) : undefined,
+        rotationPeriodInDays: rotationRes.RotationPeriodInDays,
         tags,
         encryptionAlgorithms: meta.EncryptionAlgorithms,
+        signingAlgorithms: meta.SigningAlgorithms,
+        macAlgorithms: meta.MacAlgorithms,
+        cloudHsmClusterId: meta.CloudHsmClusterId,
+        customKeyStoreId: meta.CustomKeyStoreId,
       },
     };
   } catch (err: unknown) {
@@ -623,51 +271,88 @@ export async function fetchKeyDetails(keyId: string): Promise<{
 }
 
 /**
- * Helper to get or create an active backing key in the emulator for cryptographic operations.
+ * Fetch IAM Users and Roles from the emulator for the Create Key wizard.
  */
-async function getActiveBackingKeyId(): Promise<string> {
+export async function fetchIamPrincipalsAction(): Promise<{
+  success: boolean;
+  principals: IAMPrincipal[];
+  accountId: string;
+  error?: string;
+}> {
   try {
-    const list = await kms.send(new ListKeysCommand({ Limit: 10 }));
-    if (list.Keys && list.Keys.length > 0 && list.Keys[0].KeyId) {
-      return list.Keys[0].KeyId;
+    const [usersRes, rolesRes, identityRes] = await Promise.all([
+      iam.send(new ListUsersCommand({ MaxItems: 100 })).catch(() => ({ Users: [] })),
+      iam.send(new ListRolesCommand({ MaxItems: 100 })).catch(() => ({ Roles: [] })),
+      sts.send(new GetCallerIdentityCommand({})).catch(() => ({ Account: "000000000000" })),
+    ]);
+
+    const principals: IAMPrincipal[] = [];
+
+    if (usersRes.Users) {
+      for (const u of usersRes.Users) {
+        if (u.UserName && u.Arn) {
+          principals.push({
+            name: u.UserName,
+            arn: u.Arn,
+            type: "User",
+          });
+        }
+      }
     }
-    // Create one if none exists
-    const created = await kms.send(
-      new CreateKeyCommand({
-        Description: "KMS Backing Engine Key",
-        KeyUsage: "ENCRYPT_DECRYPT",
-      })
-    );
-    return created.KeyMetadata?.KeyId || "";
-  } catch (e) {
-    console.error("Failed to resolve backing key:", e);
-    return "";
+
+    if (rolesRes.Roles) {
+      for (const r of rolesRes.Roles) {
+        if (r.RoleName && r.Arn) {
+          principals.push({
+            name: r.RoleName,
+            arn: r.Arn,
+            type: "Role",
+          });
+        }
+      }
+    }
+
+    return {
+      success: true,
+      principals,
+      accountId: identityRes.Account || "000000000000",
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      principals: [],
+      accountId: "000000000000",
+      error: msg,
+    };
   }
 }
 
 /**
- * Create a new Customer Managed Key.
+ * Create a new Customer Managed Key using complete wizard input.
  */
-export async function createKeyAction(params: {
-  alias?: string;
-  description?: string;
-  keyUsage?: "ENCRYPT_DECRYPT" | "SIGN_VERIFY";
-  keySpec?: string;
-  policy?: string;
-  tags?: Array<{ TagKey: string; TagValue: string }>;
-}) {
+export async function createKeyAction(input: CreateKeyInput): Promise<{
+  success: boolean;
+  keyId?: string;
+  error?: string;
+}> {
   try {
-    const keyUsage = params.keyUsage || "ENCRYPT_DECRYPT";
-    const keySpec = (params.keySpec as any) || "SYMMETRIC_DEFAULT";
-    const description = params.description?.trim() || "";
+    const keyUsage = input.keyUsage as KeyUsageType;
+    const keySpec = input.keySpec as KeySpec;
+    const description = input.description?.trim() || "";
+
+    const tagParams = input.tags
+      .filter((t) => t.key.trim().length > 0)
+      .map((t) => ({ TagKey: t.key.trim(), TagValue: t.value.trim() }));
 
     const createRes = await kms.send(
       new CreateKeyCommand({
         Description: description,
         KeyUsage: keyUsage,
         KeySpec: keySpec,
-        Policy: params.policy?.trim() || undefined,
-        Tags: params.tags && params.tags.length > 0 ? params.tags : undefined,
+        MultiRegion: input.multiRegion,
+        Policy: input.customPolicy?.trim() || undefined,
+        Tags: tagParams.length > 0 ? tagParams : undefined,
       })
     );
 
@@ -677,8 +362,8 @@ export async function createKeyAction(params: {
     }
 
     // Attach Alias if provided
-    if (params.alias?.trim()) {
-      let aliasName = params.alias.trim();
+    if (input.alias?.trim()) {
+      let aliasName = input.alias.trim();
       if (!aliasName.startsWith("alias/")) {
         aliasName = `alias/${aliasName}`;
       }
@@ -744,6 +429,46 @@ export async function deleteAliasAction(aliasName: string, keyId?: string) {
 }
 
 /**
+ * Update Alias target.
+ */
+export async function updateAliasAction(aliasName: string, targetKeyId: string) {
+  try {
+    await kms.send(
+      new UpdateAliasCommand({
+        AliasName: aliasName,
+        TargetKeyId: targetKeyId,
+      })
+    );
+    revalidatePath("/kms");
+    revalidatePath(`/kms/keys/${targetKeyId}`);
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Update Key Description.
+ */
+export async function updateKeyDescriptionAction(keyId: string, description: string) {
+  try {
+    await kms.send(
+      new UpdateKeyDescriptionCommand({
+        KeyId: keyId,
+        Description: description,
+      })
+    );
+    revalidatePath(`/kms/keys/${keyId}`);
+    revalidatePath("/kms");
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
  * Enable a disabled key.
  */
 export async function enableKeyAction(keyId: string) {
@@ -789,7 +514,7 @@ export async function scheduleKeyDeletionAction(keyId: string, pendingWindowInDa
     revalidatePath(`/kms/keys/${keyId}`);
     return {
       success: true,
-      deletionDate: res.DeletionDate ? new Date(res.DeletionDate).toLocaleString() : undefined,
+      deletionDate: res.DeletionDate ? formatKmsDate(res.DeletionDate) : undefined,
     };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -857,9 +582,90 @@ export async function updateKeyPolicyAction(keyId: string, policyJson: string) {
 }
 
 /**
+ * Tag Resource.
+ */
+export async function tagResourceAction(
+  keyId: string,
+  tags: Array<{ TagKey: string; TagValue: string }>
+) {
+  try {
+    await kms.send(
+      new TagResourceCommand({
+        KeyId: keyId,
+        Tags: tags,
+      })
+    );
+    revalidatePath(`/kms/keys/${keyId}`);
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Untag Resource.
+ */
+export async function untagResourceAction(keyId: string, tagKeys: string[]) {
+  try {
+    await kms.send(
+      new UntagResourceCommand({
+        KeyId: keyId,
+        TagKeys: tagKeys,
+      })
+    );
+    revalidatePath(`/kms/keys/${keyId}`);
+    return { success: true };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Fetch Custom Key Stores.
+ */
+export async function fetchCustomKeyStoresAction(): Promise<{
+  success: boolean;
+  customKeyStores: CustomKeyStoreItem[];
+  error?: string;
+}> {
+  try {
+    const res = await kms.send(new DescribeCustomKeyStoresCommand({}));
+    const rawList = res.CustomKeyStores || [];
+
+    const customKeyStores: CustomKeyStoreItem[] = rawList.map((s) => ({
+      customKeyStoreId: s.CustomKeyStoreId,
+      customKeyStoreName: s.CustomKeyStoreName,
+      cloudHsmClusterId: s.CloudHsmClusterId,
+      trustAnchorCertificate: s.TrustAnchorCertificate,
+      connectionState: s.ConnectionState as any,
+      connectionErrorCode: s.ConnectionErrorCode,
+      creationDate: s.CreationDate ? formatKmsDate(s.CreationDate) : undefined,
+      customKeyStoreType: s.CustomKeyStoreType as any,
+    }));
+
+    return {
+      success: true,
+      customKeyStores,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return {
+      success: false,
+      customKeyStores: [],
+      error: msg,
+    };
+  }
+}
+
+/**
  * Live cryptographic Encrypt action.
  */
-export async function encryptDataAction(keyId: string, plaintext: string): Promise<{
+export async function encryptDataAction(
+  keyId: string,
+  plaintext: string
+): Promise<{
   success: boolean;
   ciphertextBase64?: string;
   error?: string;
@@ -867,20 +673,16 @@ export async function encryptDataAction(keyId: string, plaintext: string): Promi
   if (!plaintext) return { success: false, error: "Plaintext is required." };
 
   try {
-    // Resolve key to target
-    let targetKeyId = keyId;
-    if (findAWSManagedKeyEntry(keyId)) {
-      targetKeyId = await getActiveBackingKeyId();
-    }
-
     const res = await kms.send(
       new EncryptCommand({
-        KeyId: targetKeyId,
+        KeyId: keyId,
         Plaintext: Buffer.from(plaintext, "utf-8"),
       })
     );
 
-    const b64 = res.CiphertextBlob ? Buffer.from(res.CiphertextBlob).toString("base64") : "";
+    const b64 = res.CiphertextBlob
+      ? Buffer.from(res.CiphertextBlob).toString("base64")
+      : "";
     return { success: true, ciphertextBase64: b64 };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -906,7 +708,9 @@ export async function decryptDataAction(ciphertextBase64: string): Promise<{
       })
     );
 
-    const plaintext = res.Plaintext ? Buffer.from(res.Plaintext).toString("utf-8") : "";
+    const plaintext = res.Plaintext
+      ? Buffer.from(res.Plaintext).toString("utf-8")
+      : "";
     return {
       success: true,
       plaintext,
@@ -931,20 +735,19 @@ export async function generateDataKeyAction(
   error?: string;
 }> {
   try {
-    let targetKeyId = keyId;
-    if (findAWSManagedKeyEntry(keyId)) {
-      targetKeyId = await getActiveBackingKeyId();
-    }
-
     const res = await kms.send(
       new GenerateDataKeyCommand({
-        KeyId: targetKeyId,
+        KeyId: keyId,
         KeySpec: keySpec,
       })
     );
 
-    const plaintextKey = res.Plaintext ? Buffer.from(res.Plaintext).toString("base64") : "";
-    const ciphertextBlob = res.CiphertextBlob ? Buffer.from(res.CiphertextBlob).toString("base64") : "";
+    const plaintextKey = res.Plaintext
+      ? Buffer.from(res.Plaintext).toString("base64")
+      : "";
+    const ciphertextBlob = res.CiphertextBlob
+      ? Buffer.from(res.CiphertextBlob).toString("base64")
+      : "";
 
     return {
       success: true,

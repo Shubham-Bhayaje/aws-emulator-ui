@@ -786,6 +786,26 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "desc": "View and manage quotas for AWS services from a central location as your workloads grow"
   },
   {
+    "id": "resource-groups",
+    "name": "AWS Resource Groups & Tag Editor",
+    "shortName": "Resource Groups & Tag Editor",
+    "href": "/resource-groups",
+    "category": "Management & Governance",
+    "color": "#C925D1",
+    "status": "functional",
+    "desc": "Organize AWS resources, manage tags across services and Regions, and automate tasks on resource collections"
+  },
+  {
+    "id": "account",
+    "name": "AWS Account Management",
+    "shortName": "Account Management",
+    "href": "/account",
+    "category": "Management & Governance",
+    "color": "#C925D1",
+    "status": "functional",
+    "desc": "Manage account information, primary and alternate contacts, AWS Region availability, and account settings"
+  },
+  {
     "id": "controltower",
     "name": "AWS Control Tower",
     "shortName": "Control Tower",
@@ -2745,6 +2765,26 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "color": "#C925D1",
         "status": "functional",
         "desc": "View and manage quotas for AWS services from a central location as your workloads grow"
+      },
+      {
+        "id": "resource-groups",
+        "name": "AWS Resource Groups & Tag Editor",
+        "shortName": "Resource Groups & Tag Editor",
+        "href": "/resource-groups",
+        "category": "Management & Governance",
+        "color": "#C925D1",
+        "status": "functional",
+        "desc": "Organize AWS resources, manage tags across services and Regions, and automate tasks on resource collections"
+      },
+      {
+        "id": "account",
+        "name": "AWS Account Management",
+        "shortName": "Account Management",
+        "href": "/account",
+        "category": "Management & Governance",
+        "color": "#C925D1",
+        "status": "functional",
+        "desc": "Manage account information, primary and alternate contacts, AWS Region availability, and account settings"
       },
       {
         "id": "controltower",

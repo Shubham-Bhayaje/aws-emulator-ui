@@ -25,6 +25,11 @@ import { OrganizationsClient } from "@aws-sdk/client-organizations";
 import { KMSClient } from "@aws-sdk/client-kms";
 import { RAMClient } from "@aws-sdk/client-ram";
 import { ServiceQuotasClient } from "@aws-sdk/client-service-quotas";
+import { ResourceGroupsTaggingAPIClient } from "@aws-sdk/client-resource-groups-tagging-api";
+import { ResourceGroupsClient } from "@aws-sdk/client-resource-groups";
+import { AccountClient } from "@aws-sdk/client-account";
+import { ACMClient } from "@aws-sdk/client-acm";
+import { Route53Client } from "@aws-sdk/client-route-53";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -105,6 +110,36 @@ export const ram = new RAMClient({
 
 // --- Service Quotas ---
 export const serviceQuotas = new ServiceQuotasClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- Resource Groups Tagging API ---
+export const resourceGroupsTaggingApi = new ResourceGroupsTaggingAPIClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- Resource Groups ---
+export const resourceGroups = new ResourceGroupsClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- AWS Account Management ---
+export const accountClient = new AccountClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- ACM (AWS Certificate Manager) ---
+export const acm = new ACMClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- Route 53 (DNS) ---
+export const route53 = new Route53Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });
