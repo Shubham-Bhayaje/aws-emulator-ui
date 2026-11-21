@@ -514,6 +514,9 @@ export function ServiceIcon({
     case "efs":
       return <EFSIcon size={size} className={className} />;
     case "glacier":
+    case "s3glacier":
+    case "s3-glacier":
+    case "amazons3glacier":
       return <GlacierIcon size={size} className={className} />;
     case "dynamodb":
       return <DynamoDBIcon size={size} className={className} />;

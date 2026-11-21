@@ -98,19 +98,18 @@ export interface S3AccessPoint {
 
 export interface S3MultiRegionAccessPoint {
   name: string;
-}
-
-export interface KmsKeyOption {
-  keyId: string;
-  keyArn: string;
-  alias?: string;
-}
   alias: string;
   status: "Ready" | "Creating" | "Deleting";
   createdAt: string;
   arn: string;
   buckets: string[];
   blockAllPublic: boolean;
+}
+
+export interface KmsKeyOption {
+  keyId: string;
+  keyArn: string;
+  alias?: string;
 }
 
 export interface S3BatchJob {

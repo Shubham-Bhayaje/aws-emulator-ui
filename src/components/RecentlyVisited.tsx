@@ -82,12 +82,20 @@ export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
 
       for (const item of [...stored, ...DEFAULT_SERVICES]) {
         if (!item || !item.href) continue;
-        const key = item.href.toLowerCase().trim();
+
+        let cleanHref = item.href.toLowerCase().trim().replace(/\/$/, "");
+        const isGlacier = cleanHref === "/glacier" || cleanHref.includes("glacier") || (item.name && item.name.toLowerCase().includes("glacier"));
+        if (isGlacier) {
+          cleanHref = "/glacier";
+        }
+
+        const key = isGlacier ? "service:glacier" : cleanHref;
+
         if (!seen.has(key)) {
           seen.add(key);
           deduped.push({
-            name: item.name,
-            href: item.href,
+            name: isGlacier ? "Amazon S3 Glacier" : item.name,
+            href: isGlacier ? "/glacier" : item.href,
             visitedAt: item.visitedAt,
           });
         }
@@ -101,10 +109,21 @@ export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
   }, []);
 
   function handleServiceClick(service: RecentService) {
-    const norm = service.href.toLowerCase().trim();
+    let cleanHref = service.href.toLowerCase().trim().replace(/\/$/, "");
+    const isGlacier = cleanHref === "/glacier" || cleanHref.includes("glacier") || (service.name && service.name.toLowerCase().includes("glacier"));
+    const targetHref = isGlacier ? "/glacier" : service.href;
+    const targetName = isGlacier ? "Amazon S3 Glacier" : service.name;
+
+    const filtered = recents.filter((s) => {
+      const sHref = s.href.toLowerCase().trim();
+      const sName = s.name.toLowerCase().trim();
+      if (isGlacier && (sHref.includes("glacier") || sName.includes("glacier"))) return false;
+      return sHref !== targetHref.toLowerCase().trim();
+    });
+
     const updated = [
-      { ...service, visitedAt: Date.now() },
-      ...recents.filter((s) => s.href.toLowerCase().trim() !== norm),
+      { name: targetName, href: targetHref, visitedAt: Date.now() },
+      ...filtered,
     ].slice(0, 16);
 
     setRecents(updated);

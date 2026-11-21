@@ -8,6 +8,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import ServiceLayout from "@/components/ServiceLayout";
 import ComingSoon from "@/components/ComingSoon";
+import RedirectClient from "@/components/RedirectClient";
 import { findServiceByHref, findServiceById, ALL_SERVICES } from "@/lib/services-catalog";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +20,19 @@ type Props = {
 export default async function DynamicServicePage(props: Props) {
   const { service: slug } = await props.params;
 
+  // Handle common aliases and glacier redirects immediately
+  const cleanSlug = slug.toLowerCase().replace(/[-_\s]+/g, "");
+  if (cleanSlug === "s3glacier" || cleanSlug === "glaciervaults") {
+    redirect("/glacier");
+  }
+
   let service = findServiceByHref("/" + slug) || findServiceById(slug);
 
+  if (service && service.href && service.href.toLowerCase() !== ("/" + slug).toLowerCase()) {
+    redirect(service.href);
+  }
+
   if (!service) {
-    const cleanSlug = slug.toLowerCase().replace(/[-_\s]+/g, "");
     const aliasMatch = ALL_SERVICES.find((s) => {
       if (s.id.toLowerCase().replace(/[-_\s]+/g, "") === cleanSlug) return true;
       return (s.aliases || []).some(
@@ -30,7 +40,7 @@ export default async function DynamicServicePage(props: Props) {
       );
     });
 
-    if (aliasMatch && aliasMatch.href && aliasMatch.href !== "/" + slug) {
+    if (aliasMatch && aliasMatch.href && aliasMatch.href.toLowerCase() !== ("/" + slug).toLowerCase()) {
       redirect(aliasMatch.href);
     }
     service = aliasMatch;

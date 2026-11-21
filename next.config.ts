@@ -178,6 +178,41 @@ const nextConfig: NextConfig = {
         destination: "/systems-manager",
         permanent: false,
       },
+      {
+        source: "/s3-glacier",
+        destination: "/glacier",
+        permanent: false,
+      },
+      {
+        source: "/s3-glacier/:path*",
+        destination: "/glacier/:path*",
+        permanent: false,
+      },
+      {
+        source: "/s3glacier",
+        destination: "/glacier",
+        permanent: false,
+      },
+      {
+        source: "/s3glacier/:path*",
+        destination: "/glacier/:path*",
+        permanent: false,
+      },
+      {
+        source: "/s3_glacier",
+        destination: "/glacier",
+        permanent: false,
+      },
+      {
+        source: "/s3_glacier/:path*",
+        destination: "/glacier/:path*",
+        permanent: false,
+      },
+      {
+        source: "/glacier/vaults",
+        destination: "/glacier",
+        permanent: false,
+      },
     ];
   },
 };

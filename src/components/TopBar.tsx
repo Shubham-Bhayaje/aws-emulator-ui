@@ -137,25 +137,31 @@ export default function TopBar({ accountId, userName, region: initialRegion, ini
   }
 
   function handleServiceClick(name: string, href: string) {
+    const isGlacier = href.toLowerCase().includes("glacier") || name.toLowerCase().includes("glacier");
+    const targetHref = isGlacier ? "/glacier" : href;
+    const targetName = isGlacier ? "Amazon S3 Glacier" : name;
+
     try {
       const stored: Array<{ name: string; href: string; visitedAt?: number }> = JSON.parse(
         localStorage.getItem("recentServices") || "[]"
       );
-      const filtered = stored.filter(
-        (s) =>
-          s &&
-          s.href &&
-          s.href.toLowerCase().trim() !== href.toLowerCase().trim() &&
-          s.name.toLowerCase().trim() !== name.toLowerCase().trim()
-      );
-      filtered.unshift({ name, href, visitedAt: Date.now() });
+
+      const filtered = stored.filter((s) => {
+        if (!s || !s.href) return false;
+        const sHref = s.href.toLowerCase().trim();
+        const sName = s.name.toLowerCase().trim();
+        if (isGlacier && (sHref.includes("glacier") || sName.includes("glacier"))) return false;
+        if (sHref === targetHref.toLowerCase().trim() || sName === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
+      filtered.unshift({ name: targetName, href: targetHref, visitedAt: Date.now() });
       localStorage.setItem("recentServices", JSON.stringify(filtered.slice(0, 16)));
     } catch { /* ignore */ }
     closeAllDropdowns();
     setServicesSearchQuery("");
     setGlobalSearch("");
     setSearchFocused(false);
-    router.push(href);
+    router.push(targetHref);
   }
 
   function handleClearHistory() {

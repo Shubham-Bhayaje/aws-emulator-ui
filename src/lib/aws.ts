@@ -35,6 +35,8 @@ import { SSMClient } from "@aws-sdk/client-ssm";
 import { ACMPCAClient } from "@aws-sdk/client-acm-pca";
 import { CloudHSMV2Client } from "@aws-sdk/client-cloudhsm-v2";
 import { DirectoryServiceClient } from "@aws-sdk/client-directory-service";
+import { GlacierClient } from "@aws-sdk/client-glacier";
+import { SNSClient } from "@aws-sdk/client-sns";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -178,6 +180,19 @@ export const ds = new DirectoryServiceClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
 });
+
+// --- S3 Glacier ---
+export const glacier = new GlacierClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
+// --- SNS ---
+export const sns = new SNSClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+});
+
 
 
 

@@ -1,19 +1,18 @@
-/**
- * Create Queue page – form matching real AWS Console.
- */
+import { listQueuesAction, getKmsKeysAction } from "../actions";
+import CreateQueueClient from "./CreateQueueClient";
 
-import ServiceLayout from "@/components/ServiceLayout";
-import { CreateQueueForm } from "./CreateQueueForm";
+export const dynamic = "force-dynamic";
 
-const sqsNav = [{ label: "Queues", href: "/sqs" }];
+export default async function CreateQueuePage() {
+  const [queuesRes, kmsKeys] = await Promise.all([
+    listQueuesAction(),
+    getKmsKeysAction(),
+  ]);
 
-export default function CreateQueuePage() {
   return (
-    <ServiceLayout serviceName="SQS" serviceColor="#D946EF" navItems={sqsNav}>
-      <div className="max-w-[800px]">
-        <h1 className="text-[22px] font-bold text-[#16191f] mb-6">Create queue</h1>
-        <CreateQueueForm />
-      </div>
-    </ServiceLayout>
+    <CreateQueueClient
+      existingQueues={queuesRes.queues || []}
+      kmsKeys={kmsKeys}
+    />
   );
 }

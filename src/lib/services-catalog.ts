@@ -48,12 +48,18 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "resource-groups",
   "service-quotas",
   "account",
+  "glacier",
+  "s3-glacier",
+  "s3glacier",
+  "sns",
+  "dynamodb",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (!idOrHref) return false;
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "glacier" || clean.startsWith("glacier/") || clean === "s3-glacier" || clean === "s3glacier") return true;
   if (clean === "systems-manager/parameter-store") return true;
   if (clean === "acm/pca" || clean === "acm-pca" || clean === "pca" || clean === "private-ca") return true;
   if (clean === "cloudhsm" || clean.startsWith("cloudhsm/")) return true;
@@ -290,7 +296,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/glacier",
     "category": "Storage",
     "color": "#3F8624",
-    "desc": "Low-cost archive storage in the cloud for compliance and long-term retention"
+    "desc": "Low-cost archive storage in the cloud for compliance and long-term retention",
+    "aliases": ["glacier", "s3glacier", "s3-glacier", "s3 glacier", "glaciervaults", "glacier-vaults", "vaults", "archive", "archives", "cold storage"]
   },
   {
     "id": "backup",
@@ -2292,7 +2299,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "href": "/glacier",
         "category": "Storage",
         "color": "#3F8624",
-        "desc": "Low-cost archive storage in the cloud for compliance and long-term retention"
+        "desc": "Low-cost archive storage in the cloud for compliance and long-term retention",
+        "aliases": ["glacier", "s3glacier", "s3-glacier", "s3 glacier", "glaciervaults", "glacier-vaults", "vaults", "archive", "archives", "cold storage"]
       },
       {
         "id": "backup",
@@ -4130,7 +4138,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
 ];
 
 export function findServiceByHref(href: string): ServiceDefinition | undefined {
-  const cleanHref = href.startsWith("/") ? href : "/" + href;
+  const cleanHref = (href.startsWith("/") ? href : "/" + href).toLowerCase().trim().replace(/\/$/, "");
+  if (cleanHref === "/s3glacier" || cleanHref === "/s3-glacier" || cleanHref === "/s3_glacier" || cleanHref === "/glaciervaults") {
+    return ALL_SERVICES.find((s) => s.id === "glacier");
+  }
   return ALL_SERVICES.find((s) => s.href.toLowerCase() === cleanHref.toLowerCase());
 }
 

@@ -12,9 +12,26 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Private Certificate Authority (Private CA)](Private%20CA.md): Create and manage private root and subordinate certificate authorities, generate and export CSRs, install CA certificates, issue and revoke private X.509 certificates with standard templates, configure S3 CRL revocation, and manage soft-deletion retention windows.
 - [AWS Secrets Manager](Secrets%20Manager.md): Store, retrieve, update, and manage sensitive credentials and API keys with KMS encryption at rest, version staging labels (AWSCURRENT, AWSPREVIOUS), resource permissions, and scheduled recovery windows.
 - [AWS Systems Manager Parameter Store](SSM%20Parameter%20Store.md): Secure, hierarchical storage for configuration data management and secrets management with KMS encryption (SecureString), version history tracking, version staging labels, and resource tagging.
+- [Amazon DynamoDB](DynamoDB.md): Fast and flexible NoSQL database service, global tables inventory, partition and sort keys, on-demand and provisioned capacity modes, item explorer with scan and query engine, Time to Live (TTL), Point-in-time recovery (PITR), on-demand backups, and DynamoDB Streams.
 - [Amazon S3 (Simple Storage Service)](S3.md): Scalable cloud object storage, buckets and prefixes navigation, versioning, default encryption with KMS, granular Block Public Access controls, bucket policies, static website hosting, and lifecycle management.
+- [Amazon S3 Glacier](S3%20Glacier.md): Low-cost cold data storage and archiving, vaults lifecycle management, archive uploads and checksum tracking, asynchronous inventory and archive retrieval jobs, and data retrieval policies.
+- [Amazon SNS (Simple Notification Service)](SNS.md): Fully managed pub/sub messaging service, Standard and FIFO topics, fanout architectures, protocol subscriptions (SQS, Lambda, HTTP/S, Email), message attributes, and subscription filter policies.
+- [Amazon SQS (Simple Queue Service)](SQS.md): Fully managed message queuing service for microservices, Standard and FIFO queues, visibility timeout, dead-letter queues (DLQs), message deduplication, and KMS encryption.
 - [Resource Groups Tagging API](Resource%20Groups%20Tagging%20API.md): Find tagged resources across services and Regions, bulk add/edit/remove tags via Tag Editor, and create tag-based Resource Groups.
 - [Service Quotas](Service%20Quotas.md): View and manage service limits, request quota increases, configure organization quota request templates, and track change request history.
+
+## Integration Backlog
+
+The following table tracks inter-service integrations that are waiting on future services to be built:
+
+| Source Service | Target / Dependent Service | Integration Feature | Status / Action Needed |
+|---|---|---|---|
+| Amazon SQS | Amazon SNS | SNS topic subscriptions tab on queue detail page | Connected live SNS topic subscription modal and active subscriptions list |
+| Amazon S3 Glacier | Amazon SNS | Vault event notifications (archive/inventory retrieval completed) | Connected live SNS topic dropdown and notification policy to Amazon SNS |
+| Amazon SNS | Amazon CloudWatch | Delivery status logging to CloudWatch Logs | Connect CloudWatch Logs log groups when Amazon CloudWatch Logs is built |
+| Amazon S3 | Amazon SNS / SQS | S3 Event Notifications destination (Bucket Events) | Add SNS and SQS destinations to bucket event configuration |
+| Amazon DynamoDB | AWS Backup | Continuous compliance and automated backup plans | Connect scheduled backup policies when AWS Backup is built |
+| Amazon DynamoDB | Amazon Kinesis | DynamoDB Kinesis data stream destination | Enable streaming destination when Amazon Kinesis is built |
 
 ---
 

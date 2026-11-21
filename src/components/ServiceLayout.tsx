@@ -38,18 +38,24 @@ export default function ServiceLayout({
       const stored: Array<{ name: string; href: string; visitedAt?: number }> = JSON.parse(
         localStorage.getItem("recentServices") || "[]"
       );
-      const targetHref = `/${serviceName.toLowerCase().replace(/\s+/g, "")}`;
-      const filtered = stored.filter(
-        (s) =>
-          s &&
-          s.href &&
-          s.href.toLowerCase().trim() !== targetHref.toLowerCase().trim() &&
-          s.name.toLowerCase().trim() !== serviceName.toLowerCase().trim()
-      );
-      filtered.unshift({ name: serviceName, href: targetHref, visitedAt: Date.now() });
+      const rootSegment = "/" + (pathname.split("/")[1] || serviceName.toLowerCase().replace(/\s+/g, ""));
+      const isGlacier = rootSegment.includes("glacier") || serviceName.toLowerCase().includes("glacier");
+      const targetHref = isGlacier ? "/glacier" : rootSegment;
+      const targetName = isGlacier ? "Amazon S3 Glacier" : serviceName;
+
+      const filtered = stored.filter((s) => {
+        if (!s || !s.href) return false;
+        const sHref = s.href.toLowerCase().trim();
+        const sName = s.name.toLowerCase().trim();
+        if (isGlacier && (sHref.includes("glacier") || sName.includes("glacier"))) return false;
+        if (sHref === targetHref.toLowerCase().trim() || sName === targetName.toLowerCase().trim()) return false;
+        return true;
+      });
+
+      filtered.unshift({ name: targetName, href: targetHref, visitedAt: Date.now() });
       localStorage.setItem("recentServices", JSON.stringify(filtered.slice(0, 16)));
     } catch { /* ignore */ }
-  }, [serviceName]);
+  }, [serviceName, pathname]);
 
   // Build breadcrumb from pathname
   const pathParts = pathname.split("/").filter(Boolean);
