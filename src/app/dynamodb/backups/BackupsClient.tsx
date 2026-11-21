@@ -8,6 +8,7 @@ import { deleteBackupAction, restoreTableFromBackupAction } from "../actions";
 
 interface BackupsClientProps {
   backups: BackupSummary[];
+  activeTableNames?: string[];
 }
 
 function formatBytes(bytes: number): string {
@@ -18,11 +19,12 @@ function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
 }
 
-export default function BackupsClient({ backups }: BackupsClientProps) {
+export default function BackupsClient({ backups, activeTableNames = [] }: BackupsClientProps) {
   const router = useRouter();
   const [backupsList, setBackupsList] = useState<BackupSummary[]>(backups);
   const [searchQuery, setSearchQuery] = useState("");
   const [isPending, startTransition] = useTransition();
+  const activeTableSet = new Set(activeTableNames);
   const [error, setError] = useState<string | null>(null);
   const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
@@ -183,12 +185,21 @@ export default function BackupsClient({ backups }: BackupsClientProps) {
                   <tr key={b.BackupArn} className="hover:bg-[#fafafa]">
                     <td className="px-5 py-3 font-bold text-[#16191f]">{b.BackupName}</td>
                     <td className="px-5 py-3">
-                      <Link
-                        href={`/dynamodb/tables/${encodeURIComponent(b.TableName)}`}
-                        className="text-[#0073bb] hover:underline font-bold"
-                      >
-                        {b.TableName}
-                      </Link>
+                      {activeTableSet.has(b.TableName) ? (
+                        <Link
+                          href={`/dynamodb/tables/${encodeURIComponent(b.TableName)}`}
+                          className="text-[#0073bb] hover:underline font-bold"
+                        >
+                          {b.TableName}
+                        </Link>
+                      ) : (
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold text-[#545b64]">{b.TableName}</span>
+                          <span className="text-[11px] font-semibold px-1.5 py-0.5 rounded bg-[#f2f3f3] text-[#545b64] border border-[#d5dbdb]">
+                            deleted
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-[#edf7ed] text-[#1d8102]">
