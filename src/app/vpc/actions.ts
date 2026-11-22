@@ -496,12 +496,26 @@ export async function createVpcAndMoreAction(data: {
       }
     }
 
-    // Private subnets
+    // Private subnets & private route tables
+    const privateRtbIds: string[] = [];
     for (let i = 0; i < data.privateSubnetsCount; i++) {
       const az = data.availabilityZones[i % data.availabilityZones.length] || "us-east-1a";
       const subCidr = `${p1}.${p2}.${subnetCounter}.0/24`;
       subnetCounter++;
-      await ec2.send(
+      
+      // Dedicated route table for private subnet
+      const privRtbRes = await ec2.send(
+        new CreateRouteTableCommand({
+          VpcId: vpcId,
+          TagSpecifications: [{ ResourceType: "route-table", Tags: [{ Key: "Name", Value: `${data.name}-rtb-private${i + 1}-${az}` }] }],
+        })
+      );
+      const privRtbId = privRtbRes.RouteTable?.RouteTableId;
+      if (privRtbId) {
+        privateRtbIds.push(privRtbId);
+      }
+
+      const subRes = await ec2.send(
         new CreateSubnetCommand({
           VpcId: vpcId,
           CidrBlock: subCidr,
@@ -509,6 +523,23 @@ export async function createVpcAndMoreAction(data: {
           TagSpecifications: [{ ResourceType: "subnet", Tags: [{ Key: "Name", Value: `${data.name}-subnet-private${i + 1}-${az}` }] }],
         })
       );
+      const subId = subRes.Subnet?.SubnetId;
+      if (subId && privRtbId) {
+        await ec2.send(new AssociateRouteTableCommand({ RouteTableId: privRtbId, SubnetId: subId })).catch(() => {});
+      }
+    }
+
+    // Optional Gateway Endpoint for S3 on private route tables
+    if (privateRtbIds.length > 0) {
+      await ec2.send(
+        new CreateVpcEndpointCommand({
+          VpcId: vpcId,
+          ServiceName: "com.amazonaws.us-east-1.s3",
+          VpcEndpointType: "Gateway",
+          RouteTableIds: privateRtbIds,
+          TagSpecifications: [{ ResourceType: "vpc-endpoint", Tags: [{ Key: "Name", Value: `${data.name}-vpce-s3` }] }],
+        })
+      ).catch(() => {});
     }
 
     return { success: true, vpcId };

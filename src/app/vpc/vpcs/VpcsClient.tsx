@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -18,6 +18,7 @@ import {
   listInternetGatewaysAction,
   listNatGatewaysAction,
   listVpcEndpointsAction,
+  createVpcAndMoreAction,
 } from "../actions";
 
 interface Props {
@@ -47,7 +48,8 @@ export default function VpcsClient({
   const [endpoints, setEndpoints] = useState<VpcEndpointItem[]>(initialEndpoints);
 
   const [selectedVpcId, setSelectedVpcId] = useState<string | null>(
-    initialVpcs.length > 0 ? initialVpcs[0].VpcId : null
+    initialVpcs.find((v) => v.Name === "example-vpc-vpc")?.VpcId ||
+    (initialVpcs.length > 0 ? initialVpcs[0].VpcId : null)
   );
   const [activeTab, setActiveTab] = useState<"details" | "cidrs" | "resourcemap" | "tags">("resourcemap");
   const [searchQuery, setSearchQuery] = useState("");
@@ -55,15 +57,42 @@ export default function VpcsClient({
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  // Resource map interactive highlight state
-  const [selectedMapSubnetId, setSelectedMapSubnetId] = useState<string | null>(null);
-  const [hoveredMapSubnetId, setHoveredMapSubnetId] = useState<string | null>(null);
+  // Resource map interactive state
+  const [showVpcDetails, setShowVpcDetails] = useState(true);
+  const [hoveredSubnetId, setHoveredSubnetId] = useState<string | null>(null);
+  const [selectedSubnetId, setSelectedSubnetId] = useState<string | null>(null);
+  const [hoveredRtbId, setHoveredRtbId] = useState<string | null>(null);
+  const [selectedRtbId, setSelectedRtbId] = useState<string | null>(null);
+  const [hoveredGwId, setHoveredGwId] = useState<string | null>(null);
+  const [selectedGwId, setSelectedGwId] = useState<string | null>(null);
 
-  const [selectedMapRtbId, setSelectedMapRtbId] = useState<string | null>(null);
-  const [hoveredMapRtbId, setHoveredMapRtbId] = useState<string | null>(null);
-
-  const [selectedMapGatewayId, setSelectedMapGatewayId] = useState<string | null>(null);
-  const [hoveredMapGatewayId, setHoveredMapGatewayId] = useState<string | null>(null);
+  // SVG lines state
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const [svgLines, setSvgLines] = useState<{
+    vpcToSubnets: {
+      subId: string;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+    }[];
+    subnetToRtb: {
+      subId: string;
+      rtbId: string;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+    }[];
+    rtbToGw: {
+      rtbId: string;
+      gwId: string;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+    }[];
+  }>({ vpcToSubnets: [], subnetToRtb: [], rtbToGw: [] });
 
   // Delete modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -156,6 +185,33 @@ export default function VpcsClient({
     }
   };
 
+  const handleCreateSampleMultiTierVpc = async () => {
+    setActionLoading(true);
+    setMessage(null);
+    try {
+      const res = await createVpcAndMoreAction({
+        name: "example-vpc",
+        cidrBlock: "10.0.0.0/16",
+        publicSubnetsCount: 2,
+        privateSubnetsCount: 2,
+        availabilityZones: ["us-east-1a", "us-east-1b"],
+      });
+      if (res.success && res.vpcId) {
+        await refreshVpcs();
+        setSelectedVpcId(res.vpcId);
+        setActiveTab("resourcemap");
+        setMessage({
+          type: "success",
+          text: `Provisioned sample 4-subnet multi-tier VPC (${res.vpcId}) matching official AWS architecture.`,
+        });
+      } else {
+        setMessage({ type: "error", text: res.error || "Failed to create sample VPC" });
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   const filteredVpcs = vpcs.filter((v) => {
     const q = searchQuery.toLowerCase();
     return (
@@ -166,7 +222,7 @@ export default function VpcsClient({
   });
 
   // -------------------------------------------------------------
-  // Resource Map Topology Calculations for selected VPC
+  // Resource Map Topology Calculations
   // -------------------------------------------------------------
   const vpcSubnets = subnets.filter((s) => s.VpcId === selectedVpc?.VpcId);
   const vpcRouteTables = routeTables.filter((r) => r.VpcId === selectedVpc?.VpcId);
@@ -181,9 +237,11 @@ export default function VpcsClient({
     subnet: SubnetItem;
     routeTable?: RouteTableItem;
     isPublic: boolean;
+    azLetter: string;
     connectedGateways: { id: string; name: string; type: string }[];
   }
 
+  // Group subnets by Availability Zone
   const subnetsTopology: SubnetTopology[] = vpcSubnets.map((sub) => {
     const explicitRtb = vpcRouteTables.find((r) =>
       r.Associations?.some((a) => a.SubnetId === sub.SubnetId)
@@ -211,12 +269,6 @@ export default function VpcsClient({
             name: natObj?.Name || natId,
             type: "NAT Gateway",
           });
-        } else if (route.GatewayId === "local") {
-          connectedGws.push({
-            id: "local",
-            name: "Local",
-            type: "Local VPC Router",
-          });
         }
       }
     }
@@ -230,122 +282,129 @@ export default function VpcsClient({
           connectedGws.push({
             id: ep.VpcEndpointId,
             name: ep.ServiceName.replace("com.amazonaws.us-east-1.", ""),
-            type: `VPC Endpoint (${ep.VpcEndpointType})`,
+            type: `Gateway Endpoint (${ep.VpcEndpointType})`,
           });
         }
       }
     }
 
+    // Extract AZ letter (e.g. us-east-1a -> A)
+    const azStr = sub.AvailabilityZone || "a";
+    const lastChar = azStr.slice(-1).toUpperCase();
+    const azLetter = /[A-Z]/.test(lastChar) ? lastChar : "A";
+
     return {
       subnet: sub,
       routeTable: rtb,
       isPublic: hasIgw,
+      azLetter,
       connectedGateways: connectedGws,
     };
   });
 
+  // Group by AZ
+  const subnetsByAz: Record<string, SubnetTopology[]> = {};
+  for (const item of subnetsTopology) {
+    const az = item.subnet.AvailabilityZone || "Unknown AZ";
+    if (!subnetsByAz[az]) {
+      subnetsByAz[az] = [];
+    }
+    subnetsByAz[az].push(item);
+  }
+
+  // Network Connections (Column 4)
   interface GatewayTarget {
     id: string;
     name: string;
     type: string;
-    destination: string;
-    status: string;
+    subtext1: string;
+    subtext2?: string;
     associatedRtbIds: string[];
   }
 
   const gatewayTargets: GatewayTarget[] = [];
 
-  // Internet Gateways
+  // 1. Internet Gateways
   for (const igw of vpcIgws) {
     const matchingRtbs = vpcRouteTables.filter((r) =>
       r.Routes?.some((rt) => rt.GatewayId === igw.InternetGatewayId)
     );
+    const publicCount = subnetsTopology.filter((t) => t.isPublic).length;
+    const privateCount = subnetsTopology.filter((t) => !t.isPublic).length;
+
     gatewayTargets.push({
       id: igw.InternetGatewayId,
-      name: igw.Name ? `${igw.Name} (${igw.InternetGatewayId})` : igw.InternetGatewayId,
+      name: igw.Name || igw.InternetGatewayId,
       type: "Internet Gateway",
-      destination: "0.0.0.0/0",
-      status: igw.State === "attached" ? "Attached" : "Detached",
+      subtext1: `Internet routes to ${publicCount} public subnets`,
+      subtext2: `${privateCount} private subnets route to the Internet`,
       associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
     });
   }
 
-  // NAT Gateways
+  // 2. NAT Gateways
   for (const nat of vpcNats) {
     const matchingRtbs = vpcRouteTables.filter((r) =>
       r.Routes?.some((rt) => rt.NatGatewayId === nat.NatGatewayId || rt.GatewayId === nat.NatGatewayId)
     );
     gatewayTargets.push({
       id: nat.NatGatewayId,
-      name: nat.Name ? `${nat.Name} (${nat.NatGatewayId})` : nat.NatGatewayId,
+      name: nat.Name || nat.NatGatewayId,
       type: "NAT Gateway",
-      destination: "0.0.0.0/0",
-      status: nat.State,
+      subtext1: "NAT gateway for private subnets",
+      subtext2: `Status: ${nat.State}`,
       associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
     });
   }
 
-  // VPC Endpoints
+  // 3. VPC Endpoints
   for (const ep of vpcEndpoints) {
     const matchingRtbs = vpcRouteTables.filter(
       (r) => ep.RouteTableIds?.includes(r.RouteTableId) || r.Routes?.some((rt) => rt.GatewayId === ep.VpcEndpointId)
     );
+    const svcShort = ep.ServiceName.replace("com.amazonaws.us-east-1.", "");
     gatewayTargets.push({
       id: ep.VpcEndpointId,
-      name: ep.ServiceName.replace("com.amazonaws.us-east-1.", ""),
-      type: `Gateway Endpoint (${ep.VpcEndpointType})`,
-      destination: ep.ServiceName,
-      status: ep.State,
+      name: ep.VpcEndpointId,
+      type: "VPC Endpoint",
+      subtext1: `Gateway endpoint to ${svcShort.toUpperCase()}`,
       associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
     });
   }
 
-  // Local VPC Route
-  const localMatchingRtbs = vpcRouteTables.filter((r) =>
-    r.Routes?.some((rt) => rt.GatewayId === "local" || rt.DestinationCidrBlock === selectedVpc?.CidrBlock)
-  );
-  gatewayTargets.push({
-    id: "local",
-    name: "Local Router",
-    type: "Local VPC Router",
-    destination: selectedVpc?.CidrBlock || "10.0.0.0/16",
-    status: "Active",
-    associatedRtbIds: localMatchingRtbs.map((r) => r.RouteTableId),
-  });
-
   // Active highlighted items calculation
-  const activeSubnetId = hoveredMapSubnetId || selectedMapSubnetId;
-  const activeRtbId = hoveredMapRtbId || selectedMapRtbId;
-  const activeGatewayId = hoveredMapGatewayId || selectedMapGatewayId;
-  const isAnyActive = Boolean(activeSubnetId || activeRtbId || activeGatewayId);
+  const activeSubnet = hoveredSubnetId || selectedSubnetId;
+  const activeRtb = hoveredRtbId || selectedRtbId;
+  const activeGw = hoveredGwId || selectedGwId;
+  const isAnyActive = Boolean(activeSubnet || activeRtb || activeGw);
 
-  const isCardHighlighted = (type: "subnet" | "rtb" | "gw", id: string) => {
-    if (!isAnyActive) return true;
+  const isCardActive = (type: "subnet" | "rtb" | "gw", id: string) => {
+    if (!isAnyActive) return false;
 
-    if (activeSubnetId) {
-      const topo = subnetsTopology.find((t) => t.subnet.SubnetId === activeSubnetId);
+    if (activeSubnet) {
+      const topo = subnetsTopology.find((t) => t.subnet.SubnetId === activeSubnet);
       if (!topo) return false;
-      if (type === "subnet") return id === activeSubnetId;
+      if (type === "subnet") return id === activeSubnet;
       if (type === "rtb") return id === topo.routeTable?.RouteTableId;
       if (type === "gw") return topo.connectedGateways.some((g) => g.id === id);
     }
 
-    if (activeRtbId) {
-      if (type === "rtb") return id === activeRtbId;
+    if (activeRtb) {
+      if (type === "rtb") return id === activeRtb;
       if (type === "subnet") {
         const topo = subnetsTopology.find((t) => t.subnet.SubnetId === id);
-        return topo?.routeTable?.RouteTableId === activeRtbId;
+        return topo?.routeTable?.RouteTableId === activeRtb;
       }
       if (type === "gw") {
         const target = gatewayTargets.find((g) => g.id === id);
-        return target?.associatedRtbIds.includes(activeRtbId);
+        return target ? target.associatedRtbIds.includes(activeRtb) : false;
       }
     }
 
-    if (activeGatewayId) {
-      const target = gatewayTargets.find((g) => g.id === activeGatewayId);
+    if (activeGw) {
+      const target = gatewayTargets.find((g) => g.id === activeGw);
       if (!target) return false;
-      if (type === "gw") return id === activeGatewayId;
+      if (type === "gw") return id === activeGw;
       if (type === "rtb") return target.associatedRtbIds.includes(id);
       if (type === "subnet") {
         const topo = subnetsTopology.find((t) => t.subnet.SubnetId === id);
@@ -356,18 +415,167 @@ export default function VpcsClient({
     return false;
   };
 
-  const clearMapSelection = () => {
-    setSelectedMapSubnetId(null);
-    setHoveredMapSubnetId(null);
-    setSelectedMapRtbId(null);
-    setHoveredMapRtbId(null);
-    setSelectedMapGatewayId(null);
-    setHoveredMapGatewayId(null);
+  const isLineActive = (fromType: "subnet" | "rtb", fromId: string, toId: string) => {
+    if (!isAnyActive) return false;
+    if (fromType === "subnet") {
+      return isCardActive("subnet", fromId) && isCardActive("rtb", toId);
+    }
+    if (fromType === "rtb") {
+      return isCardActive("rtb", fromId) && isCardActive("gw", toId);
+    }
+    return false;
+  };
+
+  // Recalculate dynamic SVG lines
+  const recalculateLines = useCallback(() => {
+    if (!mapContainerRef.current) return;
+    const container = mapContainerRef.current;
+    const containerRect = container.getBoundingClientRect();
+
+    const getRightCenter = (id: string) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: r.right - containerRect.left,
+        y: r.top + r.height / 2 - containerRect.top,
+      };
+    };
+
+    const getLeftCenter = (id: string) => {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      return {
+        x: r.left - containerRect.left,
+        y: r.top + r.height / 2 - containerRect.top,
+      };
+    };
+
+    // 1. VPC to all subnets lines
+    const vpcToSubLines: {
+      subId: string;
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+    }[] = [];
+    const vpcPoint = getRightCenter("resmap-vpc-card");
+    if (vpcPoint) {
+      for (const item of subnetsTopology) {
+        const subPoint = getLeftCenter(`resmap-sub-${item.subnet.SubnetId}`);
+        if (subPoint) {
+          vpcToSubLines.push({
+            subId: item.subnet.SubnetId,
+            x1: vpcPoint.x,
+            y1: vpcPoint.y,
+            x2: subPoint.x,
+            y2: subPoint.y,
+          });
+        }
+      }
+    }
+
+    // 2. Subnet to Route Table lines
+    const subToRtbLines = [];
+    for (const item of subnetsTopology) {
+      const subPoint = getRightCenter(`resmap-sub-${item.subnet.SubnetId}`);
+      const rtbId = item.routeTable?.RouteTableId;
+      if (subPoint && rtbId) {
+        const rtbPoint = getLeftCenter(`resmap-rtb-${rtbId}`);
+        if (rtbPoint) {
+          // If multiple subnets connect to the same RTB, distribute their entry points along the left edge
+          const sameRtbSubs = subnetsTopology.filter((s) => s.routeTable?.RouteTableId === rtbId);
+          const subIdx = sameRtbSubs.findIndex((s) => s.subnet.SubnetId === item.subnet.SubnetId);
+          const offsetY = sameRtbSubs.length > 1 ? (subIdx - (sameRtbSubs.length - 1) / 2) * 12 : 0;
+
+          subToRtbLines.push({
+            subId: item.subnet.SubnetId,
+            rtbId,
+            x1: subPoint.x,
+            y1: subPoint.y,
+            x2: rtbPoint.x,
+            y2: rtbPoint.y + offsetY,
+          });
+        }
+      }
+    }
+
+    // 3. Route Table to Gateway lines
+    const rtbToGwLines = [];
+    for (const rtb of vpcRouteTables) {
+      const rtbPoint = getRightCenter(`resmap-rtb-${rtb.RouteTableId}`);
+      if (!rtbPoint) continue;
+
+      for (const gw of gatewayTargets) {
+        if (gw.associatedRtbIds.includes(rtb.RouteTableId)) {
+          const gwPoint = getLeftCenter(`resmap-gw-${gw.id}`);
+          if (gwPoint) {
+            // Distribute entry points along the gateway card
+            const sameGwRtbs = vpcRouteTables.filter((r) => gw.associatedRtbIds.includes(r.RouteTableId));
+            const rtbIdx = sameGwRtbs.findIndex((r) => r.RouteTableId === rtb.RouteTableId);
+            const offsetY = sameGwRtbs.length > 1 ? (rtbIdx - (sameGwRtbs.length - 1) / 2) * 14 : 0;
+
+            rtbToGwLines.push({
+              rtbId: rtb.RouteTableId,
+              gwId: gw.id,
+              x1: rtbPoint.x,
+              y1: rtbPoint.y,
+              x2: gwPoint.x,
+              y2: gwPoint.y + offsetY,
+            });
+          }
+        }
+      }
+    }
+
+    setSvgLines({
+      vpcToSubnets: vpcToSubLines,
+      subnetToRtb: subToRtbLines,
+      rtbToGw: rtbToGwLines,
+    });
+  }, [subnetsTopology, vpcRouteTables, gatewayTargets]);
+
+  useEffect(() => {
+    if (activeTab !== "resourcemap") return;
+
+    recalculateLines();
+    const t1 = setTimeout(recalculateLines, 50);
+    const t2 = setTimeout(recalculateLines, 200);
+
+    let observer: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined" && mapContainerRef.current) {
+      observer = new ResizeObserver(() => {
+        recalculateLines();
+      });
+      observer.observe(mapContainerRef.current);
+    }
+
+    const handleResize = () => {
+      recalculateLines();
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      if (observer) observer.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [activeTab, selectedVpcId, subnetsTopology.length, vpcRouteTables.length, gatewayTargets.length, recalculateLines]);
+
+  const clearSelection = () => {
+    setSelectedSubnetId(null);
+    setSelectedRtbId(null);
+    setSelectedGwId(null);
+    setHoveredSubnetId(null);
+    setHoveredRtbId(null);
+    setHoveredGwId(null);
   };
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Top Title & Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-2 border-b border-[#eaeded]">
         <div>
           <h1 className="text-[24px] font-bold text-[#16191f]">Your VPCs</h1>
@@ -406,7 +614,7 @@ export default function VpcsClient({
         </div>
       )}
 
-      {/* Toolbar */}
+      {/* Filter Toolbar */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3 border border-[#d5dbdb] rounded">
         <div className="flex-1 max-w-md">
           <input
@@ -462,7 +670,7 @@ export default function VpcsClient({
         </div>
       </div>
 
-      {/* Table */}
+      {/* VPC Table */}
       <div className="bg-white border border-[#d5dbdb] rounded overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-[13px] border-collapse">
@@ -495,7 +703,7 @@ export default function VpcsClient({
                       key={vpc.VpcId}
                       onClick={() => {
                         setSelectedVpcId(vpc.VpcId);
-                        clearMapSelection();
+                        clearSelection();
                       }}
                       className={`cursor-pointer transition-colors ${
                         isSelected ? "bg-purple-50/50" : "hover:bg-[#f8f9fa]"
@@ -508,7 +716,7 @@ export default function VpcsClient({
                           checked={isSelected}
                           onChange={() => {
                             setSelectedVpcId(vpc.VpcId);
-                            clearMapSelection();
+                            clearSelection();
                           }}
                           className="text-[#ec7211] focus:ring-[#ec7211]"
                         />
@@ -535,7 +743,7 @@ export default function VpcsClient({
         </div>
       </div>
 
-      {/* Selected VPC Details & Resource Map Tabs */}
+      {/* Selected VPC Details & Authentic AWS Resource Map */}
       {selectedVpc && (
         <div className="bg-white border border-[#d5dbdb] rounded p-4 space-y-4 shadow-xs">
           <div className="border-b border-[#eaeded] pb-2">
@@ -659,311 +867,378 @@ export default function VpcsClient({
             </div>
           )}
 
-          {/* Authentic AWS VPC Resource Map */}
+          {/* Authentic AWS 4-Column Connected Resource Map */}
           {activeTab === "resourcemap" && (
-            <div className="space-y-4 pt-2">
-              {/* Toolbar & Status Bar */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 bg-[#f8f9fa] border border-[#eaeded] rounded text-xs">
-                <div>
-                  <div className="font-bold text-[#16191f] text-sm flex items-center gap-2">
-                    <span>Resource map for VPC:</span>
-                    <span className="font-mono text-[#0073bb]">{selectedVpc.VpcId}</span>
-                    {selectedVpc.Name && <span className="text-gray-500 font-normal">({selectedVpc.Name})</span>}
-                  </div>
-                  <p className="text-[#545b64] text-[11px] mt-0.5">
-                    Visual topology mapping subnets, their associated route tables, and outbound network gateways. Hover or click any resource to highlight its route path.
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {isAnyActive && (
-                    <button
-                      onClick={clearMapSelection}
-                      className="px-2.5 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-100 transition-colors"
-                      style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
-                    >
-                      Clear path highlight
-                    </button>
-                  )}
-                  <Link
-                    href="/vpc/subnets/create"
-                    className="px-3 py-1 text-xs font-medium text-white bg-[#ec7211] hover:bg-[#eb5f07] rounded transition-colors flex items-center justify-center"
-                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
-                  >
-                    Add subnet
-                  </Link>
-                </div>
+            <div className="pt-2 space-y-4">
+              {/* Header Action Bar */}
+              <div className="flex items-center justify-between pb-1">
+                <span className="text-[13px] text-[#545b64]">
+                  Interactive topology map for <span className="font-mono font-semibold text-[#16191f]">{selectedVpc.Name || selectedVpc.VpcId}</span>. Click or hover any card to trace its network path.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleCreateSampleMultiTierVpc}
+                  disabled={actionLoading}
+                  className="px-3 text-xs font-semibold text-[#0073bb] bg-white border border-[#0073bb] rounded hover:bg-blue-50 transition-colors"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                >
+                  {actionLoading ? "Provisioning..." : "Provision sample 4-subnet multi-tier VPC"}
+                </button>
               </div>
 
-              {/* Active Path Tracing Breadcrumb */}
+              {/* Optional Active Selection Bar */}
               {isAnyActive && (
-                <div className="p-2.5 bg-orange-50 border border-orange-200 rounded text-xs text-orange-900 flex flex-wrap items-center gap-2">
-                  <span className="font-bold">Active Route Trace:</span>
-                  {activeSubnetId && (
-                    <span className="bg-white px-2 py-0.5 rounded border border-orange-200 font-mono">
-                      Subnet: {activeSubnetId}
-                    </span>
-                  )}
-                  {activeRtbId && (
-                    <>
-                      <span>➔</span>
-                      <span className="bg-white px-2 py-0.5 rounded border border-orange-200 font-mono">
-                        Route Table: {activeRtbId}
+                <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-900">
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold">Active Path Highlighted:</span>
+                    {activeSubnet && (
+                      <span className="bg-white px-2 py-0.5 rounded border border-blue-200 font-mono">
+                        Subnet: {activeSubnet}
                       </span>
-                    </>
-                  )}
-                  {activeGatewayId && (
-                    <>
-                      <span>➔</span>
-                      <span className="bg-white px-2 py-0.5 rounded border border-orange-200 font-mono">
-                        Gateway: {activeGatewayId}
-                      </span>
-                    </>
-                  )}
-                </div>
-              )}
-
-              {/* Empty state if VPC has no subnets */}
-              {subnetsTopology.length === 0 ? (
-                <div className="py-12 px-4 text-center border-2 border-dashed border-[#d5dbdb] rounded bg-[#fafafa]">
-                  <p className="text-sm font-medium text-gray-700">No subnets found in this VPC.</p>
-                  <p className="text-xs text-gray-500 mt-1 mb-4">
-                    Create subnets to build your network topology and visualize routing relationships.
-                  </p>
-                  <Link
-                    href="/vpc/subnets/create"
-                    className="px-4 py-2 text-xs font-bold text-white bg-[#ec7211] rounded hover:bg-[#eb5f07] inline-flex items-center"
-                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                    )}
+                    {activeRtb && (
+                      <>
+                        <span>➔</span>
+                        <span className="bg-white px-2 py-0.5 rounded border border-blue-200 font-mono">
+                          Route Table: {activeRtb}
+                        </span>
+                      </>
+                    )}
+                    {activeGw && (
+                      <>
+                        <span>➔</span>
+                        <span className="bg-white px-2 py-0.5 rounded border border-blue-200 font-mono">
+                          Gateway: {activeGw}
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={clearSelection}
+                    className="text-xs text-[#0073bb] hover:underline font-semibold"
                   >
-                    Create subnet
-                  </Link>
-                </div>
-              ) : (
-                /* Three Column Topology Grid */
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-2">
-                  {/* Column 1: Subnets */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Subnets ({subnetsTopology.length})
-                      </span>
-                      <span className="text-[11px] text-gray-400">Step 1</span>
-                    </div>
-
-                    <div className="space-y-3">
-                      {subnetsTopology.map((item) => {
-                        const isSubnetActive = activeSubnetId === item.subnet.SubnetId;
-                        const isHighlighted = isCardHighlighted("subnet", item.subnet.SubnetId);
-                        const isLocked = selectedMapSubnetId === item.subnet.SubnetId;
-
-                        return (
-                          <div
-                            key={item.subnet.SubnetId}
-                            onMouseEnter={() => setHoveredMapSubnetId(item.subnet.SubnetId)}
-                            onMouseLeave={() => setHoveredMapSubnetId(null)}
-                            onClick={() =>
-                              setSelectedMapSubnetId(isLocked ? null : item.subnet.SubnetId)
-                            }
-                            className={`p-3.5 rounded border transition-all cursor-pointer relative shadow-xs ${
-                              isSubnetActive || isLocked
-                                ? "bg-orange-50/60 border-[#ec7211] ring-2 ring-orange-200"
-                                : isHighlighted
-                                ? "bg-white border-[#d5dbdb] hover:border-gray-400"
-                                : "bg-white border-[#eaeded] opacity-35"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-1.5">
-                              <div>
-                                <span className="font-semibold text-xs text-gray-900 block">
-                                  {item.subnet.Name || "Subnet"}
-                                </span>
-                                <Link
-                                  href={`/vpc/subnets`}
-                                  className="font-mono text-xs text-[#0073bb] hover:underline"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {item.subnet.SubnetId}
-                                </Link>
-                              </div>
-                              <span
-                                className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
-                                  item.isPublic
-                                    ? "bg-green-100 text-green-800 border border-green-200"
-                                    : "bg-blue-100 text-blue-800 border border-blue-200"
-                                }`}
-                              >
-                                {item.isPublic ? "Public" : "Private"}
-                              </span>
-                            </div>
-
-                            <div className="text-[11px] text-gray-600 flex items-center justify-between font-mono bg-gray-50 px-2 py-1 rounded border border-gray-100 mt-2">
-                              <span>{item.subnet.CidrBlock}</span>
-                              <span className="text-gray-500 font-sans">{item.subnet.AvailabilityZone}</span>
-                            </div>
-
-                            <div className="mt-2.5 pt-2 border-t border-gray-100 text-[11px] text-gray-500 flex items-center justify-between">
-                              <span>Routes to:</span>
-                              <span
-                                className={`font-mono font-medium ${
-                                  isSubnetActive || isLocked ? "text-orange-700" : "text-[#0073bb]"
-                                }`}
-                              >
-                                {item.routeTable?.Name || item.routeTable?.RouteTableId || "Main table"}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Column 2: Route tables */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Route tables ({vpcRouteTables.length})
-                      </span>
-                      <span className="text-[11px] text-gray-400">Step 2</span>
-                    </div>
-
-                    <div className="space-y-3">
-                      {vpcRouteTables.map((rtb) => {
-                        const isRtbActive = activeRtbId === rtb.RouteTableId;
-                        const isHighlighted = isCardHighlighted("rtb", rtb.RouteTableId);
-                        const isLocked = selectedMapRtbId === rtb.RouteTableId;
-
-                        const associatedSubnets = subnetsTopology.filter(
-                          (t) => t.routeTable?.RouteTableId === rtb.RouteTableId
-                        );
-
-                        return (
-                          <div
-                            key={rtb.RouteTableId}
-                            onMouseEnter={() => setHoveredMapRtbId(rtb.RouteTableId)}
-                            onMouseLeave={() => setHoveredMapRtbId(null)}
-                            onClick={() =>
-                              setSelectedMapRtbId(isLocked ? null : rtb.RouteTableId)
-                            }
-                            className={`p-3.5 rounded border transition-all cursor-pointer relative shadow-xs ${
-                              isRtbActive || isLocked
-                                ? "bg-orange-50/60 border-[#ec7211] ring-2 ring-orange-200"
-                                : isHighlighted
-                                ? "bg-white border-[#d5dbdb] hover:border-gray-400"
-                                : "bg-white border-[#eaeded] opacity-35"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-1.5">
-                              <div>
-                                <span className="font-semibold text-xs text-gray-900 block">
-                                  {rtb.Name || "Route table"}
-                                </span>
-                                <Link
-                                  href={`/vpc/route-tables`}
-                                  className="font-mono text-xs text-[#0073bb] hover:underline"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {rtb.RouteTableId}
-                                </Link>
-                              </div>
-                              {rtb.IsMain && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200">
-                                  Main
-                                </span>
-                              )}
-                            </div>
-
-                            <div className="text-[11px] text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100 mt-2 flex items-center justify-between">
-                              <span>
-                                {associatedSubnets.length} associated subnet
-                                {associatedSubnets.length === 1 ? "" : "s"}
-                              </span>
-                              <span className="font-mono text-gray-500">
-                                {rtb.Routes?.length || 0} routes
-                              </span>
-                            </div>
-
-                            <div className="mt-2.5 pt-2 border-t border-gray-100 text-[11px] text-gray-500 flex items-center justify-between">
-                              <span>Target Gateways:</span>
-                              <span className="font-medium text-gray-700">
-                                {rtb.Routes?.some((r) => r.GatewayId?.startsWith("igw-"))
-                                  ? "Internet Gateway, Local"
-                                  : rtb.Routes?.some((r) => r.NatGatewayId)
-                                  ? "NAT Gateway, Local"
-                                  : "Local only"}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Column 3: Network connections / Gateways */}
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between pb-2 border-b border-gray-200">
-                      <span className="text-xs font-bold text-gray-700 uppercase tracking-wider">
-                        Network connections ({gatewayTargets.length})
-                      </span>
-                      <span className="text-[11px] text-gray-400">Step 3</span>
-                    </div>
-
-                    <div className="space-y-3">
-                      {gatewayTargets.map((target) => {
-                        const isGwActive = activeGatewayId === target.id;
-                        const isHighlighted = isCardHighlighted("gw", target.id);
-                        const isLocked = selectedMapGatewayId === target.id;
-
-                        return (
-                          <div
-                            key={target.id}
-                            onMouseEnter={() => setHoveredMapGatewayId(target.id)}
-                            onMouseLeave={() => setHoveredMapGatewayId(null)}
-                            onClick={() =>
-                              setSelectedMapGatewayId(isLocked ? null : target.id)
-                            }
-                            className={`p-3.5 rounded border transition-all cursor-pointer relative shadow-xs ${
-                              isGwActive || isLocked
-                                ? "bg-orange-50/60 border-[#ec7211] ring-2 ring-orange-200"
-                                : isHighlighted
-                                ? "bg-white border-[#d5dbdb] hover:border-gray-400"
-                                : "bg-white border-[#eaeded] opacity-35"
-                            }`}
-                          >
-                            <div className="flex items-start justify-between gap-2 mb-1.5">
-                              <div>
-                                <span className="font-semibold text-xs text-gray-900 block">
-                                  {target.type}
-                                </span>
-                                <span className="font-mono text-xs text-[#0073bb]">
-                                  {target.id}
-                                </span>
-                              </div>
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-800">
-                                {target.status}
-                              </span>
-                            </div>
-
-                            <div className="text-[11px] text-gray-600 bg-gray-50 px-2 py-1 rounded border border-gray-100 mt-2 flex items-center justify-between">
-                              <span className="text-gray-500">Destination:</span>
-                              <span className="font-mono font-medium text-gray-700 truncate max-w-[150px]">
-                                {target.destination}
-                              </span>
-                            </div>
-
-                            <div className="mt-2.5 pt-2 border-t border-gray-100 text-[11px] text-gray-500 flex items-center justify-between">
-                              <span>Connected route tables:</span>
-                              <span className="font-medium text-gray-700">
-                                {target.associatedRtbIds.length} route table
-                                {target.associatedRtbIds.length === 1 ? "" : "s"}
-                              </span>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                    Clear selection
+                  </button>
                 </div>
               )}
+
+              {/* Relative Container Holding Columns & Connected SVG Overlay */}
+              <div
+                ref={mapContainerRef}
+                className="relative bg-[#f8f9fa] border border-[#eaeded] rounded-xl p-6 overflow-x-auto"
+              >
+                {/* SVG Connections Overlay */}
+                <svg
+                  className="absolute inset-0 pointer-events-none w-full h-full z-10"
+                  style={{ minWidth: "1020px" }}
+                >
+                  {/* VPC to Subnet lines */}
+                  {svgLines.vpcToSubnets.map((line) => {
+                    const active = isCardActive("subnet", line.subId);
+                    const dx = 35;
+                    const d = `M ${line.x1} ${line.y1} C ${line.x1 + dx} ${line.y1}, ${
+                      line.x2 - dx
+                    } ${line.y2}, ${line.x2} ${line.y2}`;
+
+                    return (
+                      <path
+                        key={`vpc-sub-${line.subId}`}
+                        d={d}
+                        fill="none"
+                        stroke={active ? "#ec7211" : "#0073bb"}
+                        strokeWidth={active ? 2.5 : 2}
+                        opacity={!isAnyActive || active ? 1 : 0.25}
+                        className="transition-all duration-150"
+                      />
+                    );
+                  })}
+
+                  {/* Subnet to Route Table lines */}
+                  {svgLines.subnetToRtb.map((line, idx) => {
+                    const active = isLineActive("subnet", line.subId, line.rtbId);
+                    const dx = Math.max((line.x2 - line.x1) / 2, 35);
+                    const d = `M ${line.x1} ${line.y1} C ${line.x1 + dx} ${line.y1}, ${
+                      line.x2 - dx
+                    } ${line.y2}, ${line.x2} ${line.y2}`;
+
+                    return (
+                      <path
+                        key={`sub-rtb-${idx}`}
+                        d={d}
+                        fill="none"
+                        stroke={active ? "#ec7211" : "#0073bb"}
+                        strokeWidth={active ? 2.5 : 2}
+                        opacity={!isAnyActive || active ? 1 : 0.25}
+                        className="transition-all duration-150"
+                      />
+                    );
+                  })}
+
+                  {/* Route Table to Network Connections lines (Dotted) */}
+                  {svgLines.rtbToGw.map((line, idx) => {
+                    const active = isLineActive("rtb", line.rtbId, line.gwId);
+                    const dx = Math.max((line.x2 - line.x1) / 2, 35);
+                    const d = `M ${line.x1} ${line.y1} C ${line.x1 + dx} ${line.y1}, ${
+                      line.x2 - dx
+                    } ${line.y2}, ${line.x2} ${line.y2}`;
+
+                    return (
+                      <path
+                        key={`rtb-gw-${idx}`}
+                        d={d}
+                        fill="none"
+                        stroke={active ? "#ec7211" : "#0073bb"}
+                        strokeWidth={active ? 2.5 : 2}
+                        strokeDasharray="4 4"
+                        opacity={!isAnyActive || active ? 1 : 0.25}
+                        className="transition-all duration-150"
+                      />
+                    );
+                  })}
+                </svg>
+
+                {/* 4 Distinct AWS Columns */}
+                <div
+                  className="grid grid-cols-4 gap-8 relative z-20"
+                  style={{ minWidth: "1020px" }}
+                >
+                  {/* Column 1: VPC */}
+                  <div className="bg-white border border-[#eaeded] rounded-xl p-5 shadow-xs flex flex-col justify-between">
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[15px] font-bold text-[#16191f]">VPC</span>
+                        <button
+                          onClick={() => setShowVpcDetails(!showVpcDetails)}
+                          className="text-[12px] text-[#0073bb] hover:underline"
+                        >
+                          {showVpcDetails ? "Hide details" : "Show details"}
+                        </button>
+                      </div>
+                      <p className="text-[12px] text-[#545b64] mb-4">Your AWS virtual network</p>
+
+                      <div
+                        id="resmap-vpc-card"
+                        className="bg-[#0073bb] text-white rounded p-3.5 shadow-sm transition-all"
+                      >
+                        <div className="font-bold text-[13px] truncate">
+                          {selectedVpc.Name || selectedVpc.VpcId}
+                        </div>
+                        <div className="text-[12px] opacity-90 font-mono mt-0.5">
+                          {selectedVpc.CidrBlock}
+                        </div>
+                        {showVpcDetails && (
+                          <div className="text-[11px] opacity-80 mt-1">
+                            Amazon-provided IPv6
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Column 2: Subnets */}
+                  <div className="bg-white border border-[#eaeded] rounded-xl p-5 shadow-xs space-y-4">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-[#16191f]">
+                        Subnets ({subnetsTopology.length})
+                      </h3>
+                      <p className="text-[12px] text-[#545b64]">Subnets within this VPC</p>
+                    </div>
+
+                    {subnetsTopology.length === 0 ? (
+                      <div className="text-xs text-gray-400 py-6 text-center">
+                        No subnets in this VPC.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {Object.entries(subnetsByAz).map(([az, azSubnets]) => (
+                          <div key={az} className="space-y-2">
+                            <div className="text-[13px] font-bold text-[#16191f]">{az}</div>
+
+                            {azSubnets.map((item) => {
+                              const active = isCardActive("subnet", item.subnet.SubnetId);
+                              const isSelected = selectedSubnetId === item.subnet.SubnetId;
+
+                              return (
+                                <div
+                                  key={item.subnet.SubnetId}
+                                  id={`resmap-sub-${item.subnet.SubnetId}`}
+                                  onMouseEnter={() => setHoveredSubnetId(item.subnet.SubnetId)}
+                                  onMouseLeave={() => setHoveredSubnetId(null)}
+                                  onClick={() =>
+                                    setSelectedSubnetId(
+                                      isSelected ? null : item.subnet.SubnetId
+                                    )
+                                  }
+                                  className={`bg-white border rounded p-2.5 transition-all cursor-pointer ${
+                                    active || isSelected
+                                      ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
+                                      : "border-[#0073bb] hover:border-[#ec7211]"
+                                  } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
+                                >
+                                  <div className="flex items-center gap-2 mb-1">
+                                    {item.isPublic ? (
+                                      /* Public subnet green circle */
+                                      <div
+                                        className="w-5 h-5 rounded-full bg-[#1e8e3e] text-white flex items-center justify-center text-[10px] font-bold shrink-0"
+                                        title="Public Subnet"
+                                      >
+                                        {item.azLetter}
+                                      </div>
+                                    ) : (
+                                      /* Private subnet blue rounded square */
+                                      <div
+                                        className="w-5 h-5 rounded bg-[#0073bb] text-white flex items-center justify-center text-[10px] font-bold shrink-0"
+                                        title="Private Subnet"
+                                      >
+                                        {item.azLetter}
+                                      </div>
+                                    )}
+
+                                    <div className="font-semibold text-[12px] text-[#0073bb] truncate max-w-[160px]">
+                                      {item.subnet.Name || item.subnet.SubnetId}
+                                    </div>
+                                  </div>
+
+                                  <div className="text-[11px] text-[#545b64] font-mono pl-7">
+                                    {item.subnet.CidrBlock}
+                                  </div>
+                                  <div className="text-[11px] text-[#545b64] pl-7">
+                                    Amazon-provided IPv6
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Column 3: Route tables */}
+                  <div className="bg-white border border-[#eaeded] rounded-xl p-5 shadow-xs space-y-4">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-[#16191f]">
+                        Route tables ({vpcRouteTables.length})
+                      </h3>
+                      <p className="text-[12px] text-[#545b64]">Route network traffic to resources</p>
+                    </div>
+
+                    {vpcRouteTables.length === 0 ? (
+                      <div className="text-xs text-gray-400 py-6 text-center">
+                        No route tables in this VPC.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {vpcRouteTables.map((rtb) => {
+                          const active = isCardActive("rtb", rtb.RouteTableId);
+                          const isSelected = selectedRtbId === rtb.RouteTableId;
+
+                          // Compute routes summary text
+                          const igwRoute = rtb.Routes?.find((r) => r.GatewayId?.startsWith("igw-"));
+                          const natRoute = rtb.Routes?.find((r) => r.NatGatewayId || r.GatewayId?.startsWith("nat-"));
+                          const vpceRoute = rtb.Routes?.find((r) => r.GatewayId?.startsWith("vpce-"));
+
+                          return (
+                            <div
+                              key={rtb.RouteTableId}
+                              id={`resmap-rtb-${rtb.RouteTableId}`}
+                              onMouseEnter={() => setHoveredRtbId(rtb.RouteTableId)}
+                              onMouseLeave={() => setHoveredRtbId(null)}
+                              onClick={() =>
+                                setSelectedRtbId(
+                                  isSelected ? null : rtb.RouteTableId
+                                )
+                              }
+                              className={`bg-white border rounded p-2.5 transition-all cursor-pointer ${
+                                active || isSelected
+                                  ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
+                                  : "border-[#0073bb] hover:border-[#ec7211]"
+                              } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
+                            >
+                              <div className="font-semibold text-[12px] text-[#0073bb] truncate">
+                                {rtb.Name || rtb.RouteTableId}
+                              </div>
+
+                              <div className="mt-1 space-y-0.5 text-[11px] text-[#545b64]">
+                                {igwRoute && (
+                                  <>
+                                    <div>0.0.0.0/0 routes to {igwRoute.GatewayId}</div>
+                                    <div>::/0 routes to {igwRoute.GatewayId}</div>
+                                  </>
+                                )}
+                                {natRoute && (
+                                  <div>
+                                    0.0.0.0/0 routes to {natRoute.NatGatewayId || natRoute.GatewayId}
+                                  </div>
+                                )}
+                                {vpceRoute && (
+                                  <div>
+                                    Prefix list through {vpceRoute.GatewayId}
+                                  </div>
+                                )}
+                                {!igwRoute && !natRoute && !vpceRoute && (
+                                  <div>Local traffic to {selectedVpc.CidrBlock}</div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Column 4: Network connections */}
+                  <div className="bg-white border border-[#eaeded] rounded-xl p-5 shadow-xs space-y-4">
+                    <div>
+                      <h3 className="text-[15px] font-bold text-[#16191f]">
+                        Network connections ({gatewayTargets.length})
+                      </h3>
+                      <p className="text-[12px] text-[#545b64]">Connections to other networks</p>
+                    </div>
+
+                    {gatewayTargets.length === 0 ? (
+                      <div className="text-xs text-gray-400 py-6 text-center">
+                        No external gateways attached.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {gatewayTargets.map((target) => {
+                          const active = isCardActive("gw", target.id);
+                          const isSelected = selectedGwId === target.id;
+
+                          return (
+                            <div
+                              key={target.id}
+                              id={`resmap-gw-${target.id}`}
+                              onMouseEnter={() => setHoveredGwId(target.id)}
+                              onMouseLeave={() => setHoveredGwId(null)}
+                              onClick={() =>
+                                setSelectedGwId(
+                                  isSelected ? null : target.id
+                                )
+                              }
+                              className={`bg-white border rounded p-2.5 transition-all cursor-pointer ${
+                                active || isSelected
+                                  ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
+                                  : "border-[#0073bb] hover:border-[#ec7211]"
+                              } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
+                            >
+                              <div className="font-semibold text-[12px] text-[#0073bb] truncate">
+                                {target.name}
+                              </div>
+
+                              <div className="mt-1 space-y-0.5 text-[11px] text-[#545b64]">
+                                <div>{target.subtext1}</div>
+                                {target.subtext2 && <div>{target.subtext2}</div>}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
