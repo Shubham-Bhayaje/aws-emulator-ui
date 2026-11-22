@@ -8,6 +8,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Account Management](Account%20Management.md): Manage account details, primary and alternate contacts (Billing, Operations, Security), AWS Region opt-in availability, and account closure.
 - [AWS AppConfig](AppConfig.md): Quickly and safely deploy dynamic application configuration and feature flags across applications and environments without code deployments, with progressive deployment strategies, bake times, automatic alarm rollbacks, and interactive AppConfigData client retrieval.
 - [AWS Certificate Manager (ACM)](ACM.md): Provision, request, and manage SSL/TLS certificates, validate domain ownership via DNS (Route 53 CNAME) or email, import third-party X.509 certificates and private keys, inspect certificate PEM bodies, and toggle Certificate Transparency logging.
+- [AWS Client VPN](CLIENT_VPN.md): Managed client-based OpenVPN solution enabling remote user devices to securely connect to Amazon VPC and private network resources. Manage Client VPN endpoints, ACM server and client mutual TLS certificates, target network subnet associations, client routing tables, security groups, and downloadable OpenVPN (.ovpn) configuration profiles.
 - [AWS Cloud Map](Cloud%20Map.md): Fully managed cloud service discovery and resource registry. Create HTTP, private DNS (with VPC association), and public DNS namespaces, configure routing policies and health checking, register/deregister service instances with custom attributes, and test live DiscoverInstances API queries.
 - [AWS CloudHSM](CloudHSM.md): Dedicated hardware security module (HSM) cluster management inside Amazon VPC, multi-AZ HSM provisioning, cluster CSR export, cluster initialization workflow, automated backup retention, and teardown safety controls.
 - [AWS Directory Service](Directory%20Service.md): Set up and manage Microsoft Active Directory, Simple AD, and AD Connector in the cloud, configure Access URL aliases, enable Single Sign-On (SSO), take point-in-time snapshots, reset domain admin credentials, and inspect trust relationships.
@@ -83,7 +84,7 @@ The following table tracks inter-service integrations that are waiting on future
 | AWS Site-to-Site VPN | AWS Transit Gateway | VPN attachments to Transit Gateway hub | Connected live Transit Gateway target support and VPN attachment workflow |
 | AWS Direct Connect | AWS Transit Gateway | Direct Connect gateway attachments to Transit Gateway hub | Connect Direct Connect gateway attachments when AWS Direct Connect is built |
 | AWS Network Firewall | Amazon VPC | Firewall endpoints and subnet routing rules | Connect Network Firewall when AWS Network Firewall is built |
-| AWS Client VPN | Amazon VPC | Client VPN endpoint subnet associations | Connect Client VPN when AWS Client VPN is built |
+| AWS Client VPN | Amazon VPC | Client VPN endpoint subnet associations | Connected live Client VPN target network associations and client routing |
 
 ---
 

@@ -30,4 +30,5 @@ export const vpcNav: VpcNavItem[] = [
   { label: "Virtual private gateways", href: "/vpc/virtual-private-gateways", group: "Virtual Private Network (VPN)" },
   { label: "Customer gateways", href: "/vpc/customer-gateways", group: "Virtual Private Network (VPN)" },
   { label: "Site-to-Site VPN connections", href: "/vpc/vpn-connections", group: "Virtual Private Network (VPN)" },
+  { label: "Client VPN endpoints", href: "/vpc/client-vpn-endpoints", group: "Virtual Private Network (VPN)" },
 ];
