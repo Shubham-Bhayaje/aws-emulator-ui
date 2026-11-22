@@ -242,7 +242,13 @@ export default function SubnetsClient({ initialSubnets, initialSearch = "" }: Pr
                         {sub.Name || "-"}
                       </td>
                       <td className="py-2.5 px-4 font-mono text-[12px] text-[#0073bb]">
-                        {sub.SubnetId}
+                        <Link
+                          href={`/vpc/subnets/${sub.SubnetId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline font-semibold"
+                        >
+                          {sub.SubnetId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-4">
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">

@@ -1106,7 +1106,7 @@ export default function VpcsClient({
                                   onMouseLeave={() => setHoveredSubnetId(null)}
                                   onClick={() => {
                                     router.push(
-                                      `/vpc/subnets?search=${encodeURIComponent(
+                                      `/vpc/subnets/${encodeURIComponent(
                                         item.subnet.SubnetId
                                       )}`
                                     );
@@ -1116,7 +1116,7 @@ export default function VpcsClient({
                                       ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
                                       : "border-[#0073bb] hover:border-[#ec7211]"
                                   } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
-                                  title={`Click to open Subnet ${item.subnet.SubnetId} in Subnets console`}
+                                  title={`Click to open Subnet ${item.subnet.SubnetId} page`}
                                 >
                                   <div className="flex items-center gap-2 mb-1">
                                     {item.isPublic ? (
@@ -1138,7 +1138,7 @@ export default function VpcsClient({
                                     )}
 
                                     <Link
-                                      href={`/vpc/subnets?search=${encodeURIComponent(
+                                      href={`/vpc/subnets/${encodeURIComponent(
                                         item.subnet.SubnetId
                                       )}`}
                                       onClick={(e) => e.stopPropagation()}
@@ -1198,7 +1198,7 @@ export default function VpcsClient({
                               onMouseLeave={() => setHoveredRtbId(null)}
                               onClick={() => {
                                 router.push(
-                                  `/vpc/route-tables?search=${encodeURIComponent(
+                                  `/vpc/route-tables/${encodeURIComponent(
                                     rtb.RouteTableId
                                   )}`
                                 );
@@ -1208,11 +1208,11 @@ export default function VpcsClient({
                                   ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
                                   : "border-[#0073bb] hover:border-[#ec7211]"
                               } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
-                              title={`Click to open Route Table ${rtb.RouteTableId} in Route tables console`}
+                              title={`Click to open Route Table ${rtb.RouteTableId} page`}
                             >
                               <div className="flex items-center justify-between mb-1">
                                 <Link
-                                  href={`/vpc/route-tables?search=${encodeURIComponent(
+                                  href={`/vpc/route-tables/${encodeURIComponent(
                                     rtb.RouteTableId
                                   )}`}
                                   onClick={(e) => e.stopPropagation()}

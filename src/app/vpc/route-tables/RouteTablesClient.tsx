@@ -379,7 +379,13 @@ export default function RouteTablesClient({
                         {rtb.Name || "-"}
                       </td>
                       <td className="py-2.5 px-4 font-mono text-[12px] text-[#0073bb]">
-                        {rtb.RouteTableId}
+                        <Link
+                          href={`/vpc/route-tables/${rtb.RouteTableId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="hover:underline font-semibold"
+                        >
+                          {rtb.RouteTableId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-4 font-mono text-[12px] text-[#0073bb]">
                         {rtb.VpcId}

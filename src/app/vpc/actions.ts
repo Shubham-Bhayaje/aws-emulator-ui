@@ -100,9 +100,12 @@ export interface SubnetItem {
   VpcId: string;
   CidrBlock: string;
   AvailabilityZone?: string;
+  AvailabilityZoneId?: string;
   AvailableIpAddressCount?: number;
   DefaultForAz?: boolean;
   MapPublicIpOnLaunch?: boolean;
+  SubnetArn?: string;
+  OwnerId?: string;
   Tags?: Record<string, string>;
 }
 
@@ -127,6 +130,8 @@ export interface RouteTableItem {
   Name?: string;
   VpcId: string;
   IsMain: boolean;
+  OwnerId?: string;
+  RouteTableArn?: string;
   Routes: RouteItem[];
   Associations: RouteTableAssociationItem[];
   Tags?: Record<string, string>;
@@ -193,6 +198,7 @@ export interface NetworkAclItem {
   IsDefault: boolean;
   Entries: NetworkAclEntryItem[];
   AssociationsCount: number;
+  Associations?: { NetworkAclAssociationId?: string; SubnetId?: string }[];
   Tags?: Record<string, string>;
 }
 
@@ -609,9 +615,12 @@ export async function listSubnetsAction(vpcId?: string): Promise<{
         VpcId: s.VpcId || "",
         CidrBlock: s.CidrBlock || "",
         AvailabilityZone: s.AvailabilityZone,
+        AvailabilityZoneId: s.AvailabilityZoneId,
         AvailableIpAddressCount: s.AvailableIpAddressCount,
         DefaultForAz: s.DefaultForAz || false,
         MapPublicIpOnLaunch: s.MapPublicIpOnLaunch || false,
+        SubnetArn: s.SubnetArn,
+        OwnerId: s.OwnerId,
         Tags: tagsMap,
       };
     });
@@ -692,6 +701,81 @@ export async function modifySubnetAttributeAction(
   }
 }
 
+export async function getSubnetDetailAction(subnetId: string): Promise<{
+  success: boolean;
+  subnet?: SubnetItem;
+  routeTable?: RouteTableItem;
+  networkAcl?: NetworkAclItem;
+  allRouteTables?: RouteTableItem[];
+  vpc?: VpcItem;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeSubnetsCommand({ SubnetIds: [subnetId] }));
+    const s = res.Subnets?.[0];
+    if (!s) {
+      return { success: false, error: `Subnet ${subnetId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    s.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const subnet: SubnetItem = {
+      SubnetId: s.SubnetId || "",
+      Name: getTag(s.Tags, "Name"),
+      State: s.State || "available",
+      VpcId: s.VpcId || "",
+      CidrBlock: s.CidrBlock || "",
+      AvailabilityZone: s.AvailabilityZone,
+      AvailabilityZoneId: s.AvailabilityZoneId,
+      AvailableIpAddressCount: s.AvailableIpAddressCount,
+      DefaultForAz: s.DefaultForAz || false,
+      MapPublicIpOnLaunch: s.MapPublicIpOnLaunch || false,
+      SubnetArn: s.SubnetArn,
+      OwnerId: s.OwnerId,
+      Tags: tagsMap,
+    };
+
+    const [rtbsRes, naclsRes, vpcsRes] = await Promise.all([
+      listRouteTablesAction(subnet.VpcId),
+      listNetworkAclsAction(subnet.VpcId),
+      listVpcsAction(),
+    ]);
+
+    const allRouteTables = rtbsRes.success ? rtbsRes.routeTables : [];
+    const explicitRtb = allRouteTables.find((r) =>
+      r.Associations?.some((a) => a.SubnetId === subnetId)
+    );
+    const mainRtb = allRouteTables.find((r) => r.IsMain) || allRouteTables[0];
+    const routeTable = explicitRtb || mainRtb;
+
+    const allNacls = naclsRes.success ? naclsRes.networkAcls : [];
+    const explicitNacl = allNacls.find((n) =>
+      n.Associations?.some((a) => a.SubnetId === subnetId)
+    );
+    const defaultNacl = allNacls.find((n) => n.IsDefault) || allNacls[0];
+    const networkAcl = explicitNacl || defaultNacl;
+
+    const vpc = vpcsRes.success ? vpcsRes.vpcs.find((v) => v.VpcId === subnet.VpcId) : undefined;
+
+    return {
+      success: true,
+      subnet,
+      routeTable,
+      networkAcl,
+      allRouteTables,
+      vpc,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 // -------------------------------------------------------------
 // 5. ROUTE TABLES ACTIONS
 // -------------------------------------------------------------
@@ -718,6 +802,8 @@ export async function listRouteTablesAction(vpcId?: string): Promise<{
         Name: getTag(rt.Tags, "Name"),
         VpcId: rt.VpcId || "",
         IsMain: isMain,
+        OwnerId: rt.OwnerId,
+        RouteTableArn: `arn:aws:ec2:us-east-1:${rt.OwnerId || "000000000000"}:route-table/${rt.RouteTableId}`,
         Routes: (rt.Routes || []).map((r) => ({
           DestinationCidrBlock: r.DestinationCidrBlock,
           GatewayId: r.GatewayId,
@@ -848,6 +934,91 @@ export async function deleteRouteAction(
   try {
     await ec2.send(new DeleteRouteCommand({ RouteTableId: routeTableId, DestinationCidrBlock: destinationCidrBlock }));
     return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getRouteTableDetailAction(routeTableId: string): Promise<{
+  success: boolean;
+  routeTable?: RouteTableItem;
+  associatedSubnets?: SubnetItem[];
+  unassociatedSubnets?: SubnetItem[];
+  allSubnets?: SubnetItem[];
+  internetGateways?: InternetGatewayItem[];
+  natGateways?: NatGatewayItem[];
+  endpoints?: VpcEndpointItem[];
+  vpc?: VpcItem;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeRouteTablesCommand({ RouteTableIds: [routeTableId] }));
+    const rt = res.RouteTables?.[0];
+    if (!rt) {
+      return { success: false, error: `Route Table ${routeTableId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    rt.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const isMain = rt.Associations?.some((a) => a.Main) || false;
+
+    const routeTable: RouteTableItem = {
+      RouteTableId: rt.RouteTableId || "",
+      Name: getTag(rt.Tags, "Name"),
+      VpcId: rt.VpcId || "",
+      IsMain: isMain,
+      OwnerId: rt.OwnerId,
+      RouteTableArn: `arn:aws:ec2:us-east-1:${rt.OwnerId || "000000000000"}:route-table/${rt.RouteTableId}`,
+      Routes: (rt.Routes || []).map((r) => ({
+        DestinationCidrBlock: r.DestinationCidrBlock,
+        GatewayId: r.GatewayId,
+        NatGatewayId: r.NatGatewayId,
+        TransitGatewayId: r.TransitGatewayId,
+        State: r.State,
+        Origin: r.Origin,
+      })),
+      Associations: (rt.Associations || []).map((a) => ({
+        RouteTableAssociationId: a.RouteTableAssociationId || "",
+        RouteTableId: a.RouteTableId || "",
+        SubnetId: a.SubnetId,
+        Main: a.Main || false,
+      })),
+      Tags: tagsMap,
+    };
+
+    const [subsRes, igwsRes, natsRes, epsRes, vpcsRes] = await Promise.all([
+      listSubnetsAction(routeTable.VpcId),
+      listInternetGatewaysAction(),
+      listNatGatewaysAction(routeTable.VpcId),
+      listVpcEndpointsAction(routeTable.VpcId),
+      listVpcsAction(),
+    ]);
+
+    const allSubnets = subsRes.success ? subsRes.subnets : [];
+    const explicitSubIds = new Set(
+      routeTable.Associations.filter((a) => a.SubnetId).map((a) => a.SubnetId!)
+    );
+    const associatedSubnets = allSubnets.filter((s) => explicitSubIds.has(s.SubnetId));
+    const unassociatedSubnets = allSubnets.filter((s) => !explicitSubIds.has(s.SubnetId));
+    const vpc = vpcsRes.success ? vpcsRes.vpcs.find((v) => v.VpcId === routeTable.VpcId) : undefined;
+
+    return {
+      success: true,
+      routeTable,
+      associatedSubnets,
+      unassociatedSubnets,
+      allSubnets,
+      internetGateways: igwsRes.success ? igwsRes.internetGateways : [],
+      natGateways: natsRes.success ? natsRes.natGateways : [],
+      endpoints: epsRes.success ? epsRes.endpoints : [],
+      vpc,
+    };
   } catch (err: unknown) {
     return {
       success: false,
@@ -1210,6 +1381,10 @@ export async function listNetworkAclsAction(vpcId?: string): Promise<{
           PortRange: e.PortRange ? { From: e.PortRange.From, To: e.PortRange.To } : undefined,
         })),
         AssociationsCount: acl.Associations?.length || 0,
+        Associations: (acl.Associations || []).map((a) => ({
+          NetworkAclAssociationId: a.NetworkAclAssociationId,
+          SubnetId: a.SubnetId,
+        })),
         Tags: tagsMap,
       };
     });

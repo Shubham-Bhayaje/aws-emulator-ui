@@ -68,10 +68,17 @@ Every action below is supported in this console replica and tested against the l
     --tag-specifications 'ResourceType=vpc,Tags=[{Key=Name,Value=production-vpc}]'
   ```
 
-### 2. Subnets (`/vpc/subnets` & `/vpc/subnets/create`)
+### 2. Subnets (`/vpc/subnets`, `/vpc/subnets/create`, & `/vpc/subnets/[subnetId]`)
 - **View Subnets**: Filterable table showing Subnet Name, Subnet ID, State, VPC ID, CIDR block, Availability Zone, and Available IPv4 addresses.
+- **Dedicated Subnet Detail Page (`/vpc/subnets/[subnetId]`)**:
+  - **Overview**: Subnet ID, state badge (`Available`), VPC ID, IPv4 CIDR, Available IPv4 addresses, and Availability Zone.
+  - **Details Tab**: Complete attribute grid including Subnet ARN, Owner ID, AZ ID, Default subnet flag, Auto-assign public IPv4 toggle, and DNS64 status.
+  - **Route Table Tab**: Associated route table details, route targets, and inline "Edit route table association" modal.
+  - **Network ACL Tab**: Inbound and outbound firewall rules evaluated for this subnet.
+  - **Resource Map Tab**: Visual end-to-end trace from VPC through this Subnet to its Route Table and next-hop gateway.
+  - **Tags Tab**: Key-value metadata tags.
 - **Create Subnet**: Select VPC, choose Availability Zone (e.g. `us-east-1a`), specify IPv4 CIDR block (e.g. `10.0.1.0/24`), and optional Name tag.
-- **Modify Settings**: Toggle `Auto-assign public IPv4 address` on launch.
+- **Modify Settings**: Toggle `Auto-assign public IPv4 address` on launch directly from the Subnet Detail page.
 - **CLI Command**:
   ```bash
   aws --endpoint-url=https://127.0.0.1:9297 --region us-east-1 ec2 create-subnet \
@@ -81,10 +88,15 @@ Every action below is supported in this console replica and tested against the l
     --tag-specifications 'ResourceType=subnet,Tags=[{Key=Name,Value=public-subnet-1a}]'
   ```
 
-### 3. Route Tables (`/vpc/route-tables`)
+### 3. Route Tables (`/vpc/route-tables` & `/vpc/route-tables/[routeTableId]`)
 - **View Route Tables**: Table showing Route Table ID, Name, Main flag, and VPC ID.
-- **Routes Tab**: Inspect destination CIDR blocks, targets, and status. Click **Add route** to point `0.0.0.0/0` to an Internet Gateway or NAT Gateway.
-- **Subnet Associations Tab**: Explicitly associate subnets with custom route tables or disassociate to revert to the main route table.
+- **Dedicated Route Table Detail Page (`/vpc/route-tables/[routeTableId]`)**:
+  - **Overview**: Route Table ID, VPC, Main/Custom status pill, explicit subnet association count, and route count.
+  - **Routes Tab**: Complete table of destination CIDRs and target hops (Internet Gateway, NAT Gateway, Gateway Endpoints). Includes "Add route" modal and route deletion.
+  - **Subnet Associations Tab**: Explicit subnet associations table with links to individual Subnet pages, main-route-table fallback subnets, and "Edit subnet associations" multi-select modal.
+  - **Details Tab**: Route Table ID, Route Table ARN, Owner ID, and VPC ID.
+  - **Edge Associations Tab**: Gateway edge associations view.
+  - **Tags Tab**: Key-value tags table.
 - **CLI Command (Create Route Table)**:
   ```bash
   aws --endpoint-url=https://127.0.0.1:9297 --region us-east-1 ec2 create-route-table \
