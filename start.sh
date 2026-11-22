@@ -66,7 +66,20 @@ echo " AWS Management Console UI"
 echo "============================================================"
 echo " Web Console URL:    http://localhost:3000"
 echo " Emulator Endpoint:  https://127.0.0.1:9297"
+
+if grep -qi microsoft /proc/version 2>/dev/null; then
+  WSL_IP=$(hostname -I 2>/dev/null | awk '{print $1}')
+  echo " WSL 2 Environment Detected:"
+  echo "   Access URL:       http://localhost:3000"
+  if [ -n "$WSL_IP" ]; then
+    echo "   Direct WSL IP:    http://${WSL_IP}:3000"
+  fi
+  echo "   If Windows Chrome shows Connection Refused, run natively on"
+  echo "   Windows via 'start.bat' or enable 'networkingMode=mirrored'."
+fi
+
 echo ""
+echo " Server is active. Pages compile on-demand when you open the URL."
 echo " Press Ctrl+C in this terminal to stop the server."
 echo " To stop all containers and services, run: ./stop.sh"
 echo "============================================================"
