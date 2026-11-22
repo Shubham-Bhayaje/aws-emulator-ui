@@ -58,10 +58,20 @@ import { Readable } from "stream";
 const ENDPOINT = "https://127.0.0.1:9297";
 const DEFAULT_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
 
-// --- EC2 ---
+// --- EC2 / VPC ---
+const ec2HttpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+  servername: "localhost",
+});
+
 export const ec2 = new EC2Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
+  },
+  requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
 });
 
 // --- ELB v2 (Elastic Load Balancing) ---

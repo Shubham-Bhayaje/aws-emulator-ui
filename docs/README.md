@@ -28,6 +28,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [Amazon SNS (Simple Notification Service)](SNS.md): Fully managed pub/sub messaging service, Standard and FIFO topics, fanout architectures, protocol subscriptions (SQS, Lambda, HTTP/S, Email), message attributes, and subscription filter policies.
 - [Amazon SQS (Simple Queue Service)](SQS.md): Fully managed message queuing service for microservices, Standard and FIFO queues, visibility timeout, dead-letter queues (DLQs), message deduplication, and KMS encryption.
 - [Amazon Timestream](Timestream.md): Fast, scalable, serverless time-series database for IoT and operational applications. Dual storage tiering (in-memory hot store and magnetic cold store), automated retention policies, live data ingestion, SQL query editor, and KMS encryption.
+- [Amazon Virtual Private Cloud (Amazon VPC)](VPC.md): Logically isolated virtual network provisioning, CIDR block allocation, public and private subnets, route tables and routes, internet gateways, NAT gateways, security groups, network ACLs, Elastic IPs, VPC endpoints (Gateway and Interface), peering connections, and DHCP option sets.
 - [Resource Groups Tagging API](Resource%20Groups%20Tagging%20API.md): Find tagged resources across services and Regions, bulk add/edit/remove tags via Tag Editor, and create tag-based Resource Groups.
 - [Service Quotas](Service%20Quotas.md): View and manage service limits, request quota increases, configure organization quota request templates, and track change request history.
 
@@ -75,6 +76,10 @@ The following table tracks inter-service integrations that are waiting on future
 | AWS App Mesh | AWS Cloud Map | Service discovery provider integration for virtual nodes and proxy routing | Connect App Mesh service discovery provider when AWS App Mesh is built |
 | AWS Organizations | AWS Resource Explorer | Organization-wide multi-account resource search views | Connect multi-account search views when AWS Organizations cross-account indexing is built |
 | AWS CloudTrail | AWS Resource Explorer | Audit logging of search queries and view modifications | Connect CloudTrail log trails when AWS CloudTrail is built |
+| Amazon Route 53 | Amazon VPC | Private hosted zone VPC association | Connect Route 53 private hosted zones when Amazon Route 53 is built |
+| AWS Transit Gateway | Amazon VPC | Transit Gateway attachments and VPC route table targets | Connect Transit Gateway when AWS Transit Gateway is built |
+| AWS Network Firewall | Amazon VPC | Firewall endpoints and subnet routing rules | Connect Network Firewall when AWS Network Firewall is built |
+| AWS Client VPN | Amazon VPC | Client VPN endpoint subnet associations | Connect Client VPN when AWS Client VPN is built |
 
 ---
 

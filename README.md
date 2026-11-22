@@ -94,6 +94,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | **Amazon Simple Email Service (SES)** | Business Applications | Built | [SES Guide](docs/SES.md) | 2026-11-22 |
 | **Amazon SNS** | Application Integration | Built | [SNS Guide](docs/SNS.md) | 2026-11-21 |
 | **Amazon SQS** | Application Integration | Built | [SQS Guide](docs/SQS.md) | 2026-11-21 |
+| **Amazon Virtual Private Cloud (VPC)** | Networking & Content Delivery | Built | [VPC Guide](docs/VPC.md) | 2026-11-22 |
 | **AWS IAM** | Security, Identity, & Compliance | Built | [Console](docs/README.md) | Initial |
 | **AWS Resource Access Manager (RAM)** | Security, Identity, & Compliance | Built | [Console](docs/README.md) | 2026-11-20 |
 | **AWS Resource Explorer** | Management & Governance | Built | [Resource Explorer Guide](docs/Resource%20Explorer.md) | 2026-11-22 |
@@ -126,6 +127,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
   - **Amazon Location Service**: Fully managed geospatial platform matching AWS Amazon Location Service, resource overview dashboard with real-time inventory counts (Maps, Trackers, Geofence Collections, Route Calculators, Place Indexes, API Keys), interactive Maps manager with vector and raster basemap styles from Esri, HERE, and Open Data, Create Map wizard with visual style selector cards, Map detail view featuring an interactive SVG/Canvas viewport simulation with pan/zoom controls and MapLibre GL JS embed code generator, Trackers manager with position filtering strategies (Time-based, Distance-based, Accuracy-based) and KMS encryption, Tracker detail view with live device position ingestion simulator (BatchUpdateDevicePosition) and consumer geofence collection linking, Geofence Collections manager with Circle and Polygon boundary support (PutGeofence) and interactive perimeter coordinate validation, Route Calculators with road network providers (Esri, HERE) and route calculation playground, Place Indexes view with emulator compatibility status banner, and API Keys view.
 
 - **Networking & Content Delivery**:
+  - **Amazon Virtual Private Cloud (Amazon VPC)**: Complete implementation and authentic replica of the Amazon VPC Management Console with VPC Dashboard featuring 11 live resource metric cards; Your VPCs manager with "VPC only" and "VPC and more" visual multi-tier architecture generator, secondary IPv4 CIDR blocks, DNS hostnames and DNS resolution toggles; Subnets manager across multiple Availability Zones with auto-assign public IPv4 address toggling; Route Tables manager with Routes tab (local, Internet Gateway, NAT Gateway targets) and explicit Subnet Associations tab; Internet Gateways manager with one-click VPC attach and detach workflows; NAT Gateways manager with Public and Private connectivity types, elastic IP allocation selection, and instant Elastic IP allocation shortcut; Security Groups manager with stateful inbound/outbound firewall rules editor (HTTP, HTTPS, SSH, custom TCP/UDP) and delete rule actions; Network ACLs manager with stateless numbered rules evaluation (ALLOW/DENY actions) and subnet associations; Elastic IP Addresses manager with allocate, associate, disassociate, and release lifecycles; VPC Endpoints manager supporting Gateway endpoints (Amazon S3, Amazon DynamoDB) with automatic route table insertion and Interface endpoints (AWS PrivateLink) with subnet ENI selection; Peering Connections manager with inter-VPC connection requests, accept request, and reject request actions; and DHCP Option Sets manager with custom domain name, DNS servers (AmazonProvidedDNS), and VPC association workflows.
   - **AWS Cloud Map**: Fully managed cloud service discovery and resource registry matching AWS Cloud Map, resource overview dashboard with real-time inventory counts (Namespaces, Services, Registered Instances), Namespaces manager with type filter (HTTP, Private DNS, Public DNS), Create Namespace wizard supporting HTTP namespaces (API-only discovery), Private DNS namespaces with dynamic Amazon VPC association, and Public DNS namespaces, comprehensive namespace details view with Route 53 managed hosted zone status and child services table, Services manager with parent namespace filter, Create Service wizard with routing policies (Multivalue Answer vs Weighted routing), DNS record types (A, AAAA, SRV, CNAME with custom TTL), and custom health check failure threshold, comprehensive service details view with Instances management (IPv4, Port, and custom key-value attributes registration/deregistration), one-click custom health status toggle (`Set Healthy` / `Set Unhealthy`), and interactive Discover Instances (API Playground) executing live `DiscoverInstances` queries with attribute filtering against the AWS emulator.
 
 - **Security, Identity, & Compliance**:
@@ -799,6 +801,59 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | `ListSupportedResourceTypes` | `resource-explorer-2:ListSupportedResourceTypes` | Unsupported (Emulator) | Graceful fallback in console filter suggestions |
 | `GetAccountLevelServiceConfiguration` | `resource-explorer-2:GetAccountLevelServiceConfiguration` | Unsupported (Emulator) | Graceful fallback in settings view |
 
+### Amazon VPC (`ec2:*`)
+| Operation | Action / Permission | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| `DescribeVpcs` | `ec2:DescribeVpcs` | Supported (Live) | Retrieves all VPCs and state |
+| `CreateVpc` | `ec2:CreateVpc` | Supported (Live) | Creates custom IPv4 CIDR VPC |
+| `DeleteVpc` | `ec2:DeleteVpc` | Supported (Live) | Deletes VPC |
+| `DescribeVpcAttribute` | `ec2:DescribeVpcAttribute` | Supported (Live) | Checks DNS hostnames and resolution |
+| `ModifyVpcAttribute` | `ec2:ModifyVpcAttribute` | Supported (Live) | Modifies DNS hostnames/resolution |
+| `DescribeSubnets` | `ec2:DescribeSubnets` | Supported (Live) | Lists all subnets in VPC |
+| `CreateSubnet` | `ec2:CreateSubnet` | Supported (Live) | Creates subnet in specified AZ and CIDR |
+| `DeleteSubnet` | `ec2:DeleteSubnet` | Supported (Live) | Deletes subnet |
+| `ModifySubnetAttribute` | `ec2:ModifySubnetAttribute` | Supported (Live) | Toggles map public IP on launch |
+| `DescribeRouteTables` | `ec2:DescribeRouteTables` | Supported (Live) | Lists route tables and associations |
+| `CreateRouteTable` | `ec2:CreateRouteTable` | Supported (Live) | Creates custom route table |
+| `DeleteRouteTable` | `ec2:DeleteRouteTable` | Supported (Live) | Deletes route table |
+| `AssociateRouteTable` | `ec2:AssociateRouteTable` | Supported (Live) | Associates subnet to route table |
+| `DisassociateRouteTable` | `ec2:DisassociateRouteTable` | Supported (Live) | Disassociates subnet from route table |
+| `CreateRoute` | `ec2:CreateRoute` | Supported (Live) | Adds destination CIDR to gateway/nat target |
+| `DeleteRoute` | `ec2:DeleteRoute` | Supported (Live) | Removes route from route table |
+| `DescribeInternetGateways` | `ec2:DescribeInternetGateways` | Supported (Live) | Lists internet gateways and VPC attachments |
+| `CreateInternetGateway` | `ec2:CreateInternetGateway` | Supported (Live) | Creates detached internet gateway |
+| `AttachInternetGateway` | `ec2:AttachInternetGateway` | Supported (Live) | Attaches internet gateway to VPC |
+| `DetachInternetGateway` | `ec2:DetachInternetGateway` | Supported (Live) | Detaches internet gateway from VPC |
+| `DeleteInternetGateway` | `ec2:DeleteInternetGateway` | Supported (Live) | Deletes internet gateway |
+| `DescribeNatGateways` | `ec2:DescribeNatGateways` | Supported (Live) | Lists public and private NAT gateways |
+| `CreateNatGateway` | `ec2:CreateNatGateway` | Supported (Live) | Creates NAT gateway with EIP |
+| `DeleteNatGateway` | `ec2:DeleteNatGateway` | Supported (Live) | Deletes NAT gateway |
+| `DescribeSecurityGroups` | `ec2:DescribeSecurityGroups` | Supported (Live) | Lists security groups and rules |
+| `CreateSecurityGroup` | `ec2:CreateSecurityGroup` | Supported (Live) | Creates custom security group in VPC |
+| `DeleteSecurityGroup` | `ec2:DeleteSecurityGroup` | Supported (Live) | Deletes security group |
+| `AuthorizeSecurityGroupIngress` | `ec2:AuthorizeSecurityGroupIngress` | Supported (Live) | Adds inbound firewall rules |
+| `RevokeSecurityGroupIngress` | `ec2:RevokeSecurityGroupIngress` | Supported (Live) | Revokes inbound firewall rules |
+| `DescribeNetworkAcls` | `ec2:DescribeNetworkAcls` | Supported (Live) | Lists network ACLs and rule entries |
+| `CreateNetworkAcl` | `ec2:CreateNetworkAcl` | Supported (Live) | Creates custom network ACL |
+| `DeleteNetworkAcl` | `ec2:DeleteNetworkAcl` | Supported (Live) | Deletes network ACL |
+| `CreateNetworkAclEntry` | `ec2:CreateNetworkAclEntry` | Supported (Live) | Adds numbered allow/deny rule entry |
+| `DeleteNetworkAclEntry` | `ec2:DeleteNetworkAclEntry` | Supported (Live) | Deletes numbered rule entry |
+| `DescribeAddresses` | `ec2:DescribeAddresses` | Supported (Live) | Lists allocated Elastic IP addresses |
+| `AllocateAddress` | `ec2:AllocateAddress` | Supported (Live) | Allocates public IPv4 address |
+| `ReleaseAddress` | `ec2:ReleaseAddress` | Supported (Live) | Releases Elastic IP back to Amazon pool |
+| `DescribeVpcEndpoints` | `ec2:DescribeVpcEndpoints` | Supported (Live) | Lists Gateway and Interface endpoints |
+| `CreateVpcEndpoint` | `ec2:CreateVpcEndpoint` | Supported (Live) | Creates S3/DynamoDB gateway or interface endpoint |
+| `DeleteVpcEndpoints` | `ec2:DeleteVpcEndpoints` | Supported (Live) | Deletes VPC endpoints |
+| `DescribeVpcPeeringConnections` | `ec2:DescribeVpcPeeringConnections` | Supported (Live) | Lists inter-VPC peering connections |
+| `CreateVpcPeeringConnection` | `ec2:CreateVpcPeeringConnection` | Supported (Live) | Requests peering connection between VPCs |
+| `AcceptVpcPeeringConnection` | `ec2:AcceptVpcPeeringConnection` | Supported (Live) | Accepts peering connection request |
+| `RejectVpcPeeringConnection` | `ec2:RejectVpcPeeringConnection` | Supported (Live) | Rejects peering connection request |
+| `DeleteVpcPeeringConnection` | `ec2:DeleteVpcPeeringConnection` | Supported (Live) | Deletes peering connection |
+| `DescribeDhcpOptions` | `ec2:DescribeDhcpOptions` | Supported (Live) | Lists DHCP option sets |
+| `CreateDhcpOptions` | `ec2:CreateDhcpOptions` | Supported (Live) | Creates custom domain name and DNS option set |
+| `AssociateDhcpOptions` | `ec2:AssociateDhcpOptions` | Supported (Live) | Associates DHCP option set with VPC |
+| `DeleteDhcpOptions` | `ec2:DeleteDhcpOptions` | Supported (Live) | Deletes DHCP option set |
+
 
 </details>
 
@@ -828,6 +883,8 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 ---
 
 ## Changelog
+
+- **2026-11-22** - **Amazon Virtual Private Cloud (VPC)**: Full implementation of Amazon VPC Management Console with VPC Dashboard featuring 11 live resource metric cards; Your VPCs inventory with "VPC only" and "VPC and more" visual multi-tier architecture generator, secondary IPv4 CIDR blocks, DNS hostnames and DNS resolution toggles; Subnets manager across multiple Availability Zones with auto-assign public IPv4 address toggling; Route Tables manager with Routes tab (local, Internet Gateway, NAT Gateway targets) and explicit Subnet Associations tab; Internet Gateways manager with one-click VPC attach and detach workflows; NAT Gateways manager with Public and Private connectivity types, elastic IP allocation selection, and instant Elastic IP allocation shortcut; Security Groups manager with stateful inbound/outbound firewall rules editor (HTTP, HTTPS, SSH, custom TCP/UDP) and delete rule actions; Network ACLs manager with stateless numbered rules evaluation (ALLOW/DENY actions) and subnet associations; Elastic IP Addresses manager with allocate, associate, disassociate, and release lifecycles; VPC Endpoints manager supporting Gateway endpoints (Amazon S3, Amazon DynamoDB) with automatic route table insertion and Interface endpoints (AWS PrivateLink) with subnet ENI selection; Peering Connections manager with inter-VPC connection requests, accept request, and reject request actions; DHCP Option Sets manager with custom domain name, DNS servers (AmazonProvidedDNS), and VPC association workflows; comprehensive learner documentation (`docs/VPC.md`); and Action Support Matrix audit.
 
 - **2026-11-22** - **AWS Resource Explorer**: Full implementation of AWS Resource Explorer (Resource Explorer 2) Management Console with Resource Search page featuring interactive search bar, syntax guide, quick filter chips for popular services (`s3`, `dynamodb`, `sns`, `sqs`, `kms`, `ec2`, `lambda`, `iam`), view selector, matching resources table with deep links and quick ARN copy; Views manager with default indicator badges, create view wizard with custom query filters and tag inclusion toggle, view details view with inline filter expression editor; Settings page with regional index status, aggregator promotion/demotion, turn off/on index, and default view configuration; timestamp normalization client middleware resolving Smithy RFC-3339 deserialization edge cases; comprehensive learner documentation (`docs/Resource Explorer.md`); and Action Support Matrix audit.
 - **2026-11-22** - **AWS Cloud Map**: Full implementation of AWS Cloud Map (Service Discovery) Management Console with resource overview dashboard and real-time inventory counts (Namespaces, Services, Registered Instances); Namespaces manager with type filtering (HTTP, Private DNS, Public DNS), Create Namespace wizard supporting HTTP namespaces (API-only discovery), Private DNS namespaces with dynamic Amazon VPC association from EC2, and Public DNS namespaces, namespace detail view with managed Route 53 hosted zone indicators and child services table; Services manager with parent namespace filtering, Create Service wizard with routing policies (Multivalue Answer vs Weighted routing), DNS record types (`A`, `AAAA`, `SRV`, `CNAME` with custom TTL), and custom health check failure threshold; comprehensive Service detail view with Registered Instances management (IPv4, Port, and custom key-value attributes), one-click custom health status toggle (`Set Healthy` / `Set Unhealthy`), and interactive Discover Instances (API Playground) executing live `DiscoverInstances` queries with attribute filtering against the AWS emulator; comprehensive learner documentation (`docs/Cloud Map.md`); and Action Support Matrix audit.

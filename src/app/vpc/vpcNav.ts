@@ -1,0 +1,23 @@
+export interface VpcNavItem {
+  label: string;
+  href: string;
+  group?: string;
+}
+
+export const vpcNav: VpcNavItem[] = [
+  // Virtual private cloud
+  { label: "VPC Dashboard", href: "/vpc", group: "Virtual private cloud" },
+  { label: "Your VPCs", href: "/vpc/vpcs", group: "Virtual private cloud" },
+  { label: "Subnets", href: "/vpc/subnets", group: "Virtual private cloud" },
+  { label: "Route tables", href: "/vpc/route-tables", group: "Virtual private cloud" },
+  { label: "Internet gateways", href: "/vpc/internet-gateways", group: "Virtual private cloud" },
+  { label: "NAT gateways", href: "/vpc/nat-gateways", group: "Virtual private cloud" },
+  { label: "Elastic IP addresses", href: "/vpc/elastic-ips", group: "Virtual private cloud" },
+  { label: "Endpoints", href: "/vpc/endpoints", group: "Virtual private cloud" },
+  { label: "Peering connections", href: "/vpc/peering-connections", group: "Virtual private cloud" },
+  { label: "DHCP option sets", href: "/vpc/dhcp-options", group: "Virtual private cloud" },
+
+  // Security
+  { label: "Network ACLs", href: "/vpc/network-acls", group: "Security" },
+  { label: "Security groups", href: "/vpc/security-groups", group: "Security" },
+];

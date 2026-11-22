@@ -75,12 +75,16 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "resourceexplorer",
   "resourceexplorer2",
   "aws-resource-explorer",
+  "vpc",
+  "amazon-vpc",
+  "virtual-private-cloud",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (!idOrHref) return false;
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "vpc" || clean.startsWith("vpc/")) return true;
   if (clean === "cloudmap" || clean.startsWith("cloudmap/")) return true;
   if (clean === "servicediscovery" || clean.startsWith("servicediscovery/")) return true;
   if (clean === "resource-explorer" || clean.startsWith("resource-explorer/")) return true;
@@ -513,7 +517,9 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "href": "/vpc",
     "category": "Networking & Content Delivery",
     "color": "#8C4FFF",
-    "desc": "Isolated cloud resources and virtual networks with granular routing controls"
+    "status": "functional",
+    "desc": "Isolated cloud resources and virtual networks with granular routing controls",
+    "aliases": ["vpc", "virtual private cloud", "subnets", "route tables", "internet gateways", "nat gateways", "security groups", "network acls", "peering connections"]
   },
   {
     "id": "cloudfront",
