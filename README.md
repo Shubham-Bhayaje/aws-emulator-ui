@@ -39,9 +39,30 @@ The official [AWS Emulator](https://github.com/aws/aws-emulator) provides a fast
 
 ## Quickstart
 
-### One-Command Setup (Recommended)
+### Instant One-Line Install & Setup (From Scratch)
 
-Run both the AWS Emulator and the AWS Console UI with a single command:
+If you are on a fresh machine or have not yet cloned the repository, run this single command in your terminal. It automatically checks and installs **Git** (and Node.js if needed), clones this repository, starts the AWS Emulator, installs dependencies, and launches the web console:
+
+#### Windows PowerShell
+```powershell
+irm https://raw.githubusercontent.com/Shubham-Bhayaje/aws-emulator-ui/main/install.ps1 | iex
+```
+
+#### Windows Command Prompt / Run Dialog (Win + R)
+```cmd
+powershell -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Shubham-Bhayaje/aws-emulator-ui/main/install.ps1 | iex"
+```
+
+#### Linux / macOS / WSL
+```bash
+curl -fsSL https://raw.githubusercontent.com/Shubham-Bhayaje/aws-emulator-ui/main/install.sh | bash
+```
+
+---
+
+### One-Command Setup (If Already Cloned)
+
+If you have already cloned the repository, navigate into the directory and run:
 
 #### Linux / macOS / WSL
 ```bash
