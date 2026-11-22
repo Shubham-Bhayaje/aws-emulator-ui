@@ -48,6 +48,7 @@ import { SESv2Client } from "@aws-sdk/client-sesv2";
 import { AppConfigClient } from "@aws-sdk/client-appconfig";
 import { AppConfigDataClient } from "@aws-sdk/client-appconfigdata";
 import { LocationClient } from "@aws-sdk/client-location";
+import { ServiceDiscoveryClient } from "@aws-sdk/client-servicediscovery";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import https from "https";
 
@@ -286,6 +287,41 @@ export const location = new LocationClient({
   },
   requestHandler: new NodeHttpHandler({ httpsAgent: locationHttpsAgent }),
 });
+
+// Custom HTTPS agent for AWS Cloud Map
+const cloudMapHttpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+  checkServerIdentity: () => undefined,
+  servername: "localhost",
+});
+
+// --- AWS Cloud Map (Service Discovery) ---
+export const serviceDiscovery = new ServiceDiscoveryClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
+  },
+  requestHandler: new NodeHttpHandler({ httpsAgent: cloudMapHttpsAgent }),
+});
+
+// Middleware to strip 'data-' endpoint prefix for DiscoverInstances in local emulator
+serviceDiscovery.middlewareStack.add(
+  (next) => async (args: any) => {
+    const { request } = args;
+    if (request && request.hostname && request.hostname.startsWith("data-")) {
+      request.hostname = request.hostname.replace(/^data-/, "");
+    }
+    return next(args);
+  },
+  {
+    step: "finalizeRequest",
+    name: "fixDataEndpointPrefix",
+    priority: "low",
+  }
+);
+
 
 
 

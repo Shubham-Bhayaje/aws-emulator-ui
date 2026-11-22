@@ -8,6 +8,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Account Management](Account%20Management.md): Manage account details, primary and alternate contacts (Billing, Operations, Security), AWS Region opt-in availability, and account closure.
 - [AWS AppConfig](AppConfig.md): Quickly and safely deploy dynamic application configuration and feature flags across applications and environments without code deployments, with progressive deployment strategies, bake times, automatic alarm rollbacks, and interactive AppConfigData client retrieval.
 - [AWS Certificate Manager (ACM)](ACM.md): Provision, request, and manage SSL/TLS certificates, validate domain ownership via DNS (Route 53 CNAME) or email, import third-party X.509 certificates and private keys, inspect certificate PEM bodies, and toggle Certificate Transparency logging.
+- [AWS Cloud Map](Cloud%20Map.md): Fully managed cloud service discovery and resource registry. Create HTTP, private DNS (with VPC association), and public DNS namespaces, configure routing policies and health checking, register/deregister service instances with custom attributes, and test live DiscoverInstances API queries.
 - [AWS CloudHSM](CloudHSM.md): Dedicated hardware security module (HSM) cluster management inside Amazon VPC, multi-AZ HSM provisioning, cluster CSR export, cluster initialization workflow, automated backup retention, and teardown safety controls.
 - [AWS Directory Service](Directory%20Service.md): Set up and manage Microsoft Active Directory, Simple AD, and AD Connector in the cloud, configure Access URL aliases, enable Single Sign-On (SSO), take point-in-time snapshots, reset domain admin credentials, and inspect trust relationships.
 - [AWS Key Management Service (KMS)](KMS.md): Create and manage customer keys, inspect AWS managed keys, configure key policies, toggle annual rotation, and test live encryption/decryption in the playground.
@@ -68,6 +69,9 @@ The following table tracks inter-service integrations that are waiting on future
 | Amazon Cognito | Amazon Location Service | Cognito Identity Pool temporary credentials for client-side map rendering | Connect Cognito Identity Pools when Amazon Cognito is built |
 | AWS CloudWatch | Amazon Location Service | Tracking request volume, tile cache hits, and device positions metrics | Connect CloudWatch metrics dashboard when Amazon CloudWatch is built |
 | AWS IoT Core | Amazon Location Service | IoT topic rules directly ingesting device telemetry into Location Trackers | Connect IoT Core rule actions when AWS IoT Core is built |
+| Route 53 Health Checks | AWS Cloud Map | Route 53 active endpoint health check monitoring for registered service instances | Connect Route 53 health checking when Route 53 Health Checks is built |
+| Amazon ECS | AWS Cloud Map | Automated ECS service discovery registration and deregistration for task container instances | Connect ECS service discovery when Amazon ECS is built |
+| AWS App Mesh | AWS Cloud Map | Service discovery provider integration for virtual nodes and proxy routing | Connect App Mesh service discovery provider when AWS App Mesh is built |
 
 ---
 

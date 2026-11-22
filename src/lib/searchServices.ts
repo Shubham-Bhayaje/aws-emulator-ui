@@ -878,10 +878,35 @@ export const COMMON_FEATURES: ServiceFeatureItem[] = [
     color: "#00A4A6",
     aliases: ["api keys", "location api keys", "map keys", "credentials", "access keys"],
   },
+  // AWS Cloud Map
+  {
+    id: "feat-cloudmap-namespaces",
+    name: "Cloud Map Namespaces",
+    href: "/cloudmap/namespaces",
+    serviceId: "cloudmap",
+    serviceName: "AWS Cloud Map",
+    category: "Networking & Content Delivery",
+    desc: "Create and manage HTTP, Private DNS, and Public DNS namespaces for microservice routing",
+    color: "#8C4FFF",
+    aliases: ["namespaces", "namespace", "cloud map namespaces", "servicediscovery", "domains"],
+  },
+  {
+    id: "feat-cloudmap-services",
+    name: "Cloud Map Services",
+    href: "/cloudmap/services",
+    serviceId: "cloudmap",
+    serviceName: "AWS Cloud Map",
+    category: "Networking & Content Delivery",
+    desc: "Manage service discovery endpoints, routing policies, and registered instances",
+    color: "#8C4FFF",
+    aliases: ["services", "cloud map services", "service discovery", "endpoints", "microservices"],
+  },
 ];
 
 // Acronym and common synonym expansion dictionary
 const ACRONYM_MAP: Record<string, string[]> = {
+  cloudmap: ["cloud", "map", "servicediscovery", "service", "discovery", "namespaces", "instances", "dns", "microservices"],
+  servicediscovery: ["cloud", "map", "servicediscovery", "service", "discovery", "namespaces", "instances"],
   location: ["location", "maps", "trackers", "geofences", "routes", "places", "gis", "geospatial", "coordinates"],
   geo: ["location", "service", "maps", "geofencing", "tracking"],
   appconfig: ["appconfig", "app", "config", "feature", "flags", "deployment", "strategy", "configuration", "profiles"],

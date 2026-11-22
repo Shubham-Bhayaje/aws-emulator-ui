@@ -66,12 +66,18 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "amazon-location",
   "amazon-location-service",
   "geo",
+  "cloudmap",
+  "aws-cloud-map",
+  "servicediscovery",
+  "service-discovery",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (!idOrHref) return false;
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "cloudmap" || clean.startsWith("cloudmap/")) return true;
+  if (clean === "servicediscovery" || clean.startsWith("servicediscovery/")) return true;
   if (clean === "location" || clean.startsWith("location/")) return true;
   if (clean === "appconfig" || clean.startsWith("appconfig/")) return true;
   if (clean === "ecr" || clean.startsWith("ecr/")) return true;
@@ -582,6 +588,16 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Networking & Content Delivery",
     "color": "#8C4FFF",
     "desc": "Build, manage, and monitor global wide area networks across clouds and data centers"
+  },
+  {
+    "id": "cloudmap",
+    "name": "AWS Cloud Map",
+    "shortName": "Cloud Map",
+    "href": "/cloudmap",
+    "category": "Networking & Content Delivery",
+    "color": "#8C4FFF",
+    "status": "functional",
+    "desc": "Application service discovery and dynamic resource tracking with API and DNS resolution"
   },
   {
     "id": "appmesh",
@@ -2621,6 +2637,16 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "category": "Networking & Content Delivery",
         "color": "#8C4FFF",
         "desc": "Build, manage, and monitor global wide area networks across clouds and data centers"
+      },
+      {
+        "id": "cloudmap",
+        "name": "AWS Cloud Map",
+        "shortName": "Cloud Map",
+        "href": "/cloudmap",
+        "category": "Networking & Content Delivery",
+        "color": "#8C4FFF",
+        "status": "functional",
+        "desc": "Application service discovery and dynamic resource tracking with API and DNS resolution"
       },
       {
         "id": "appmesh",
