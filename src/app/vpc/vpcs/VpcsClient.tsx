@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -93,6 +93,7 @@ export default function VpcsClient({
       y2: number;
     }[];
   }>({ vpcToSubnets: [], subnetToRtb: [], rtbToGw: [] });
+  const svgLinesKeyRef = useRef<string>("");
 
   // Delete modal state
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -222,16 +223,35 @@ export default function VpcsClient({
   });
 
   // -------------------------------------------------------------
-  // Resource Map Topology Calculations
+  // Resource Map Topology Calculations (Memoized to prevent render loops)
   // -------------------------------------------------------------
-  const vpcSubnets = subnets.filter((s) => s.VpcId === selectedVpc?.VpcId);
-  const vpcRouteTables = routeTables.filter((r) => r.VpcId === selectedVpc?.VpcId);
-  const vpcIgws = internetGateways.filter((igw) => igw.VpcId === selectedVpc?.VpcId);
-  const vpcNats = natGateways.filter(
-    (n) => n.VpcId === selectedVpc?.VpcId || vpcSubnets.some((s) => s.SubnetId === n.SubnetId)
+  const vpcSubnets = useMemo(
+    () => subnets.filter((s) => s.VpcId === selectedVpc?.VpcId),
+    [subnets, selectedVpc?.VpcId]
   );
-  const vpcEndpoints = endpoints.filter((ep) => ep.VpcId === selectedVpc?.VpcId);
-  const mainRtb = vpcRouteTables.find((r) => r.IsMain) || vpcRouteTables[0];
+  const vpcRouteTables = useMemo(
+    () => routeTables.filter((r) => r.VpcId === selectedVpc?.VpcId),
+    [routeTables, selectedVpc?.VpcId]
+  );
+  const vpcIgws = useMemo(
+    () => internetGateways.filter((igw) => igw.VpcId === selectedVpc?.VpcId),
+    [internetGateways, selectedVpc?.VpcId]
+  );
+  const vpcNats = useMemo(
+    () =>
+      natGateways.filter(
+        (n) => n.VpcId === selectedVpc?.VpcId || vpcSubnets.some((s) => s.SubnetId === n.SubnetId)
+      ),
+    [natGateways, selectedVpc?.VpcId, vpcSubnets]
+  );
+  const vpcEndpoints = useMemo(
+    () => endpoints.filter((ep) => ep.VpcId === selectedVpc?.VpcId),
+    [endpoints, selectedVpc?.VpcId]
+  );
+  const mainRtb = useMemo(
+    () => vpcRouteTables.find((r) => r.IsMain) || vpcRouteTables[0],
+    [vpcRouteTables]
+  );
 
   interface SubnetTopology {
     subnet: SubnetItem;
@@ -242,75 +262,80 @@ export default function VpcsClient({
   }
 
   // Group subnets by Availability Zone
-  const subnetsTopology: SubnetTopology[] = vpcSubnets.map((sub) => {
-    const explicitRtb = vpcRouteTables.find((r) =>
-      r.Associations?.some((a) => a.SubnetId === sub.SubnetId)
-    );
-    const rtb = explicitRtb || mainRtb;
+  const subnetsTopology: SubnetTopology[] = useMemo(() => {
+    return vpcSubnets.map((sub) => {
+      const explicitRtb = vpcRouteTables.find((r) =>
+        r.Associations?.some((a) => a.SubnetId === sub.SubnetId)
+      );
+      const rtb = explicitRtb || mainRtb;
 
-    const connectedGws: { id: string; name: string; type: string }[] = [];
-    let hasIgw = false;
+      const connectedGws: { id: string; name: string; type: string }[] = [];
+      let hasIgw = false;
 
-    if (rtb?.Routes) {
-      for (const route of rtb.Routes) {
-        if (route.GatewayId?.startsWith("igw-")) {
-          hasIgw = true;
-          const igwObj = vpcIgws.find((i) => i.InternetGatewayId === route.GatewayId);
-          connectedGws.push({
-            id: route.GatewayId,
-            name: igwObj?.Name || route.GatewayId,
-            type: "Internet Gateway",
-          });
-        } else if (route.NatGatewayId || route.GatewayId?.startsWith("nat-")) {
-          const natId = route.NatGatewayId || route.GatewayId!;
-          const natObj = vpcNats.find((n) => n.NatGatewayId === natId);
-          connectedGws.push({
-            id: natId,
-            name: natObj?.Name || natId,
-            type: "NAT Gateway",
-          });
+      if (rtb?.Routes) {
+        for (const route of rtb.Routes) {
+          if (route.GatewayId?.startsWith("igw-")) {
+            hasIgw = true;
+            const igwObj = vpcIgws.find((i) => i.InternetGatewayId === route.GatewayId);
+            connectedGws.push({
+              id: route.GatewayId,
+              name: igwObj?.Name || route.GatewayId,
+              type: "Internet Gateway",
+            });
+          } else if (route.NatGatewayId || route.GatewayId?.startsWith("nat-")) {
+            const natId = route.NatGatewayId || route.GatewayId!;
+            const natObj = vpcNats.find((n) => n.NatGatewayId === natId);
+            connectedGws.push({
+              id: natId,
+              name: natObj?.Name || natId,
+              type: "NAT Gateway",
+            });
+          }
         }
       }
-    }
 
-    if (rtb) {
-      for (const ep of vpcEndpoints) {
-        if (
-          ep.RouteTableIds?.includes(rtb.RouteTableId) ||
-          rtb.Routes?.some((r) => r.GatewayId === ep.VpcEndpointId)
-        ) {
-          connectedGws.push({
-            id: ep.VpcEndpointId,
-            name: ep.ServiceName.replace("com.amazonaws.us-east-1.", ""),
-            type: `Gateway Endpoint (${ep.VpcEndpointType})`,
-          });
+      if (rtb) {
+        for (const ep of vpcEndpoints) {
+          if (
+            ep.RouteTableIds?.includes(rtb.RouteTableId) ||
+            rtb.Routes?.some((r) => r.GatewayId === ep.VpcEndpointId)
+          ) {
+            connectedGws.push({
+              id: ep.VpcEndpointId,
+              name: ep.ServiceName.replace("com.amazonaws.us-east-1.", ""),
+              type: `Gateway Endpoint (${ep.VpcEndpointType})`,
+            });
+          }
         }
       }
-    }
 
-    // Extract AZ letter (e.g. us-east-1a -> A)
-    const azStr = sub.AvailabilityZone || "a";
-    const lastChar = azStr.slice(-1).toUpperCase();
-    const azLetter = /[A-Z]/.test(lastChar) ? lastChar : "A";
+      // Extract AZ letter (e.g. us-east-1a -> A)
+      const azStr = sub.AvailabilityZone || "a";
+      const lastChar = azStr.slice(-1).toUpperCase();
+      const azLetter = /[A-Z]/.test(lastChar) ? lastChar : "A";
 
-    return {
-      subnet: sub,
-      routeTable: rtb,
-      isPublic: hasIgw,
-      azLetter,
-      connectedGateways: connectedGws,
-    };
-  });
+      return {
+        subnet: sub,
+        routeTable: rtb,
+        isPublic: hasIgw,
+        azLetter,
+        connectedGateways: connectedGws,
+      };
+    });
+  }, [vpcSubnets, vpcRouteTables, mainRtb, vpcIgws, vpcNats, vpcEndpoints]);
 
   // Group by AZ
-  const subnetsByAz: Record<string, SubnetTopology[]> = {};
-  for (const item of subnetsTopology) {
-    const az = item.subnet.AvailabilityZone || "Unknown AZ";
-    if (!subnetsByAz[az]) {
-      subnetsByAz[az] = [];
+  const subnetsByAz: Record<string, SubnetTopology[]> = useMemo(() => {
+    const groups: Record<string, SubnetTopology[]> = {};
+    for (const item of subnetsTopology) {
+      const az = item.subnet.AvailabilityZone || "Unknown AZ";
+      if (!groups[az]) {
+        groups[az] = [];
+      }
+      groups[az].push(item);
     }
-    subnetsByAz[az].push(item);
-  }
+    return groups;
+  }, [subnetsTopology]);
 
   // Network Connections (Column 4)
   interface GatewayTarget {
@@ -322,55 +347,59 @@ export default function VpcsClient({
     associatedRtbIds: string[];
   }
 
-  const gatewayTargets: GatewayTarget[] = [];
+  const gatewayTargets: GatewayTarget[] = useMemo(() => {
+    const targets: GatewayTarget[] = [];
 
-  // 1. Internet Gateways
-  for (const igw of vpcIgws) {
-    const matchingRtbs = vpcRouteTables.filter((r) =>
-      r.Routes?.some((rt) => rt.GatewayId === igw.InternetGatewayId)
-    );
-    const publicCount = subnetsTopology.filter((t) => t.isPublic).length;
-    const privateCount = subnetsTopology.filter((t) => !t.isPublic).length;
+    // 1. Internet Gateways
+    for (const igw of vpcIgws) {
+      const matchingRtbs = vpcRouteTables.filter((r) =>
+        r.Routes?.some((rt) => rt.GatewayId === igw.InternetGatewayId)
+      );
+      const publicCount = subnetsTopology.filter((t) => t.isPublic).length;
+      const privateCount = subnetsTopology.filter((t) => !t.isPublic).length;
 
-    gatewayTargets.push({
-      id: igw.InternetGatewayId,
-      name: igw.Name || igw.InternetGatewayId,
-      type: "Internet Gateway",
-      subtext1: `Internet routes to ${publicCount} public subnets`,
-      subtext2: `${privateCount} private subnets route to the Internet`,
-      associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
-    });
-  }
+      targets.push({
+        id: igw.InternetGatewayId,
+        name: igw.Name || igw.InternetGatewayId,
+        type: "Internet Gateway",
+        subtext1: `Internet routes to ${publicCount} public subnets`,
+        subtext2: `${privateCount} private subnets route to the Internet`,
+        associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
+      });
+    }
 
-  // 2. NAT Gateways
-  for (const nat of vpcNats) {
-    const matchingRtbs = vpcRouteTables.filter((r) =>
-      r.Routes?.some((rt) => rt.NatGatewayId === nat.NatGatewayId || rt.GatewayId === nat.NatGatewayId)
-    );
-    gatewayTargets.push({
-      id: nat.NatGatewayId,
-      name: nat.Name || nat.NatGatewayId,
-      type: "NAT Gateway",
-      subtext1: "NAT gateway for private subnets",
-      subtext2: `Status: ${nat.State}`,
-      associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
-    });
-  }
+    // 2. NAT Gateways
+    for (const nat of vpcNats) {
+      const matchingRtbs = vpcRouteTables.filter((r) =>
+        r.Routes?.some((rt) => rt.NatGatewayId === nat.NatGatewayId || rt.GatewayId === nat.NatGatewayId)
+      );
+      targets.push({
+        id: nat.NatGatewayId,
+        name: nat.Name || nat.NatGatewayId,
+        type: "NAT Gateway",
+        subtext1: "NAT gateway for private subnets",
+        subtext2: `Status: ${nat.State}`,
+        associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
+      });
+    }
 
-  // 3. VPC Endpoints
-  for (const ep of vpcEndpoints) {
-    const matchingRtbs = vpcRouteTables.filter(
-      (r) => ep.RouteTableIds?.includes(r.RouteTableId) || r.Routes?.some((rt) => rt.GatewayId === ep.VpcEndpointId)
-    );
-    const svcShort = ep.ServiceName.replace("com.amazonaws.us-east-1.", "");
-    gatewayTargets.push({
-      id: ep.VpcEndpointId,
-      name: ep.VpcEndpointId,
-      type: "VPC Endpoint",
-      subtext1: `Gateway endpoint to ${svcShort.toUpperCase()}`,
-      associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
-    });
-  }
+    // 3. VPC Endpoints
+    for (const ep of vpcEndpoints) {
+      const matchingRtbs = vpcRouteTables.filter(
+        (r) => ep.RouteTableIds?.includes(r.RouteTableId) || r.Routes?.some((rt) => rt.GatewayId === ep.VpcEndpointId)
+      );
+      const svcShort = ep.ServiceName.replace("com.amazonaws.us-east-1.", "");
+      targets.push({
+        id: ep.VpcEndpointId,
+        name: ep.VpcEndpointId,
+        type: "VPC Endpoint",
+        subtext1: `Gateway endpoint to ${svcShort.toUpperCase()}`,
+        associatedRtbIds: matchingRtbs.map((r) => r.RouteTableId),
+      });
+    }
+
+    return targets;
+  }, [vpcIgws, vpcRouteTables, subnetsTopology, vpcNats, vpcEndpoints]);
 
   // Active highlighted items calculation
   const activeSubnet = hoveredSubnetId || selectedSubnetId;
@@ -529,11 +558,17 @@ export default function VpcsClient({
       }
     }
 
-    setSvgLines({
+    const newSvgLines = {
       vpcToSubnets: vpcToSubLines,
       subnetToRtb: subToRtbLines,
       rtbToGw: rtbToGwLines,
-    });
+    };
+
+    const key = JSON.stringify(newSvgLines);
+    if (svgLinesKeyRef.current !== key) {
+      svgLinesKeyRef.current = key;
+      setSvgLines(newSvgLines);
+    }
   }, [subnetsTopology, vpcRouteTables, gatewayTargets]);
 
   useEffect(() => {
@@ -541,15 +576,7 @@ export default function VpcsClient({
 
     recalculateLines();
     const t1 = setTimeout(recalculateLines, 50);
-    const t2 = setTimeout(recalculateLines, 200);
-
-    let observer: ResizeObserver | null = null;
-    if (typeof ResizeObserver !== "undefined" && mapContainerRef.current) {
-      observer = new ResizeObserver(() => {
-        recalculateLines();
-      });
-      observer.observe(mapContainerRef.current);
-    }
+    const t2 = setTimeout(recalculateLines, 250);
 
     const handleResize = () => {
       recalculateLines();
@@ -559,10 +586,9 @@ export default function VpcsClient({
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
-      if (observer) observer.disconnect();
       window.removeEventListener("resize", handleResize);
     };
-  }, [activeTab, selectedVpcId, subnetsTopology.length, vpcRouteTables.length, gatewayTargets.length, recalculateLines]);
+  }, [activeTab, selectedVpcId, subnetsTopology, vpcRouteTables, gatewayTargets, recalculateLines]);
 
   const clearSelection = () => {
     setSelectedSubnetId(null);
