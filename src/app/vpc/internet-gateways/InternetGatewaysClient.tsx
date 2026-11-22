@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   InternetGatewayItem,
@@ -186,6 +187,19 @@ export default function InternetGatewaysClient({ initialGateways, vpcs, initialS
             {loading ? "Refreshing..." : "Refresh"}
           </button>
 
+          <button
+            onClick={() => {
+              if (selectedIgw) {
+                router.push(`/vpc/internet-gateways/${selectedIgw.InternetGatewayId}`);
+              }
+            }}
+            disabled={!selectedIgw}
+            className="px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          >
+            View details
+          </button>
+
           {/* Attach button */}
           <button
             onClick={() => setIsAttachModalOpen(true)}
@@ -289,6 +303,7 @@ export default function InternetGatewaysClient({ initialGateways, vpcs, initialS
                     <tr
                       key={igw.InternetGatewayId}
                       onClick={() => setSelectedIgwId(igw.InternetGatewayId)}
+                      onDoubleClick={() => router.push(`/vpc/internet-gateways/${igw.InternetGatewayId}`)}
                       className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                         isSelected ? "bg-[#F2F8FD]" : ""
                       }`}
@@ -303,10 +318,20 @@ export default function InternetGatewaysClient({ initialGateways, vpcs, initialS
                         />
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-900">
-                        {igw.Name || "-"}
+                        <Link
+                          href={`/vpc/internet-gateways/${igw.InternetGatewayId}`}
+                          className="hover:underline"
+                        >
+                          {igw.Name || "-"}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[#0073BB]">
-                        {igw.InternetGatewayId}
+                        <Link
+                          href={`/vpc/internet-gateways/${igw.InternetGatewayId}`}
+                          className="hover:underline"
+                        >
+                          {igw.InternetGatewayId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3">
                         <span
@@ -334,7 +359,7 @@ export default function InternetGatewaysClient({ initialGateways, vpcs, initialS
       {/* Detail Tabs for Selected Gateway */}
       {selectedIgw && (
         <div className="bg-white border border-gray-200 rounded shadow-sm">
-          <div className="border-b border-gray-200 px-4">
+          <div className="border-b border-gray-200 px-4 flex items-center justify-between">
             <div className="flex space-x-6">
               <button
                 onClick={() => setActiveTab("details")}
@@ -357,6 +382,13 @@ export default function InternetGatewaysClient({ initialGateways, vpcs, initialS
                 Tags ({Object.keys(selectedIgw.Tags || {}).length})
               </button>
             </div>
+            <Link
+              href={`/vpc/internet-gateways/${selectedIgw.InternetGatewayId}`}
+              className="text-[12px] font-medium text-[#0073bb] hover:underline flex items-center gap-1"
+            >
+              <span>Open internet gateway page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           <div className="p-4">

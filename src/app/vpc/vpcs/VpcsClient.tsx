@@ -691,6 +691,22 @@ export default function VpcsClient({
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => {
+              if (selectedVpc) {
+                router.push(`/vpc/vpcs/${selectedVpc.VpcId}`);
+              }
+            }}
+            disabled={!selectedVpc}
+            className={`px-3 py-1.5 text-[13px] font-medium border rounded transition-colors ${
+              selectedVpc
+                ? "text-[#16191f] border-[#d5dbdb] hover:bg-[#fafafa]"
+                : "text-[#aab7b8] border-[#eaeded] cursor-not-allowed"
+            }`}
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          >
+            View details
+          </button>
+          <button
             onClick={handleToggleDnsHostnames}
             disabled={!selectedVpc || actionLoading}
             className={`px-3 py-1.5 text-[13px] font-medium border rounded transition-colors ${
@@ -767,6 +783,7 @@ export default function VpcsClient({
                         setSelectedVpcId(vpc.VpcId);
                         clearSelection();
                       }}
+                      onDoubleClick={() => router.push(`/vpc/vpcs/${vpc.VpcId}`)}
                       className={`cursor-pointer transition-colors ${
                         isSelected ? "bg-purple-50/50" : "hover:bg-[#f8f9fa]"
                       }`}
@@ -783,8 +800,16 @@ export default function VpcsClient({
                           className="text-[#ec7211] focus:ring-[#ec7211]"
                         />
                       </td>
-                      <td className="py-2.5 px-4 font-medium text-[#16191f]">{vpc.Name || "-"}</td>
-                      <td className="py-2.5 px-4 font-mono font-medium text-[#0073bb]">{vpc.VpcId}</td>
+                      <td className="py-2.5 px-4 font-medium text-[#16191f]">
+                        <Link href={`/vpc/vpcs/${vpc.VpcId}`} className="hover:underline">
+                          {vpc.Name || "-"}
+                        </Link>
+                      </td>
+                      <td className="py-2.5 px-4 font-mono font-medium text-[#0073bb]">
+                        <Link href={`/vpc/vpcs/${vpc.VpcId}`} className="hover:underline">
+                          {vpc.VpcId}
+                        </Link>
+                      </td>
                       <td className="py-2.5 px-4">
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-50 text-emerald-700">
                           {vpc.State}
@@ -808,7 +833,7 @@ export default function VpcsClient({
       {/* Selected VPC Details & Authentic AWS Resource Map */}
       {selectedVpc && (
         <div className="bg-white border border-[#d5dbdb] rounded p-4 space-y-4 shadow-xs">
-          <div className="border-b border-[#eaeded] pb-2">
+          <div className="border-b border-[#eaeded] pb-2 flex items-center justify-between">
             <div className="flex space-x-6">
               <button
                 onClick={() => setActiveTab("details")}
@@ -851,6 +876,13 @@ export default function VpcsClient({
                 Tags
               </button>
             </div>
+            <Link
+              href={`/vpc/vpcs/${selectedVpc.VpcId}`}
+              className="text-[12px] font-medium text-[#0073bb] hover:underline flex items-center gap-1"
+            >
+              <span>Open VPC page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           {activeTab === "details" && (

@@ -154,6 +154,8 @@ export interface NatGatewayItem {
   PublicIp?: string;
   PrivateIp?: string;
   AllocationId?: string;
+  ConnectivityType?: string;
+  NetworkInterfaceId?: string;
   CreateTime?: string;
   Tags?: Record<string, string>;
 }
@@ -223,25 +225,43 @@ export interface VpcEndpointItem {
   RouteTableIds?: string[];
   SubnetIds?: string[];
   Groups?: { GroupId: string; GroupName: string }[];
+  PolicyDocument?: string;
   CreationTimestamp?: string;
   Tags?: Record<string, string>;
 }
 
 export interface PeeringConnectionItem {
   VpcPeeringConnectionId: string;
+  Name?: string;
   Status: string;
+  StatusMessage?: string;
   RequesterVpcId: string;
   RequesterCidr?: string;
   AccepterVpcId: string;
   AccepterCidr?: string;
+  RequesterVpcInfo?: {
+    VpcId: string;
+    OwnerId?: string;
+    CidrBlock?: string;
+    Region?: string;
+  };
+  AccepterVpcInfo?: {
+    VpcId: string;
+    OwnerId?: string;
+    CidrBlock?: string;
+    Region?: string;
+  };
+  ExpirationTime?: string;
   Tags?: Record<string, string>;
 }
 
 export interface DhcpOptionsItem {
   DhcpOptionsId: string;
+  Name?: string;
   DomainName?: string;
   DomainNameServers?: string[];
   NtpServers?: string[];
+  NetbiosNameServers?: string[];
   Tags?: Record<string, string>;
 }
 
@@ -1895,6 +1915,457 @@ export async function deleteDhcpOptionsAction(dhcpOptionsId: string): Promise<{ 
   try {
     await ec2.send(new DeleteDhcpOptionsCommand({ DhcpOptionsId: dhcpOptionsId }));
     return { success: true };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// -------------------------------------------------------------
+// DEDICATED RESOURCE DETAIL ACTIONS
+// -------------------------------------------------------------
+
+export async function getVpcDetailAction(vpcId: string): Promise<{
+  success: boolean;
+  vpc?: VpcItem;
+  subnets?: SubnetItem[];
+  routeTables?: RouteTableItem[];
+  internetGateways?: InternetGatewayItem[];
+  natGateways?: NatGatewayItem[];
+  endpoints?: VpcEndpointItem[];
+  networkAcls?: NetworkAclItem[];
+  error?: string;
+}> {
+  try {
+    const [vpcsRes, subnetsRes, rtbsRes, igwsRes, natsRes, epsRes, naclsRes] = await Promise.all([
+      listVpcsAction(),
+      listSubnetsAction(vpcId),
+      listRouteTablesAction(vpcId),
+      listInternetGatewaysAction(),
+      listNatGatewaysAction(vpcId),
+      listVpcEndpointsAction(vpcId),
+      listNetworkAclsAction(vpcId),
+    ]);
+
+    const vpc = vpcsRes.vpcs?.find((v) => v.VpcId === vpcId);
+    if (!vpc) {
+      return { success: false, error: `VPC ${vpcId} not found` };
+    }
+
+    const vpcIgws = (igwsRes.internetGateways || []).filter((i) => i.VpcId === vpcId);
+
+    return {
+      success: true,
+      vpc,
+      subnets: subnetsRes.subnets || [],
+      routeTables: rtbsRes.routeTables || [],
+      internetGateways: vpcIgws,
+      natGateways: natsRes.natGateways || [],
+      endpoints: epsRes.endpoints || [],
+      networkAcls: naclsRes.networkAcls || [],
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getInternetGatewayDetailAction(internetGatewayId: string): Promise<{
+  success: boolean;
+  internetGateway?: InternetGatewayItem;
+  vpcs?: VpcItem[];
+  attachedVpc?: VpcItem;
+  error?: string;
+}> {
+  try {
+    const [igwsRes, vpcsRes] = await Promise.all([
+      listInternetGatewaysAction(),
+      listVpcsAction(),
+    ]);
+
+    const igw = (igwsRes.internetGateways || []).find((i) => i.InternetGatewayId === internetGatewayId);
+    if (!igw) {
+      return { success: false, error: `Internet Gateway ${internetGatewayId} not found` };
+    }
+
+    const vpcs = vpcsRes.vpcs || [];
+    const attachedVpc = igw.VpcId ? vpcs.find((v) => v.VpcId === igw.VpcId) : undefined;
+
+    return {
+      success: true,
+      internetGateway: igw,
+      vpcs,
+      attachedVpc,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getNatGatewayDetailAction(natGatewayId: string): Promise<{
+  success: boolean;
+  natGateway?: NatGatewayItem;
+  vpc?: VpcItem;
+  subnet?: SubnetItem;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeNatGatewaysCommand({ NatGatewayIds: [natGatewayId] }));
+    const n = res.NatGateways?.[0];
+    if (!n) {
+      return { success: false, error: `NAT Gateway ${natGatewayId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    n.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const address = n.NatGatewayAddresses?.[0];
+    const natGateway: NatGatewayItem = {
+      NatGatewayId: n.NatGatewayId || "",
+      Name: getTag(n.Tags, "Name"),
+      State: n.State || "available",
+      VpcId: n.VpcId,
+      SubnetId: n.SubnetId || "",
+      ConnectivityType: n.ConnectivityType,
+      PublicIp: address?.PublicIp,
+      PrivateIp: address?.PrivateIp,
+      AllocationId: address?.AllocationId,
+      NetworkInterfaceId: address?.NetworkInterfaceId,
+      CreateTime: n.CreateTime?.toISOString(),
+      Tags: tagsMap,
+    };
+
+    const [vpcsRes, subsRes] = await Promise.all([
+      listVpcsAction(),
+      natGateway.SubnetId ? ec2.send(new DescribeSubnetsCommand({ SubnetIds: [natGateway.SubnetId] })).catch(() => null) : null,
+    ]);
+
+    const vpc = natGateway.VpcId ? vpcsRes.vpcs?.find((v) => v.VpcId === natGateway.VpcId) : undefined;
+    let subnet: SubnetItem | undefined;
+    if (subsRes && subsRes.Subnets?.[0]) {
+      const s = subsRes.Subnets[0];
+      subnet = {
+        SubnetId: s.SubnetId || "",
+        Name: getTag(s.Tags, "Name"),
+        State: s.State || "available",
+        VpcId: s.VpcId || "",
+        CidrBlock: s.CidrBlock || "",
+        AvailabilityZone: s.AvailabilityZone,
+        DefaultForAz: s.DefaultForAz || false,
+        MapPublicIpOnLaunch: s.MapPublicIpOnLaunch || false,
+      };
+    }
+
+    return {
+      success: true,
+      natGateway,
+      vpc,
+      subnet,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getElasticIpDetailAction(allocationId: string): Promise<{
+  success: boolean;
+  elasticIp?: ElasticIpItem;
+  vpcs?: VpcItem[];
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeAddressesCommand({ AllocationIds: [allocationId] }));
+    const a = res.Addresses?.[0];
+    if (!a) {
+      return { success: false, error: `Elastic IP ${allocationId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    a.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const elasticIp: ElasticIpItem = {
+      AllocationId: a.AllocationId || "",
+      PublicIp: a.PublicIp || "",
+      Domain: a.Domain || "vpc",
+      InstanceId: a.InstanceId,
+      AssociationId: a.AssociationId,
+      NetworkInterfaceId: a.NetworkInterfaceId,
+      PrivateIpAddress: a.PrivateIpAddress,
+      NetworkBorderGroup: a.NetworkBorderGroup,
+      Tags: tagsMap,
+    };
+
+    const vpcsRes = await listVpcsAction();
+
+    return {
+      success: true,
+      elasticIp,
+      vpcs: vpcsRes.vpcs || [],
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getVpcEndpointDetailAction(endpointId: string): Promise<{
+  success: boolean;
+  endpoint?: VpcEndpointItem;
+  vpc?: VpcItem;
+  routeTables?: RouteTableItem[];
+  subnets?: SubnetItem[];
+  allRouteTables?: RouteTableItem[];
+  allSubnets?: SubnetItem[];
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeVpcEndpointsCommand({ VpcEndpointIds: [endpointId] }));
+    const ep = res.VpcEndpoints?.[0];
+    if (!ep) {
+      return { success: false, error: `VPC Endpoint ${endpointId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    ep.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const endpoint: VpcEndpointItem = {
+      VpcEndpointId: ep.VpcEndpointId || "",
+      ServiceName: ep.ServiceName || "",
+      State: ep.State || "available",
+      VpcId: ep.VpcId || "",
+      VpcEndpointType: (ep.VpcEndpointType as "Gateway" | "Interface") || "Gateway",
+      RouteTableIds: ep.RouteTableIds || [],
+      SubnetIds: ep.SubnetIds || [],
+      CreationTimestamp: ep.CreationTimestamp?.toISOString(),
+      PolicyDocument: ep.PolicyDocument,
+      Tags: tagsMap,
+    };
+
+    const [vpcsRes, rtbsRes, subsRes] = await Promise.all([
+      listVpcsAction(),
+      listRouteTablesAction(endpoint.VpcId),
+      listSubnetsAction(endpoint.VpcId),
+    ]);
+
+    const vpc = vpcsRes.vpcs?.find((v) => v.VpcId === endpoint.VpcId);
+    const allRouteTables = rtbsRes.routeTables || [];
+    const allSubnets = subsRes.subnets || [];
+
+    const routeTables = allRouteTables.filter((r) => endpoint.RouteTableIds?.includes(r.RouteTableId));
+    const subnets = allSubnets.filter((s) => endpoint.SubnetIds?.includes(s.SubnetId));
+
+    return {
+      success: true,
+      endpoint,
+      vpc,
+      routeTables,
+      subnets,
+      allRouteTables,
+      allSubnets,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getPeeringConnectionDetailAction(peeringConnectionId: string): Promise<{
+  success: boolean;
+  peeringConnection?: PeeringConnectionItem;
+  requesterVpc?: VpcItem;
+  accepterVpc?: VpcItem;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(
+      new DescribeVpcPeeringConnectionsCommand({ VpcPeeringConnectionIds: [peeringConnectionId] })
+    );
+    const pc = res.VpcPeeringConnections?.[0];
+    if (!pc) {
+      return { success: false, error: `Peering Connection ${peeringConnectionId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    pc.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const peeringConnection: PeeringConnectionItem = {
+      VpcPeeringConnectionId: pc.VpcPeeringConnectionId || "",
+      Name: getTag(pc.Tags, "Name"),
+      Status: pc.Status?.Code || "active",
+      StatusMessage: pc.Status?.Message,
+      RequesterVpcId: pc.RequesterVpcInfo?.VpcId || "",
+      RequesterCidr: pc.RequesterVpcInfo?.CidrBlock || "",
+      AccepterVpcId: pc.AccepterVpcInfo?.VpcId || "",
+      AccepterCidr: pc.AccepterVpcInfo?.CidrBlock || "",
+      RequesterVpcInfo: {
+        VpcId: pc.RequesterVpcInfo?.VpcId || "",
+        OwnerId: pc.RequesterVpcInfo?.OwnerId || "",
+        CidrBlock: pc.RequesterVpcInfo?.CidrBlock || "",
+        Region: pc.RequesterVpcInfo?.Region || "us-east-1",
+      },
+      AccepterVpcInfo: {
+        VpcId: pc.AccepterVpcInfo?.VpcId || "",
+        OwnerId: pc.AccepterVpcInfo?.OwnerId || "",
+        CidrBlock: pc.AccepterVpcInfo?.CidrBlock || "",
+        Region: pc.AccepterVpcInfo?.Region || "us-east-1",
+      },
+      ExpirationTime: pc.ExpirationTime?.toISOString(),
+      Tags: tagsMap,
+    };
+
+    const vpcsRes = await listVpcsAction();
+    const vpcs = vpcsRes.vpcs || [];
+    const requesterVpc = vpcs.find((v) => v.VpcId === peeringConnection.RequesterVpcId);
+    const accepterVpc = vpcs.find((v) => v.VpcId === peeringConnection.AccepterVpcId);
+
+    return {
+      success: true,
+      peeringConnection,
+      requesterVpc,
+      accepterVpc,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getDhcpOptionsDetailAction(dhcpOptionsId: string): Promise<{
+  success: boolean;
+  dhcpOptions?: DhcpOptionsItem;
+  associatedVpcs?: VpcItem[];
+  allVpcs?: VpcItem[];
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeDhcpOptionsCommand({ DhcpOptionsIds: [dhcpOptionsId] }));
+    const d = res.DhcpOptions?.[0];
+    if (!d) {
+      return { success: false, error: `DHCP Option Set ${dhcpOptionsId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    d.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const configs: Record<string, string[]> = {};
+    d.DhcpConfigurations?.forEach((c) => {
+      if (c.Key) {
+        configs[c.Key] = c.Values?.map((v) => v.Value || "").filter(Boolean) || [];
+      }
+    });
+
+    const dhcpOptions: DhcpOptionsItem = {
+      DhcpOptionsId: d.DhcpOptionsId || "",
+      Name: getTag(d.Tags, "Name"),
+      DomainName: configs["domain-name"]?.[0],
+      DomainNameServers: configs["domain-name-servers"],
+      NtpServers: configs["ntp-servers"],
+      NetbiosNameServers: configs["netbios-name-servers"],
+      Tags: tagsMap,
+    };
+
+    const vpcsRes = await listVpcsAction();
+    const allVpcs = vpcsRes.vpcs || [];
+    const associatedVpcs = allVpcs.filter((v) => v.DhcpOptionsId === dhcpOptionsId);
+
+    return {
+      success: true,
+      dhcpOptions,
+      associatedVpcs,
+      allVpcs,
+    };
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+export async function getNetworkAclDetailAction(networkAclId: string): Promise<{
+  success: boolean;
+  networkAcl?: NetworkAclItem;
+  associatedSubnets?: SubnetItem[];
+  allSubnets?: SubnetItem[];
+  vpc?: VpcItem;
+  error?: string;
+}> {
+  try {
+    const res = await ec2.send(new DescribeNetworkAclsCommand({ NetworkAclIds: [networkAclId] }));
+    const acl = res.NetworkAcls?.[0];
+    if (!acl) {
+      return { success: false, error: `Network ACL ${networkAclId} not found` };
+    }
+
+    const tagsMap: Record<string, string> = {};
+    acl.Tags?.forEach((t) => {
+      if (t.Key && t.Value) tagsMap[t.Key] = t.Value;
+    });
+
+    const networkAcl: NetworkAclItem = {
+      NetworkAclId: acl.NetworkAclId || "",
+      Name: getTag(acl.Tags, "Name"),
+      VpcId: acl.VpcId || "",
+      IsDefault: acl.IsDefault || false,
+      Entries: (acl.Entries || []).map((e) => ({
+        RuleNumber: e.RuleNumber || 0,
+        Protocol: e.Protocol || "-1",
+        RuleAction: (e.RuleAction as "allow" | "deny") || "allow",
+        Egress: e.Egress || false,
+        CidrBlock: e.CidrBlock,
+        PortRange: e.PortRange ? { From: e.PortRange.From, To: e.PortRange.To } : undefined,
+      })),
+      AssociationsCount: acl.Associations?.length || 0,
+      Associations: (acl.Associations || []).map((a) => ({
+        NetworkAclAssociationId: a.NetworkAclAssociationId,
+        SubnetId: a.SubnetId,
+      })),
+      Tags: tagsMap,
+    };
+
+    const [vpcsRes, subsRes] = await Promise.all([
+      listVpcsAction(),
+      listSubnetsAction(networkAcl.VpcId),
+    ]);
+
+    const vpc = vpcsRes.vpcs?.find((v) => v.VpcId === networkAcl.VpcId);
+    const allSubnets = subsRes.subnets || [];
+    const assocSubIds = new Set(networkAcl.Associations?.map((a) => a.SubnetId).filter(Boolean) as string[]);
+    const associatedSubnets = allSubnets.filter((s) => assocSubIds.has(s.SubnetId));
+
+    return {
+      success: true,
+      networkAcl,
+      associatedSubnets,
+      allSubnets,
+      vpc,
+    };
   } catch (err: unknown) {
     return {
       success: false,

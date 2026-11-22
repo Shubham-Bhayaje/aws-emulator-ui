@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   NetworkAclItem,
@@ -197,6 +198,19 @@ export default function NetworkAclsClient({ initialNetworkAcls, vpcs }: Props) {
             {loading ? "Refreshing..." : "Refresh"}
           </button>
 
+          <button
+            onClick={() => {
+              if (selectedAcl) {
+                router.push(`/vpc/network-acls/${selectedAcl.NetworkAclId}`);
+              }
+            }}
+            disabled={!selectedAcl}
+            className="px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          >
+            View details
+          </button>
+
           {/* Add rule button */}
           <button
             onClick={() => {
@@ -297,6 +311,7 @@ export default function NetworkAclsClient({ initialNetworkAcls, vpcs }: Props) {
                     <tr
                       key={acl.NetworkAclId}
                       onClick={() => setSelectedAclId(acl.NetworkAclId)}
+                      onDoubleClick={() => router.push(`/vpc/network-acls/${acl.NetworkAclId}`)}
                       className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                         isSelected ? "bg-[#F2F8FD]" : ""
                       }`}
@@ -311,10 +326,20 @@ export default function NetworkAclsClient({ initialNetworkAcls, vpcs }: Props) {
                         />
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-900">
-                        {acl.Name || "-"}
+                        <Link
+                          href={`/vpc/network-acls/${acl.NetworkAclId}`}
+                          className="hover:underline"
+                        >
+                          {acl.Name || "-"}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[#0073BB]">
-                        {acl.NetworkAclId}
+                        <Link
+                          href={`/vpc/network-acls/${acl.NetworkAclId}`}
+                          className="hover:underline"
+                        >
+                          {acl.NetworkAclId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3">
                         {acl.IsDefault ? "Yes" : "No"}
@@ -340,7 +365,7 @@ export default function NetworkAclsClient({ initialNetworkAcls, vpcs }: Props) {
       {/* Detail Tabs for Selected NACL */}
       {selectedAcl && (
         <div className="bg-white border border-gray-200 rounded shadow-sm">
-          <div className="border-b border-gray-200 px-4">
+          <div className="border-b border-gray-200 px-4 flex items-center justify-between">
             <div className="flex space-x-6">
               <button
                 onClick={() => setActiveTab("inbound")}
@@ -383,6 +408,13 @@ export default function NetworkAclsClient({ initialNetworkAcls, vpcs }: Props) {
                 Tags ({Object.keys(selectedAcl.Tags || {}).length})
               </button>
             </div>
+            <Link
+              href={`/vpc/network-acls/${selectedAcl.NetworkAclId}`}
+              className="text-[12px] font-medium text-[#0073bb] hover:underline flex items-center gap-1"
+            >
+              <span>Open network ACL page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           <div className="p-4">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   NatGatewayItem,
@@ -184,6 +185,19 @@ export default function NatGatewaysClient({
             {loading ? "Refreshing..." : "Refresh"}
           </button>
 
+          <button
+            onClick={() => {
+              if (selectedNat) {
+                router.push(`/vpc/nat-gateways/${selectedNat.NatGatewayId}`);
+              }
+            }}
+            disabled={!selectedNat}
+            className="px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          >
+            View details
+          </button>
+
           {/* Delete button */}
           <button
             onClick={() => {
@@ -273,6 +287,7 @@ export default function NatGatewaysClient({
                     <tr
                       key={nat.NatGatewayId}
                       onClick={() => setSelectedNatId(nat.NatGatewayId)}
+                      onDoubleClick={() => router.push(`/vpc/nat-gateways/${nat.NatGatewayId}`)}
                       className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                         isSelected ? "bg-[#F2F8FD]" : ""
                       }`}
@@ -287,10 +302,20 @@ export default function NatGatewaysClient({
                         />
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-900">
-                        {nat.Name || "-"}
+                        <Link
+                          href={`/vpc/nat-gateways/${nat.NatGatewayId}`}
+                          className="hover:underline"
+                        >
+                          {nat.Name || "-"}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[#0073BB]">
-                        {nat.NatGatewayId}
+                        <Link
+                          href={`/vpc/nat-gateways/${nat.NatGatewayId}`}
+                          className="hover:underline"
+                        >
+                          {nat.NatGatewayId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3">
                         <span
@@ -332,7 +357,7 @@ export default function NatGatewaysClient({
       {/* Detail Tabs for Selected NAT Gateway */}
       {selectedNat && (
         <div className="bg-white border border-gray-200 rounded shadow-sm">
-          <div className="border-b border-gray-200 px-4">
+          <div className="border-b border-gray-200 px-4 flex items-center justify-between">
             <div className="flex space-x-6">
               <button
                 onClick={() => setActiveTab("details")}
@@ -355,6 +380,13 @@ export default function NatGatewaysClient({
                 Tags ({Object.keys(selectedNat.Tags || {}).length})
               </button>
             </div>
+            <Link
+              href={`/vpc/nat-gateways/${selectedNat.NatGatewayId}`}
+              className="text-[12px] font-medium text-[#0073bb] hover:underline flex items-center gap-1"
+            >
+              <span>Open NAT gateway page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           <div className="p-4">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ElasticIpItem,
@@ -131,6 +132,19 @@ export default function ElasticIpsClient({ initialElasticIps }: Props) {
             {loading ? "Refreshing..." : "Refresh"}
           </button>
 
+          <button
+            onClick={() => {
+              if (selectedEip) {
+                router.push(`/vpc/elastic-ips/${selectedEip.AllocationId}`);
+              }
+            }}
+            disabled={!selectedEip}
+            className="px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          >
+            View details
+          </button>
+
           {/* Release button */}
           <button
             onClick={() => setIsReleaseModalOpen(true)}
@@ -212,6 +226,7 @@ export default function ElasticIpsClient({ initialElasticIps }: Props) {
                     <tr
                       key={eip.AllocationId}
                       onClick={() => setSelectedAllocationId(eip.AllocationId)}
+                      onDoubleClick={() => router.push(`/vpc/elastic-ips/${eip.AllocationId}`)}
                       className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                         isSelected ? "bg-[#F2F8FD]" : ""
                       }`}
@@ -226,10 +241,20 @@ export default function ElasticIpsClient({ initialElasticIps }: Props) {
                         />
                       </td>
                       <td className="py-2.5 px-3 font-mono font-medium text-[#0073BB]">
-                        {eip.PublicIp}
+                        <Link
+                          href={`/vpc/elastic-ips/${eip.AllocationId}`}
+                          className="hover:underline"
+                        >
+                          {eip.PublicIp}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-gray-700">
-                        {eip.AllocationId}
+                        <Link
+                          href={`/vpc/elastic-ips/${eip.AllocationId}`}
+                          className="hover:underline"
+                        >
+                          {eip.AllocationId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-gray-600">
                         {eip.InstanceId || "-"}
@@ -255,7 +280,7 @@ export default function ElasticIpsClient({ initialElasticIps }: Props) {
       {/* Detail Tabs for Selected Elastic IP */}
       {selectedEip && (
         <div className="bg-white border border-gray-200 rounded shadow-sm">
-          <div className="border-b border-gray-200 px-4">
+          <div className="border-b border-gray-200 px-4 flex items-center justify-between">
             <div className="flex space-x-6">
               <button
                 onClick={() => setActiveTab("details")}
@@ -278,6 +303,13 @@ export default function ElasticIpsClient({ initialElasticIps }: Props) {
                 Tags ({Object.keys(selectedEip.Tags || {}).length})
               </button>
             </div>
+            <Link
+              href={`/vpc/elastic-ips/${selectedEip.AllocationId}`}
+              className="text-[12px] font-medium text-[#0073bb] hover:underline flex items-center gap-1"
+            >
+              <span>Open Elastic IP page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           <div className="p-4">

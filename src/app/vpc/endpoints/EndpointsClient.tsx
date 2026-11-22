@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   VpcEndpointItem,
@@ -172,6 +173,19 @@ export default function EndpointsClient({
             {loading ? "Refreshing..." : "Refresh"}
           </button>
 
+          <button
+            onClick={() => {
+              if (selectedEndpoint) {
+                router.push(`/vpc/endpoints/${selectedEndpoint.VpcEndpointId}`);
+              }
+            }}
+            disabled={!selectedEndpoint}
+            className="px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          >
+            View details
+          </button>
+
           {/* Delete button */}
           <button
             onClick={() => {
@@ -260,6 +274,7 @@ export default function EndpointsClient({
                     <tr
                       key={ep.VpcEndpointId}
                       onClick={() => setSelectedEndpointId(ep.VpcEndpointId)}
+                      onDoubleClick={() => router.push(`/vpc/endpoints/${ep.VpcEndpointId}`)}
                       className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                         isSelected ? "bg-[#F2F8FD]" : ""
                       }`}
@@ -274,10 +289,20 @@ export default function EndpointsClient({
                         />
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-900">
-                        {ep.Tags?.Name || "-"}
+                        <Link
+                          href={`/vpc/endpoints/${ep.VpcEndpointId}`}
+                          className="hover:underline"
+                        >
+                          {ep.Tags?.Name || "-"}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[#0073BB]">
-                        {ep.VpcEndpointId}
+                        <Link
+                          href={`/vpc/endpoints/${ep.VpcEndpointId}`}
+                          className="hover:underline"
+                        >
+                          {ep.VpcEndpointId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-gray-700">
                         {ep.ServiceName}
@@ -313,7 +338,7 @@ export default function EndpointsClient({
       {/* Detail Tabs for Selected Endpoint */}
       {selectedEndpoint && (
         <div className="bg-white border border-gray-200 rounded shadow-sm">
-          <div className="border-b border-gray-200 px-4">
+          <div className="border-b border-gray-200 px-4 flex items-center justify-between">
             <div className="flex space-x-6">
               <button
                 onClick={() => setActiveTab("details")}
@@ -346,6 +371,13 @@ export default function EndpointsClient({
                 Tags ({Object.keys(selectedEndpoint.Tags || {}).length})
               </button>
             </div>
+            <Link
+              href={`/vpc/endpoints/${selectedEndpoint.VpcEndpointId}`}
+              className="text-[12px] font-medium text-[#0073bb] hover:underline flex items-center gap-1"
+            >
+              <span>Open endpoint page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           <div className="p-4">

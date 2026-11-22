@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   DhcpOptionsItem,
@@ -180,6 +181,19 @@ export default function DhcpOptionsClient({ initialDhcpOptions, vpcs }: Props) {
             {loading ? "Refreshing..." : "Refresh"}
           </button>
 
+          <button
+            onClick={() => {
+              if (selectedDhcp) {
+                router.push(`/vpc/dhcp-options/${selectedDhcp.DhcpOptionsId}`);
+              }
+            }}
+            disabled={!selectedDhcp}
+            className="px-3 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+          >
+            View details
+          </button>
+
           {/* Associate with VPC button */}
           <button
             onClick={() => setIsAssociateModalOpen(true)}
@@ -276,6 +290,7 @@ export default function DhcpOptionsClient({ initialDhcpOptions, vpcs }: Props) {
                     <tr
                       key={dhcp.DhcpOptionsId}
                       onClick={() => setSelectedDhcpId(dhcp.DhcpOptionsId)}
+                      onDoubleClick={() => router.push(`/vpc/dhcp-options/${dhcp.DhcpOptionsId}`)}
                       className={`cursor-pointer hover:bg-gray-50 transition-colors ${
                         isSelected ? "bg-[#F2F8FD]" : ""
                       }`}
@@ -290,10 +305,20 @@ export default function DhcpOptionsClient({ initialDhcpOptions, vpcs }: Props) {
                         />
                       </td>
                       <td className="py-2.5 px-3 font-medium text-gray-900">
-                        {dhcp.Tags?.Name || "-"}
+                        <Link
+                          href={`/vpc/dhcp-options/${dhcp.DhcpOptionsId}`}
+                          className="hover:underline"
+                        >
+                          {dhcp.Tags?.Name || "-"}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-[#0073BB]">
-                        {dhcp.DhcpOptionsId}
+                        <Link
+                          href={`/vpc/dhcp-options/${dhcp.DhcpOptionsId}`}
+                          className="hover:underline"
+                        >
+                          {dhcp.DhcpOptionsId}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-3 font-mono text-gray-700">
                         {dhcp.DomainName || "-"}
@@ -316,7 +341,7 @@ export default function DhcpOptionsClient({ initialDhcpOptions, vpcs }: Props) {
       {/* Detail Tabs for Selected DHCP Option Set */}
       {selectedDhcp && (
         <div className="bg-white border border-gray-200 rounded shadow-sm">
-          <div className="border-b border-gray-200 px-4">
+          <div className="border-b border-gray-200 px-4 flex items-center justify-between">
             <div className="flex space-x-6">
               <button
                 onClick={() => setActiveTab("details")}
@@ -339,6 +364,13 @@ export default function DhcpOptionsClient({ initialDhcpOptions, vpcs }: Props) {
                 Tags ({Object.keys(selectedDhcp.Tags || {}).length})
               </button>
             </div>
+            <Link
+              href={`/vpc/dhcp-options/${selectedDhcp.DhcpOptionsId}`}
+              className="text-[12px] font-medium text-[#0073bb] hover:underline flex items-center gap-1"
+            >
+              <span>Open DHCP options page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           <div className="p-4">

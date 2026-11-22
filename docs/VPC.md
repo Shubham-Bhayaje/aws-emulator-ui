@@ -286,6 +286,25 @@ Every action below is supported in this console replica and tested against the l
 
 ---
 
+## Dedicated Individual Resource Detail Pages
+
+Every VPC resource provides a full-fidelity dedicated detail page accessible via direct URL, by clicking the Name or Resource ID in inventory list tables, by double-clicking any table row, from the bottom preview drawer (`Open <resource> page ↗`), or by clicking cards in the interactive VPC Resource Map:
+
+| Resource Type | Route Pattern | Key Details and Capabilities |
+|---|---|---|
+| **VPCs** | `/vpc/vpcs/[vpcId]` | VPC details, primary and secondary IPv4 CIDR associations, authentic interactive topology Resource Map, DNS hostnames/resolution toggles, tag manager. |
+| **Subnets** | `/vpc/subnets/[subnetId]` | Subnet CIDR, availability zone, available IPs, auto-assign public IPv4 toggle, associated route table and network ACL links, tags. |
+| **Route Tables** | `/vpc/route-tables/[routeTableId]` | Full route rule editor (target types: local, igw, nat, vpce, pcx), explicit and main subnet association managers, tags. |
+| **Internet Gateways** | `/vpc/internet-gateways/[internetGatewayId]` | Attachment state, attached VPC link, attach/detach workflows, delete confirmation modal, tags. |
+| **NAT Gateways** | `/vpc/nat-gateways/[natGatewayId]` | Connectivity type (public/private), allocated Elastic IP, subnet association, delete workflow, tags. |
+| **Elastic IPs** | `/vpc/elastic-ips/[allocationId]` | Allocation ID, public IPv4, association ID, network interface, instance link, network border group, release workflow, tags. |
+| **VPC Endpoints** | `/vpc/endpoints/[endpointId]` | Endpoint type (Gateway vs Interface), service name, state, associated route tables or subnets table, delete workflow, tags. |
+| **Peering Connections** | `/vpc/peering-connections/[peeringConnectionId]` | Requester and accepter VPC side-by-side comparison, accept/reject request handlers, delete peering workflow, tags. |
+| **DHCP Option Sets** | `/vpc/dhcp-options/[dhcpOptionsId]` | Domain name, DNS servers, NTP servers, associate with VPC modal, associated VPCs table, delete workflow, tags. |
+| **Network ACLs** | `/vpc/network-acls/[networkAclId]` | Inbound and outbound rule managers (rule number, protocol, port range, CIDR, allow/deny), associated subnets list, tags. |
+
+---
+
 ## Limitations and Differences from Real AWS
 
 | Feature | Real AWS Console | Mini AWS Console (Emulator) |
