@@ -243,12 +243,16 @@ function CreateAttachmentForm({ transitGateways, vpcs, subnets }: Props) {
                 <span className="text-[13px] font-medium text-[#16191f]">VPN</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input type="radio" name="attachmentType" disabled />
-                <span className="text-[13px] text-gray-700">
-                  Direct Connect gateway{" "}
-                  <span className="text-[11px] text-gray-500">(Available after AWS Direct Connect is built)</span>
-                </span>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="attachmentType"
+                  value="dxgw"
+                  checked={attachmentType === "dxgw"}
+                  onChange={() => setAttachmentType("dxgw")}
+                  className="text-[#ec7211] focus:ring-[#ec7211]"
+                />
+                <span className="text-[13px] font-medium text-[#16191f]">Direct Connect gateway</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
@@ -286,6 +290,29 @@ function CreateAttachmentForm({ transitGateways, vpcs, subnets }: Props) {
                   style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
                 >
                   Create Site-to-Site VPN Connection
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Direct Connect Gateway Attachment Guidance Card */}
+        {attachmentType === "dxgw" && (
+          <div className="bg-white border border-[#eaeded] rounded shadow-sm p-6 space-y-4">
+            <h2 className="text-[16px] font-bold text-[#16191f] border-b pb-2">
+              Direct Connect gateway attachment options
+            </h2>
+            <div className="p-4 bg-[#f1faff] border border-[#0073bb] rounded text-[13px] text-[#16191f] space-y-3">
+              <p>
+                To attach an AWS Direct Connect gateway to this transit gateway, navigate to AWS Direct Connect and associate your Direct Connect gateway with this Transit Gateway, or create a Transit Virtual Interface.
+              </p>
+              <div>
+                <Link
+                  href="/direct-connect/gateways"
+                  className="inline-flex items-center justify-center px-4 py-1.5 text-xs font-semibold text-white bg-[#ec7211] hover:bg-[#eb5f07] rounded shadow-sm"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                >
+                  Manage Direct Connect Gateways
                 </Link>
               </div>
             </div>
@@ -449,7 +476,7 @@ function CreateAttachmentForm({ transitGateways, vpcs, subnets }: Props) {
           </div>
         )}
 
-        {/* Tags Card */}
+
         <div className="bg-white border border-[#eaeded] rounded shadow-sm p-6 space-y-4">
           <div className="flex items-center justify-between border-b pb-2">
             <div>

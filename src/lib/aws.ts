@@ -50,6 +50,7 @@ import { AppConfigDataClient } from "@aws-sdk/client-appconfigdata";
 import { LocationClient } from "@aws-sdk/client-location";
 import { ServiceDiscoveryClient } from "@aws-sdk/client-servicediscovery";
 import { ResourceExplorer2Client } from "@aws-sdk/client-resource-explorer-2";
+import { DirectConnectClient } from "@aws-sdk/client-direct-connect";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import https from "https";
 import { Readable } from "stream";
@@ -392,6 +393,18 @@ resourceExplorer.middlewareStack.add(
     priority: "low",
   }
 );
+
+// --- Direct Connect ---
+export const directConnect = new DirectConnectClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
+  },
+  requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
+});
+
 
 
 

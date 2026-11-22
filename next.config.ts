@@ -213,6 +213,26 @@ const nextConfig: NextConfig = {
         destination: "/glacier",
         permanent: false,
       },
+      {
+        source: "/directconnect",
+        destination: "/direct-connect",
+        permanent: false,
+      },
+      {
+        source: "/directconnect/:path*",
+        destination: "/direct-connect/:path*",
+        permanent: false,
+      },
+      {
+        source: "/dx",
+        destination: "/direct-connect",
+        permanent: false,
+      },
+      {
+        source: "/dx/:path*",
+        destination: "/direct-connect/:path*",
+        permanent: false,
+      },
     ];
   },
 };

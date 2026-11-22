@@ -552,10 +552,12 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "id": "directconnect",
     "name": "AWS Direct Connect",
     "shortName": "Direct Connect",
-    "href": "/directconnect",
+    "href": "/direct-connect",
     "category": "Networking & Content Delivery",
     "color": "#8C4FFF",
-    "desc": "Dedicated private network connection from on-premises to AWS"
+    "status": "functional",
+    "desc": "Dedicated private network connection from on-premises to AWS",
+    "aliases": ["directconnect", "direct-connect", "dx", "direct connect", "dedicated connection"]
   },
   {
     "id": "elb",
@@ -2612,10 +2614,12 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "id": "directconnect",
         "name": "AWS Direct Connect",
         "shortName": "Direct Connect",
-        "href": "/directconnect",
+        "href": "/direct-connect",
         "category": "Networking & Content Delivery",
         "color": "#8C4FFF",
-        "desc": "Dedicated private network connection from on-premises to AWS"
+        "status": "functional",
+        "desc": "Dedicated private network connection from on-premises to AWS",
+        "aliases": ["directconnect", "direct-connect", "dx", "direct connect", "dedicated connection"]
       },
       {
         "id": "elb",

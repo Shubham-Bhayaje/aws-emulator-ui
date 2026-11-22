@@ -7,6 +7,7 @@ import {
   TransitGatewayAttachmentItem,
   deleteTransitGatewayAttachmentAction,
 } from "../../transit-gateway-actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   attachment: TransitGatewayAttachmentItem;
@@ -214,9 +215,7 @@ export default function TransitGatewayAttachmentDetailClient({
               <div>
                 <dt className="text-gray-500">Creation time</dt>
                 <dd className="text-gray-900 font-mono" suppressHydrationWarning>
-                  {attachment.CreationTime
-                    ? new Date(attachment.CreationTime).toLocaleString()
-                    : "-"}
+                  {formatDateTime(attachment.CreationTime)}
                 </dd>
               </div>
 

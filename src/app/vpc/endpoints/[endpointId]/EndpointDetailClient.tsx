@@ -10,6 +10,7 @@ import {
   SubnetItem,
   deleteVpcEndpointsAction,
 } from "../../actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   endpoint: VpcEndpointItem;
@@ -227,8 +228,8 @@ export default function EndpointDetailClient({
 
               <div>
                 <dt className="text-[#545b64] font-medium">Creation time</dt>
-                <dd className="mt-1 text-[#16191f]">
-                  {ep.CreationTimestamp ? new Date(ep.CreationTimestamp).toLocaleString() : "-"}
+                <dd className="mt-1 text-[#16191f]" suppressHydrationWarning>
+                  {formatDateTime(ep.CreationTimestamp)}
                 </dd>
               </div>
             </div>

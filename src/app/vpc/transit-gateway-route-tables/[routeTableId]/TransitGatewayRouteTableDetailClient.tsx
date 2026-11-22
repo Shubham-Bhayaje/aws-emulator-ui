@@ -17,6 +17,7 @@ import {
   createTransitGatewayRouteAction,
   deleteTransitGatewayRouteAction,
 } from "../../transit-gateway-actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   routeTable: TransitGatewayRouteTableItem;
@@ -396,9 +397,7 @@ export default function TransitGatewayRouteTableDetailClient({
               <div>
                 <dt className="text-gray-500">Creation time</dt>
                 <dd className="text-gray-900 font-mono" suppressHydrationWarning>
-                  {routeTable.CreationTime
-                    ? new Date(routeTable.CreationTime).toLocaleString()
-                    : "-"}
+                  {formatDateTime(routeTable.CreationTime)}
                 </dd>
               </div>
             </div>

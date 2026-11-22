@@ -8,6 +8,7 @@ import {
   deleteClientVpnEndpointAction,
   generateClientVpnConfigurationAction,
 } from "../client-vpn-actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   initialEndpoints: ClientVpnEndpointItem[];
@@ -352,7 +353,7 @@ export default function ClientVpnEndpointsClient({ initialEndpoints }: Props) {
                         {ep.TransportProtocol || "udp"}:{ep.VpnPort || 443}
                       </td>
                       <td className="py-2.5 px-4 text-gray-500 font-mono text-[12px]" suppressHydrationWarning>
-                        {ep.CreationTime ? new Date(ep.CreationTime).toLocaleString() : "-"}
+                        {formatDateTime(ep.CreationTime)}
                       </td>
                     </tr>
                   );

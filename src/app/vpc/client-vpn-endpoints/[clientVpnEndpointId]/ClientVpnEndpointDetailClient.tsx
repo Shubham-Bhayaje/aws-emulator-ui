@@ -16,6 +16,7 @@ import {
   generateClientVpnConfigurationAction,
   applySecurityGroupsToClientVpnTargetNetworkAction,
 } from "../../client-vpn-actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   endpoint: ClientVpnEndpointItem;
@@ -581,7 +582,7 @@ export default function ClientVpnEndpointDetailClient({
               <div>
                 <div className="text-xs text-[#545b64]">Creation Time</div>
                 <div className="font-mono text-xs text-[#16191f] mt-0.5" suppressHydrationWarning>
-                  {endpoint.CreationTime ? new Date(endpoint.CreationTime).toLocaleString() : "-"}
+                  {formatDateTime(endpoint.CreationTime)}
                 </div>
               </div>
             </div>

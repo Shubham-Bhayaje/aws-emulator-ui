@@ -12,6 +12,7 @@ import {
   deleteTransitGatewayRouteTableAction,
   getTransitGatewayRouteTableDetailAction,
 } from "../transit-gateway-actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   initialRouteTables: TransitGatewayRouteTableItem[];
@@ -275,7 +276,7 @@ export default function TransitGatewayRouteTablesClient({ initialRouteTables }: 
                       {rtb.DefaultPropagationRouteTable ? "Yes" : "No"}
                     </td>
                     <td className="py-2.5 px-3 text-gray-500 font-mono" suppressHydrationWarning>
-                      {rtb.CreationTime ? new Date(rtb.CreationTime).toLocaleString() : "-"}
+                      {formatDateTime(rtb.CreationTime)}
                     </td>
                   </tr>
                 );
@@ -387,7 +388,7 @@ export default function TransitGatewayRouteTablesClient({ initialRouteTables }: 
                 <div>
                   <dt className="text-gray-500">Creation time</dt>
                   <dd className="font-mono text-gray-900" suppressHydrationWarning>
-                    {selectedRtb.CreationTime ? new Date(selectedRtb.CreationTime).toLocaleString() : "-"}
+                    {formatDateTime(selectedRtb.CreationTime)}
                   </dd>
                 </div>
               </div>

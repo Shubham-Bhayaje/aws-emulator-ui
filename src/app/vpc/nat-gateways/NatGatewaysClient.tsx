@@ -13,6 +13,7 @@ import {
   listElasticIpsAction,
   allocateElasticIpAction,
 } from "../actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   initialGateways: NatGatewayItem[];
@@ -422,7 +423,7 @@ export default function NatGatewaysClient({
                 </div>
                 <div>
                   <dt className="text-gray-500 font-medium">Created at</dt>
-                  <dd className="text-gray-900 mt-1">{selectedNat.CreateTime ? new Date(selectedNat.CreateTime).toLocaleString() : "-"}</dd>
+                  <dd className="text-gray-900 mt-1" suppressHydrationWarning>{formatDateTime(selectedNat.CreateTime)}</dd>
                 </div>
               </div>
             )}

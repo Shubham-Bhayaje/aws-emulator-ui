@@ -12,6 +12,7 @@ import {
   createVpcEndpointAction,
   deleteVpcEndpointsAction,
 } from "../actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   initialEndpoints: VpcEndpointItem[];
@@ -405,10 +406,8 @@ export default function EndpointsClient({
                 </div>
                 <div>
                   <dt className="text-gray-500 font-medium">Creation time</dt>
-                  <dd className="text-gray-900 mt-1">
-                    {selectedEndpoint.CreationTimestamp
-                      ? new Date(selectedEndpoint.CreationTimestamp).toLocaleString()
-                      : "-"}
+                  <dd className="text-gray-900 mt-1" suppressHydrationWarning>
+                    {formatDateTime(selectedEndpoint.CreationTimestamp)}
                   </dd>
                 </div>
               </div>

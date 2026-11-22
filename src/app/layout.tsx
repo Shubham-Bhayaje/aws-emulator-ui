@@ -5,7 +5,6 @@
 
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 import TopBar from "@/components/TopBar";
 import { sts } from "@/lib/aws";
@@ -49,25 +48,6 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={inter.className}>
-      <head>
-        <script
-          id="perf-measure-fix"
-          dangerouslySetInnerHTML={{
-            __html: `
-              if (typeof window !== "undefined" && window.performance && window.performance.measure) {
-                const _origMeasure = window.performance.measure.bind(window.performance);
-                window.performance.measure = function (name, startMarkOrOptions, endMark) {
-                  try {
-                    return _origMeasure(name, startMarkOrOptions, endMark);
-                  } catch (e) {
-                    return undefined;
-                  }
-                };
-              }
-            `,
-          }}
-        />
-      </head>
       <body>
         <TopBar
           accountId={accountId}

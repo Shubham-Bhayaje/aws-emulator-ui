@@ -9,6 +9,7 @@ import {
   SubnetItem,
   deleteNatGatewayAction,
 } from "../../actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   natGateway: NatGatewayItem;
@@ -258,7 +259,7 @@ export default function NatGatewayDetailClient({
             </div>
             <div>
               <span className="text-[#545b64] block mb-1">Created time</span>
-              <span className="text-[#16191f]">{nat.CreateTime ? new Date(nat.CreateTime).toLocaleString() : "-"}</span>
+              <span className="text-[#16191f]" suppressHydrationWarning>{formatDateTime(nat.CreateTime)}</span>
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import {
   listTransitGatewaysAction,
   deleteTransitGatewayAction,
 } from "../transit-gateway-actions";
+import { formatDateTime } from "@/lib/dateUtils";
 
 interface Props {
   initialTransitGateways: TransitGatewayItem[];
@@ -393,7 +394,7 @@ export default function TransitGatewaysClient({ initialTransitGateways }: Props)
                 <div>
                   <dt className="text-gray-500 font-medium">Created at</dt>
                   <dd className="text-gray-900 mt-1" suppressHydrationWarning>
-                    {selectedTgw.CreationTime ? new Date(selectedTgw.CreationTime).toLocaleString() : "-"}
+                    {formatDateTime(selectedTgw.CreationTime)}
                   </dd>
                 </div>
               </div>

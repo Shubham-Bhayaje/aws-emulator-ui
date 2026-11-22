@@ -7,6 +7,17 @@
 
 "use client";
 
+if (typeof window !== "undefined" && window.performance && window.performance.measure) {
+  const origMeasure = window.performance.measure.bind(window.performance);
+  window.performance.measure = function (name: string, startMarkOrOptions?: string | PerformanceMeasureOptions, endMark?: string) {
+    try {
+      return origMeasure(name, startMarkOrOptions as any, endMark);
+    } catch {
+      return undefined as any;
+    }
+  };
+}
+
 import { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
