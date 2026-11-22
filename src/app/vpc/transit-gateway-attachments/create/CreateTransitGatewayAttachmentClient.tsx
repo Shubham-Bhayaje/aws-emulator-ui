@@ -231,11 +231,16 @@ function CreateAttachmentForm({ transitGateways, vpcs, subnets }: Props) {
                 <span className="text-[13px] font-medium text-[#16191f]">VPC</span>
               </label>
 
-              <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
-                <input type="radio" name="attachmentType" disabled />
-                <span className="text-[13px] text-gray-700">
-                  VPN <span className="text-[11px] text-gray-500">(Available after AWS Site-to-Site VPN is built)</span>
-                </span>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="attachmentType"
+                  value="vpn"
+                  checked={attachmentType === "vpn"}
+                  onChange={() => setAttachmentType("vpn")}
+                  className="text-[#ec7211] focus:ring-[#ec7211]"
+                />
+                <span className="text-[13px] font-medium text-[#16191f]">VPN</span>
               </label>
 
               <label className="flex items-center gap-2 cursor-not-allowed opacity-60">
@@ -263,6 +268,29 @@ function CreateAttachmentForm({ transitGateways, vpcs, subnets }: Props) {
             </div>
           </div>
         </div>
+
+        {/* VPN Attachment Guidance Card */}
+        {attachmentType === "vpn" && (
+          <div className="bg-white border border-[#eaeded] rounded shadow-sm p-6 space-y-4">
+            <h2 className="text-[16px] font-bold text-[#16191f] border-b pb-2">
+              VPN attachment options
+            </h2>
+            <div className="p-4 bg-[#f1faff] border border-[#0073bb] rounded text-[13px] text-[#16191f] space-y-3">
+              <p>
+                To attach a Site-to-Site VPN connection to this transit gateway, create a VPN connection with Target gateway type set to Transit Gateway.
+              </p>
+              <div>
+                <Link
+                  href={`/vpc/vpn-connections/create${transitGatewayId ? `?tgw=${transitGatewayId}` : ""}`}
+                  className="inline-flex items-center justify-center px-4 py-1.5 text-xs font-semibold text-white bg-[#ec7211] hover:bg-[#eb5f07] rounded shadow-sm"
+                  style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+                >
+                  Create Site-to-Site VPN Connection
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* VPC Attachment Details Card */}
         {attachmentType === "vpc" && (

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getRouteTableDetailAction } from "../../actions";
 import { listTransitGatewaysAction } from "../../transit-gateway-actions";
+import { listVirtualPrivateGatewaysAction } from "../../vpn-actions";
 import RouteTableDetailClient from "./RouteTableDetailClient";
 
 export const dynamic = "force-dynamic";
@@ -11,9 +12,10 @@ export default async function RouteTableDetailPage({
   params: Promise<{ routeTableId: string }>;
 }) {
   const { routeTableId } = await params;
-  const [res, tgwRes] = await Promise.all([
+  const [res, tgwRes, vgwRes] = await Promise.all([
     getRouteTableDetailAction(routeTableId),
     listTransitGatewaysAction(),
+    listVirtualPrivateGatewaysAction(),
   ]);
 
   if (!res.success || !res.routeTable) {
@@ -30,6 +32,7 @@ export default async function RouteTableDetailPage({
       natGateways={res.natGateways || []}
       endpoints={res.endpoints || []}
       transitGateways={tgwRes.success ? tgwRes.transitGateways : []}
+      virtualPrivateGateways={vgwRes.success ? vgwRes.vpnGateways : []}
       vpc={res.vpc}
     />
   );

@@ -25,4 +25,9 @@ export const vpcNav: VpcNavItem[] = [
   { label: "Transit gateways", href: "/vpc/transit-gateways", group: "Transit Gateways" },
   { label: "Transit gateway attachments", href: "/vpc/transit-gateway-attachments", group: "Transit Gateways" },
   { label: "Transit gateway route tables", href: "/vpc/transit-gateway-route-tables", group: "Transit Gateways" },
+
+  // Virtual Private Network (VPN)
+  { label: "Virtual private gateways", href: "/vpc/virtual-private-gateways", group: "Virtual Private Network (VPN)" },
+  { label: "Customer gateways", href: "/vpc/customer-gateways", group: "Virtual Private Network (VPN)" },
+  { label: "Site-to-Site VPN connections", href: "/vpc/vpn-connections", group: "Virtual Private Network (VPN)" },
 ];

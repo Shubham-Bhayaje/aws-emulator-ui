@@ -17,6 +17,7 @@ import {
   deleteRouteTableAction,
 } from "../../actions";
 import { TransitGatewayItem } from "../../transit-gateway-actions";
+import { EC2VpnGateway } from "../../vpn-actions";
 
 interface Props {
   routeTable: RouteTableItem;
@@ -27,6 +28,7 @@ interface Props {
   natGateways: NatGatewayItem[];
   endpoints: VpcEndpointItem[];
   transitGateways?: TransitGatewayItem[];
+  virtualPrivateGateways?: EC2VpnGateway[];
   vpc?: VpcItem;
 }
 
@@ -39,6 +41,7 @@ export default function RouteTableDetailClient({
   natGateways,
   endpoints,
   transitGateways = [],
+  virtualPrivateGateways = [],
   vpc,
 }: Props) {
   const router = useRouter();
@@ -57,7 +60,7 @@ export default function RouteTableDetailClient({
   // Add Route Modal
   const [isAddRouteOpen, setIsAddRouteOpen] = useState(false);
   const [routeDestination, setRouteDestination] = useState("");
-  const [targetType, setTargetType] = useState<"igw" | "nat" | "vpce" | "tgw">("igw");
+  const [targetType, setTargetType] = useState<"igw" | "nat" | "vpce" | "tgw" | "vgw">("igw");
   const [targetId, setTargetId] = useState(internetGateways.length > 0 ? internetGateways[0].InternetGatewayId : "");
 
   // Edit Subnet Associations Modal
@@ -82,7 +85,7 @@ export default function RouteTableDetailClient({
       const res = await createRouteAction({
         routeTableId: routeTable.RouteTableId,
         destinationCidrBlock: routeDestination.trim(),
-        gatewayId: targetType === "igw" || targetType === "vpce" ? targetId : undefined,
+        gatewayId: targetType === "igw" || targetType === "vpce" || targetType === "vgw" ? targetId : undefined,
         natGatewayId: targetType === "nat" ? targetId : undefined,
         transitGatewayId: targetType === "tgw" ? targetId : undefined,
       });
@@ -94,7 +97,7 @@ export default function RouteTableDetailClient({
             ...prev.Routes,
             {
               DestinationCidrBlock: routeDestination.trim(),
-              GatewayId: targetType === "igw" || targetType === "vpce" ? targetId : undefined,
+              GatewayId: targetType === "igw" || targetType === "vpce" || targetType === "vgw" ? targetId : undefined,
               NatGatewayId: targetType === "nat" ? targetId : undefined,
               TransitGatewayId: targetType === "tgw" ? targetId : undefined,
               State: "active",
@@ -455,6 +458,10 @@ export default function RouteTableDetailClient({
                           <Link href={`/vpc/transit-gateways/${target}`} className="hover:underline">
                             {target}
                           </Link>
+                        ) : target.startsWith("vgw-") ? (
+                          <Link href={`/vpc/virtual-private-gateways/${target}`} className="hover:underline">
+                            {target}
+                          </Link>
                         ) : (
                           <span>{target}</span>
                         )}
@@ -746,6 +753,18 @@ export default function RouteTableDetailClient({
                     />
                     <span>Transit Gateway</span>
                   </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="targetType"
+                      checked={targetType === "vgw"}
+                      onChange={() => {
+                        setTargetType("vgw");
+                        setTargetId(virtualPrivateGateways[0]?.VpnGatewayId || "");
+                      }}
+                    />
+                    <span>Virtual Private Gateway</span>
+                  </label>
                 </div>
               </div>
 
@@ -783,10 +802,17 @@ export default function RouteTableDetailClient({
                         {t.TransitGatewayId} {t.Name ? `(${t.Name})` : ""}
                       </option>
                     ))}
+                  {targetType === "vgw" &&
+                    virtualPrivateGateways.map((v) => (
+                      <option key={v.VpnGatewayId} value={v.VpnGatewayId}>
+                        {v.VpnGatewayId} {v.Name ? `(${v.Name})` : ""}
+                      </option>
+                    ))}
                   {((targetType === "igw" && internetGateways.length === 0) ||
                     (targetType === "nat" && natGateways.length === 0) ||
                     (targetType === "vpce" && endpoints.length === 0) ||
-                    (targetType === "tgw" && transitGateways.length === 0)) && (
+                    (targetType === "tgw" && transitGateways.length === 0) ||
+                    (targetType === "vgw" && virtualPrivateGateways.length === 0)) && (
                     <option value="">No targets of this type available</option>
                   )}
                 </select>
