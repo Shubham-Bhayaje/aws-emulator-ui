@@ -60,6 +60,18 @@ const INSTANCE_TYPES = [
   { type: "c5.xlarge", vCpu: 4, memoryGib: 8.0, storage: "EBS only", network: "Up to 10 Gbps", freeTier: false },
 ];
 
+const DEFAULT_FALLBACK_SG: SecurityGroup = {
+  id: "sg-default",
+  name: "default",
+  description: "Default security group",
+  vpcId: "vpc-00000000000000001",
+  ownerId: "000000000000",
+  arn: "arn:aws:ec2:us-east-1:000000000000:security-group/sg-default",
+  tags: {},
+  inboundRules: [],
+  outboundRules: [],
+};
+
 interface LaunchInstanceWizardProps {
   initialSecurityGroups?: SecurityGroup[];
   initialKeyPairs?: KeyPair[];
@@ -79,7 +91,7 @@ export default function LaunchInstanceWizard({
     initialKeyPairs[0]?.name || ""
   );
   const [selectedSgId, setSelectedSgId] = useState(
-    initialSecurityGroups[0]?.id || ""
+    initialSecurityGroups[0]?.id || DEFAULT_FALLBACK_SG.id
   );
   const [allowSsh, setAllowSsh] = useState(true);
   const [allowHttp, setAllowHttp] = useState(true);
@@ -88,14 +100,16 @@ export default function LaunchInstanceWizard({
   const [iamRole, setIamRole] = useState("None");
   const [userData, setUserData] = useState("#!/bin/bash\necho 'Hello from EC2' > /var/www/html/index.html");
 
-  const [secGroups] = useState<SecurityGroup[]>(initialSecurityGroups);
+  const [secGroups] = useState<SecurityGroup[]>(
+    initialSecurityGroups.length > 0 ? initialSecurityGroups : [DEFAULT_FALLBACK_SG]
+  );
   const [keyPairs] = useState<KeyPair[]>(initialKeyPairs);
   const [isLaunching, setIsLaunching] = useState(false);
   const [launchError, setLaunchError] = useState<string | null>(null);
 
   const currentAmi = AMI_OPTIONS.find((a) => a.id === selectedAmiId) || AMI_OPTIONS[0];
   const currentTypeObj = INSTANCE_TYPES.find((t) => t.type === selectedType) || INSTANCE_TYPES[1];
-  const currentSg = secGroups.find((s) => s.id === selectedSgId) || secGroups[0];
+  const currentSg = secGroups.find((s) => s.id === selectedSgId) || secGroups[0] || DEFAULT_FALLBACK_SG;
 
   async function handleLaunch(e: React.FormEvent) {
     e.preventDefault();
@@ -108,7 +122,7 @@ export default function LaunchInstanceWizard({
         imageId: selectedAmiId,
         instanceType: selectedType,
         keyName: selectedKeyPair && selectedKeyPair !== "none" ? selectedKeyPair : undefined,
-        securityGroupId: selectedSgId || undefined,
+        securityGroupId: selectedSgId && selectedSgId !== "sg-default" ? selectedSgId : undefined,
       });
 
       if (res.success && res.instance) {
@@ -416,8 +430,8 @@ export default function LaunchInstanceWizard({
 
               <div>
                 <div className="text-[11px] text-[#545b64] uppercase font-bold">Firewall (Security group)</div>
-                <div className="font-medium text-[#16191f]">{currentSg.name}</div>
-                <div className="text-[11px] text-[#879596] font-mono">{currentSg.id}</div>
+                <div className="font-medium text-[#16191f]">{currentSg?.name || "default"}</div>
+                <div className="text-[11px] text-[#879596] font-mono">{currentSg?.id || "sg-default"}</div>
               </div>
 
               <div>

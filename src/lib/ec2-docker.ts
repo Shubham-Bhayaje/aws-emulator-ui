@@ -15,9 +15,6 @@ function getDockerPrefix(): string {
   if (process.env.DOCKER_CMD) {
     return process.env.DOCKER_CMD;
   }
-  if (process.platform === "win32") {
-    return "wsl -e docker";
-  }
   return "docker";
 }
 

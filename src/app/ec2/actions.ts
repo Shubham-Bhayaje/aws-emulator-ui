@@ -485,14 +485,50 @@ export async function launchLiveInstance(params: {
 // Security Groups: Real Emulator Actions
 // -------------------------------------------------------------
 
+const DEFAULT_EC2_SECURITY_GROUP: SecurityGroup = {
+  id: "sg-default",
+  name: "default",
+  description: "Default security group",
+  vpcId: "vpc-00000000000000001",
+  ownerId: "000000000000",
+  arn: "arn:aws:ec2:us-east-1:000000000000:security-group/sg-default",
+  tags: {},
+  inboundRules: [
+    {
+      type: "All traffic",
+      protocol: "All",
+      portRange: "All",
+      source: "0.0.0.0/0",
+      description: "Allow all inbound traffic",
+    },
+  ],
+  outboundRules: [
+    {
+      type: "All traffic",
+      protocol: "All",
+      portRange: "All",
+      source: "0.0.0.0/0",
+      description: "Allow all outbound traffic",
+    },
+  ],
+};
+
 export async function fetchLiveSecurityGroups(): Promise<{ securityGroups: SecurityGroup[]; isLive: boolean; error?: string }> {
   try {
     const res = await ec2.send(new DescribeSecurityGroupsCommand({}));
     const rawList = res.SecurityGroups || [];
-    return { securityGroups: rawList.map(mapAwsSecurityGroupToModel), isLive: true };
+    const mapped = rawList.map(mapAwsSecurityGroupToModel);
+    return {
+      securityGroups: mapped.length > 0 ? mapped : [DEFAULT_EC2_SECURITY_GROUP],
+      isLive: true,
+    };
   } catch (err: any) {
     console.warn("[EC2 Action] Failed to fetch live security groups:", err.message);
-    return { securityGroups: [], isLive: false, error: err.message };
+    return {
+      securityGroups: [DEFAULT_EC2_SECURITY_GROUP],
+      isLive: false,
+      error: err.message,
+    };
   }
 }
 
