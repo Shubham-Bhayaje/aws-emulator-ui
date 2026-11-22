@@ -76,10 +76,6 @@ const ec2HttpsAgent = new https.Agent({
 export const ec2 = new EC2Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
-  },
   requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
 });
 
@@ -300,12 +296,8 @@ const locationHttpsAgent = new https.Agent({
 
 // --- Amazon Location Service ---
 export const location = new LocationClient({
-  endpoint: "https://localhost:9297",
+  endpoint: ENDPOINT,
   region: DEFAULT_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
-  },
   requestHandler: new NodeHttpHandler({ httpsAgent: locationHttpsAgent }),
 });
 
@@ -320,10 +312,6 @@ const cloudMapHttpsAgent = new https.Agent({
 export const serviceDiscovery = new ServiceDiscoveryClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
-  },
   requestHandler: new NodeHttpHandler({ httpsAgent: cloudMapHttpsAgent }),
 });
 
@@ -352,10 +340,6 @@ const resourceExplorerHttpsAgent = new https.Agent({
 export const resourceExplorer = new ResourceExplorer2Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
-  },
   requestHandler: new NodeHttpHandler({ httpsAgent: resourceExplorerHttpsAgent }),
 });
 
@@ -406,10 +390,6 @@ resourceExplorer.middlewareStack.add(
 export const directConnect = new DirectConnectClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
-  },
   requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
 });
 
@@ -417,10 +397,6 @@ export const directConnect = new DirectConnectClient({
 export const route53Resolver = new Route53ResolverClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
-  },
   requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
 });
 

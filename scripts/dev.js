@@ -43,6 +43,23 @@ const env = {
   AWS_EC2_METADATA_DISABLED: "true",
 };
 
+if (fs.existsSync(credentialsFile)) {
+  try {
+    const credContent = fs.readFileSync(credentialsFile, "utf-8");
+    const keyMatch = credContent.match(/aws_access_key_id\s*=\s*([^\r\n]+)/);
+    const secretMatch = credContent.match(/aws_secret_access_key\s*=\s*([^\r\n]+)/);
+    if (keyMatch) {
+      env.AWS_ACCESS_KEY_ID = keyMatch[1].trim();
+    }
+    if (secretMatch) {
+      env.AWS_SECRET_ACCESS_KEY = secretMatch[1].trim();
+    }
+    console.log(`[AWS Emulator UI] Loaded emulator credentials for key: ${env.AWS_ACCESS_KEY_ID}`);
+  } catch (err) {
+    console.warn(`[AWS Emulator UI] Warning: Could not parse credentials file:`, err.message);
+  }
+}
+
 if (fs.existsSync(caCert)) {
   env.NODE_EXTRA_CA_CERTS = caCert;
   console.log(`[AWS Emulator UI] Using CA cert: ${caCert}`);
