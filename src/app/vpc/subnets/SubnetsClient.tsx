@@ -7,17 +7,26 @@ import { SubnetItem, listSubnetsAction, deleteSubnetAction, modifySubnetAttribut
 
 interface Props {
   initialSubnets: SubnetItem[];
+  initialSearch?: string;
 }
 
-export default function SubnetsClient({ initialSubnets }: Props) {
+export default function SubnetsClient({ initialSubnets, initialSearch = "" }: Props) {
   const router = useRouter();
 
   const [subnets, setSubnets] = useState<SubnetItem[]>(initialSubnets);
-  const [selectedSubnetId, setSelectedSubnetId] = useState<string | null>(
-    initialSubnets.length > 0 ? initialSubnets[0].SubnetId : null
-  );
+  const [selectedSubnetId, setSelectedSubnetId] = useState<string | null>(() => {
+    if (initialSearch) {
+      const match = initialSubnets.find(
+        (s) =>
+          s.SubnetId.toLowerCase().includes(initialSearch.toLowerCase()) ||
+          (s.Name && s.Name.toLowerCase().includes(initialSearch.toLowerCase()))
+      );
+      if (match) return match.SubnetId;
+    }
+    return initialSubnets.length > 0 ? initialSubnets[0].SubnetId : null;
+  });
   const [activeTab, setActiveTab] = useState<"details" | "tags">("details");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);

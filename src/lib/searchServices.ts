@@ -1127,7 +1127,6 @@ const ACRONYM_MAP: Record<string, string[]> = {
   cw: ["cloudwatch", "logs", "metrics"],
   cfn: ["cloudformation", "templates"],
   ebs: ["elastic", "block", "store", "volumes"],
-  vpc: ["virtual", "private", "cloud", "networking"],
 };
 
 /**

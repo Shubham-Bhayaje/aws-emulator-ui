@@ -3,7 +3,12 @@ import { listVpcEndpointsAction, listVpcsAction, listRouteTablesAction, listSubn
 
 export const dynamic = "force-dynamic";
 
-export default async function EndpointsPage() {
+export default async function EndpointsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ search?: string }>;
+}) {
+  const sp = searchParams ? await searchParams : {};
   const [endpointsRes, vpcsRes, rtbsRes, subnetsRes] = await Promise.all([
     listVpcEndpointsAction(),
     listVpcsAction(),
@@ -17,6 +22,7 @@ export default async function EndpointsPage() {
       vpcs={vpcsRes.success ? vpcsRes.vpcs : []}
       routeTables={rtbsRes.success ? rtbsRes.routeTables : []}
       subnets={subnetsRes.success ? subnetsRes.subnets : []}
+      initialSearch={sp.search || ""}
     />
   );
 }

@@ -30,6 +30,34 @@ interface Props {
   initialEndpoints?: VpcEndpointItem[];
 }
 
+/**
+ * Authentic AWS-style smooth rounded orthogonal connector path.
+ * Connects horizontally from (x1, y1) to (x2, y2) with smooth 90-degree rounded fillets.
+ */
+function getAwsSmoothPath(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  forcedChannelX?: number
+): string {
+  if (x1 === 0 && y1 === 0 && x2 === 0 && y2 === 0) return "";
+
+  // Straight line if Y is within 3 pixels
+  if (Math.abs(y2 - y1) <= 3) {
+    return `M ${x1} ${y1} L ${x2} ${y2}`;
+  }
+
+  // Midpoint channel X
+  const channelX = forcedChannelX !== undefined ? forcedChannelX : x1 + (x2 - x1) * 0.45;
+  const radius = Math.min(14, Math.abs(channelX - x1), Math.abs(x2 - channelX), Math.abs(y2 - y1) / 2);
+  const R = Math.max(radius, 2);
+  const dirY = y2 > y1 ? 1 : -1;
+
+  // Path with smooth 90-degree rounded fillets:
+  return `M ${x1} ${y1} L ${channelX - R} ${y1} Q ${channelX} ${y1}, ${channelX} ${y1 + dirY * R} L ${channelX} ${y2 - dirY * R} Q ${channelX} ${y2}, ${channelX + R} ${y2} L ${x2} ${y2}`;
+}
+
 export default function VpcsClient({
   initialVpcs,
   initialSubnets = [],
@@ -574,21 +602,29 @@ export default function VpcsClient({
   useEffect(() => {
     if (activeTab !== "resourcemap") return;
 
-    recalculateLines();
-    const t1 = setTimeout(recalculateLines, 50);
-    const t2 = setTimeout(recalculateLines, 250);
+    let animFrameId: number;
+    const runRecalc = () => {
+      animFrameId = requestAnimationFrame(() => {
+        recalculateLines();
+      });
+    };
+
+    runRecalc();
+    const t1 = setTimeout(runRecalc, 60);
+    const t2 = setTimeout(runRecalc, 250);
 
     const handleResize = () => {
-      recalculateLines();
+      runRecalc();
     };
 
     window.addEventListener("resize", handleResize);
     return () => {
+      cancelAnimationFrame(animFrameId);
       clearTimeout(t1);
       clearTimeout(t2);
       window.removeEventListener("resize", handleResize);
     };
-  }, [activeTab, selectedVpcId, subnetsTopology, vpcRouteTables, gatewayTargets, recalculateLines]);
+  }, [activeTab, selectedVpcId, recalculateLines]);
 
   const clearSelection = () => {
     setSelectedSubnetId(null);
@@ -958,34 +994,35 @@ export default function VpcsClient({
                   className="absolute inset-0 pointer-events-none w-full h-full z-10"
                   style={{ minWidth: "1020px" }}
                 >
-                  {/* VPC to Subnet lines */}
-                  {svgLines.vpcToSubnets.map((line) => {
-                    const active = isCardActive("subnet", line.subId);
-                    const dx = 35;
-                    const d = `M ${line.x1} ${line.y1} C ${line.x1 + dx} ${line.y1}, ${
-                      line.x2 - dx
-                    } ${line.y2}, ${line.x2} ${line.y2}`;
+                  {/* VPC to Subnet lines (Unified Smooth Tree Trunk) */}
+                  {(() => {
+                    const channelX =
+                      svgLines.vpcToSubnets.length > 0
+                        ? (svgLines.vpcToSubnets[0].x1 + svgLines.vpcToSubnets[0].x2) / 2
+                        : undefined;
 
-                    return (
-                      <path
-                        key={`vpc-sub-${line.subId}`}
-                        d={d}
-                        fill="none"
-                        stroke={active ? "#ec7211" : "#0073bb"}
-                        strokeWidth={active ? 2.5 : 2}
-                        opacity={!isAnyActive || active ? 1 : 0.25}
-                        className="transition-all duration-150"
-                      />
-                    );
-                  })}
+                    return svgLines.vpcToSubnets.map((line) => {
+                      const active = isCardActive("subnet", line.subId);
+                      const d = getAwsSmoothPath(line.x1, line.y1, line.x2, line.y2, channelX);
 
-                  {/* Subnet to Route Table lines */}
+                      return (
+                        <path
+                          key={`vpc-sub-${line.subId}`}
+                          d={d}
+                          fill="none"
+                          stroke={active ? "#ec7211" : "#0073bb"}
+                          strokeWidth={active ? 2.5 : 2}
+                          opacity={!isAnyActive || active ? 1 : 0.25}
+                          className="transition-all duration-150"
+                        />
+                      );
+                    });
+                  })()}
+
+                  {/* Subnet to Route Table lines (Smooth Rounded Connectors) */}
                   {svgLines.subnetToRtb.map((line, idx) => {
                     const active = isLineActive("subnet", line.subId, line.rtbId);
-                    const dx = Math.max((line.x2 - line.x1) / 2, 35);
-                    const d = `M ${line.x1} ${line.y1} C ${line.x1 + dx} ${line.y1}, ${
-                      line.x2 - dx
-                    } ${line.y2}, ${line.x2} ${line.y2}`;
+                    const d = getAwsSmoothPath(line.x1, line.y1, line.x2, line.y2);
 
                     return (
                       <path
@@ -1000,13 +1037,10 @@ export default function VpcsClient({
                     );
                   })}
 
-                  {/* Route Table to Network Connections lines (Dotted) */}
+                  {/* Route Table to Network Connections lines (Dotted Smooth Connectors) */}
                   {svgLines.rtbToGw.map((line, idx) => {
                     const active = isLineActive("rtb", line.rtbId, line.gwId);
-                    const dx = Math.max((line.x2 - line.x1) / 2, 35);
-                    const d = `M ${line.x1} ${line.y1} C ${line.x1 + dx} ${line.y1}, ${
-                      line.x2 - dx
-                    } ${line.y2}, ${line.x2} ${line.y2}`;
+                    const d = getAwsSmoothPath(line.x1, line.y1, line.x2, line.y2);
 
                     return (
                       <path
@@ -1044,10 +1078,15 @@ export default function VpcsClient({
 
                       <div
                         id="resmap-vpc-card"
-                        className="bg-[#0073bb] text-white rounded p-3.5 shadow-sm transition-all"
+                        onClick={() => setActiveTab("details")}
+                        className="bg-[#0073bb] text-white rounded p-3.5 shadow-sm transition-all cursor-pointer group hover:bg-[#005a9e]"
+                        title="Click to view VPC details"
                       >
-                        <div className="font-bold text-[13px] truncate">
-                          {selectedVpc.Name || selectedVpc.VpcId}
+                        <div className="flex items-center justify-between">
+                          <div className="font-bold text-[13px] truncate group-hover:underline">
+                            {selectedVpc.Name || selectedVpc.VpcId}
+                          </div>
+                          <span className="text-[11px] opacity-75 group-hover:opacity-100">↗</span>
                         </div>
                         <div className="text-[12px] opacity-90 font-mono mt-0.5">
                           {selectedVpc.CidrBlock}
@@ -1090,16 +1129,19 @@ export default function VpcsClient({
                                   id={`resmap-sub-${item.subnet.SubnetId}`}
                                   onMouseEnter={() => setHoveredSubnetId(item.subnet.SubnetId)}
                                   onMouseLeave={() => setHoveredSubnetId(null)}
-                                  onClick={() =>
-                                    setSelectedSubnetId(
-                                      isSelected ? null : item.subnet.SubnetId
-                                    )
-                                  }
-                                  className={`bg-white border rounded p-2.5 transition-all cursor-pointer ${
+                                  onClick={() => {
+                                    router.push(
+                                      `/vpc/subnets?search=${encodeURIComponent(
+                                        item.subnet.SubnetId
+                                      )}`
+                                    );
+                                  }}
+                                  className={`bg-white border rounded p-2.5 transition-all cursor-pointer group hover:shadow-md ${
                                     active || isSelected
                                       ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
                                       : "border-[#0073bb] hover:border-[#ec7211]"
                                   } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
+                                  title={`Click to open Subnet ${item.subnet.SubnetId} in Subnets console`}
                                 >
                                   <div className="flex items-center gap-2 mb-1">
                                     {item.isPublic ? (
@@ -1120,9 +1162,18 @@ export default function VpcsClient({
                                       </div>
                                     )}
 
-                                    <div className="font-semibold text-[12px] text-[#0073bb] truncate max-w-[160px]">
+                                    <Link
+                                      href={`/vpc/subnets?search=${encodeURIComponent(
+                                        item.subnet.SubnetId
+                                      )}`}
+                                      onClick={(e) => e.stopPropagation()}
+                                      className="font-semibold text-[12px] text-[#0073bb] group-hover:underline truncate max-w-[150px]"
+                                    >
                                       {item.subnet.Name || item.subnet.SubnetId}
-                                    </div>
+                                    </Link>
+                                    <span className="text-[#0073bb] text-[11px] ml-auto shrink-0 opacity-70 group-hover:opacity-100">
+                                      ↗
+                                    </span>
                                   </div>
 
                                   <div className="text-[11px] text-[#545b64] font-mono pl-7">
@@ -1170,19 +1221,33 @@ export default function VpcsClient({
                               id={`resmap-rtb-${rtb.RouteTableId}`}
                               onMouseEnter={() => setHoveredRtbId(rtb.RouteTableId)}
                               onMouseLeave={() => setHoveredRtbId(null)}
-                              onClick={() =>
-                                setSelectedRtbId(
-                                  isSelected ? null : rtb.RouteTableId
-                                )
-                              }
-                              className={`bg-white border rounded p-2.5 transition-all cursor-pointer ${
+                              onClick={() => {
+                                router.push(
+                                  `/vpc/route-tables?search=${encodeURIComponent(
+                                    rtb.RouteTableId
+                                  )}`
+                                );
+                              }}
+                              className={`bg-white border rounded p-2.5 transition-all cursor-pointer group hover:shadow-md ${
                                 active || isSelected
                                   ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
                                   : "border-[#0073bb] hover:border-[#ec7211]"
                               } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
+                              title={`Click to open Route Table ${rtb.RouteTableId} in Route tables console`}
                             >
-                              <div className="font-semibold text-[12px] text-[#0073bb] truncate">
-                                {rtb.Name || rtb.RouteTableId}
+                              <div className="flex items-center justify-between mb-1">
+                                <Link
+                                  href={`/vpc/route-tables?search=${encodeURIComponent(
+                                    rtb.RouteTableId
+                                  )}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="font-semibold text-[12px] text-[#0073bb] group-hover:underline truncate max-w-[160px]"
+                                >
+                                  {rtb.Name || rtb.RouteTableId}
+                                </Link>
+                                <span className="text-[#0073bb] text-[11px] opacity-70 group-hover:opacity-100 shrink-0">
+                                  ↗
+                                </span>
                               </div>
 
                               <div className="mt-1 space-y-0.5 text-[11px] text-[#545b64]">
@@ -1238,19 +1303,51 @@ export default function VpcsClient({
                               id={`resmap-gw-${target.id}`}
                               onMouseEnter={() => setHoveredGwId(target.id)}
                               onMouseLeave={() => setHoveredGwId(null)}
-                              onClick={() =>
-                                setSelectedGwId(
-                                  isSelected ? null : target.id
-                                )
-                              }
-                              className={`bg-white border rounded p-2.5 transition-all cursor-pointer ${
+                              onClick={() => {
+                                const dest =
+                                  target.type === "Internet Gateway"
+                                    ? `/vpc/internet-gateways?search=${encodeURIComponent(
+                                        target.id
+                                      )}`
+                                    : target.type === "NAT Gateway"
+                                    ? `/vpc/nat-gateways?search=${encodeURIComponent(
+                                        target.id
+                                      )}`
+                                    : `/vpc/endpoints?search=${encodeURIComponent(
+                                        target.id
+                                      )}`;
+                                router.push(dest);
+                              }}
+                              className={`bg-white border rounded p-2.5 transition-all cursor-pointer group hover:shadow-md ${
                                 active || isSelected
                                   ? "border-[#ec7211] ring-2 ring-orange-200 shadow-sm"
                                   : "border-[#0073bb] hover:border-[#ec7211]"
                               } ${isAnyActive && !active ? "opacity-35" : "opacity-100"}`}
+                              title={`Click to open in ${target.type} console`}
                             >
-                              <div className="font-semibold text-[12px] text-[#0073bb] truncate">
-                                {target.name}
+                              <div className="flex items-center justify-between mb-1">
+                                <Link
+                                  href={
+                                    target.type === "Internet Gateway"
+                                      ? `/vpc/internet-gateways?search=${encodeURIComponent(
+                                          target.id
+                                        )}`
+                                      : target.type === "NAT Gateway"
+                                      ? `/vpc/nat-gateways?search=${encodeURIComponent(
+                                          target.id
+                                        )}`
+                                      : `/vpc/endpoints?search=${encodeURIComponent(
+                                          target.id
+                                        )}`
+                                  }
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="font-semibold text-[12px] text-[#0073bb] group-hover:underline truncate max-w-[160px]"
+                                >
+                                  {target.name}
+                                </Link>
+                                <span className="text-[#0073bb] text-[11px] opacity-70 group-hover:opacity-100 shrink-0">
+                                  ↗
+                                </span>
                               </div>
 
                               <div className="mt-1 space-y-0.5 text-[11px] text-[#545b64]">

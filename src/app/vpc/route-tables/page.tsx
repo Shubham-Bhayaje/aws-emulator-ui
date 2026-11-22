@@ -9,7 +9,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function RouteTablesPage() {
+export default async function RouteTablesPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ search?: string }>;
+}) {
+  const sp = searchParams ? await searchParams : {};
   const [rtbsRes, vpcsRes, subnetsRes, igwsRes, natsRes] = await Promise.all([
     listRouteTablesAction(),
     listVpcsAction(),
@@ -25,6 +30,7 @@ export default async function RouteTablesPage() {
       subnets={subnetsRes.success ? subnetsRes.subnets : []}
       internetGateways={igwsRes.success ? igwsRes.internetGateways : []}
       natGateways={natsRes.success ? natsRes.natGateways : []}
+      initialSearch={sp.search || ""}
     />
   );
 }

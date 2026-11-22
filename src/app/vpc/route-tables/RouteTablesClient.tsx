@@ -24,6 +24,7 @@ interface Props {
   subnets: SubnetItem[];
   internetGateways: InternetGatewayItem[];
   natGateways: NatGatewayItem[];
+  initialSearch?: string;
 }
 
 export default function RouteTablesClient({
@@ -32,15 +33,24 @@ export default function RouteTablesClient({
   subnets,
   internetGateways,
   natGateways,
+  initialSearch = "",
 }: Props) {
   const router = useRouter();
 
   const [routeTables, setRouteTables] = useState<RouteTableItem[]>(initialRouteTables);
-  const [selectedRtbId, setSelectedRtbId] = useState<string | null>(
-    initialRouteTables.length > 0 ? initialRouteTables[0].RouteTableId : null
-  );
+  const [selectedRtbId, setSelectedRtbId] = useState<string | null>(() => {
+    if (initialSearch) {
+      const match = initialRouteTables.find(
+        (r) =>
+          r.RouteTableId.toLowerCase().includes(initialSearch.toLowerCase()) ||
+          (r.Name && r.Name.toLowerCase().includes(initialSearch.toLowerCase()))
+      );
+      if (match) return match.RouteTableId;
+    }
+    return initialRouteTables.length > 0 ? initialRouteTables[0].RouteTableId : null;
+  });
   const [activeTab, setActiveTab] = useState<"details" | "routes" | "associations" | "tags">("routes");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);

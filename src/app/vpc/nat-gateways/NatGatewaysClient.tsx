@@ -17,18 +17,32 @@ interface Props {
   initialGateways: NatGatewayItem[];
   subnets: SubnetItem[];
   elasticIps: ElasticIpItem[];
+  initialSearch?: string;
 }
 
-export default function NatGatewaysClient({ initialGateways, subnets, elasticIps }: Props) {
+export default function NatGatewaysClient({
+  initialGateways,
+  subnets,
+  elasticIps,
+  initialSearch = "",
+}: Props) {
   const router = useRouter();
 
   const [gateways, setGateways] = useState<NatGatewayItem[]>(initialGateways);
   const [eips, setEips] = useState<ElasticIpItem[]>(elasticIps);
-  const [selectedNatId, setSelectedNatId] = useState<string | null>(
-    initialGateways.length > 0 ? initialGateways[0].NatGatewayId : null
-  );
+  const [selectedNatId, setSelectedNatId] = useState<string | null>(() => {
+    if (initialSearch) {
+      const match = initialGateways.find(
+        (n) =>
+          n.NatGatewayId.toLowerCase().includes(initialSearch.toLowerCase()) ||
+          (n.Name && n.Name.toLowerCase().includes(initialSearch.toLowerCase()))
+      );
+      if (match) return match.NatGatewayId;
+    }
+    return initialGateways.length > 0 ? initialGateways[0].NatGatewayId : null;
+  });
   const [activeTab, setActiveTab] = useState<"details" | "tags">("details");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -70,7 +84,7 @@ export default function NatGatewaysClient({ initialGateways, subnets, elasticIps
     setAllocatingEip(true);
     setMessage(null);
     try {
-      const res = await allocateElasticIpAction({ tag: "NAT Gateway EIP" });
+      const res = await allocateElasticIpAction({ tags: { Name: "NAT Gateway EIP" } });
       if (res.success && res.allocationId) {
         const eipsRes = await listElasticIpsAction();
         if (eipsRes.success) {

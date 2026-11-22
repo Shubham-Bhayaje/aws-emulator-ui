@@ -15,17 +15,26 @@ import {
 interface Props {
   initialGateways: InternetGatewayItem[];
   vpcs: VpcItem[];
+  initialSearch?: string;
 }
 
-export default function InternetGatewaysClient({ initialGateways, vpcs }: Props) {
+export default function InternetGatewaysClient({ initialGateways, vpcs, initialSearch = "" }: Props) {
   const router = useRouter();
 
   const [gateways, setGateways] = useState<InternetGatewayItem[]>(initialGateways);
-  const [selectedIgwId, setSelectedIgwId] = useState<string | null>(
-    initialGateways.length > 0 ? initialGateways[0].InternetGatewayId : null
-  );
+  const [selectedIgwId, setSelectedIgwId] = useState<string | null>(() => {
+    if (initialSearch) {
+      const match = initialGateways.find(
+        (g) =>
+          g.InternetGatewayId.toLowerCase().includes(initialSearch.toLowerCase()) ||
+          (g.Name && g.Name.toLowerCase().includes(initialSearch.toLowerCase()))
+      );
+      if (match) return match.InternetGatewayId;
+    }
+    return initialGateways.length > 0 ? initialGateways[0].InternetGatewayId : null;
+  });
   const [activeTab, setActiveTab] = useState<"details" | "tags">("details");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);

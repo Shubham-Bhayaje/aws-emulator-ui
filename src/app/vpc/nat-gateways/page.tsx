@@ -3,7 +3,12 @@ import { listNatGatewaysAction, listSubnetsAction, listElasticIpsAction } from "
 
 export const dynamic = "force-dynamic";
 
-export default async function NatGatewaysPage() {
+export default async function NatGatewaysPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ search?: string }>;
+}) {
+  const sp = searchParams ? await searchParams : {};
   const [natsRes, subnetsRes, eipsRes] = await Promise.all([
     listNatGatewaysAction(),
     listSubnetsAction(),
@@ -15,6 +20,7 @@ export default async function NatGatewaysPage() {
       initialGateways={natsRes.success ? natsRes.natGateways : []}
       subnets={subnetsRes.success ? subnetsRes.subnets : []}
       elasticIps={eipsRes.success ? eipsRes.elasticIps : []}
+      initialSearch={sp.search || ""}
     />
   );
 }

@@ -17,6 +17,7 @@ interface Props {
   vpcs: VpcItem[];
   routeTables: RouteTableItem[];
   subnets: SubnetItem[];
+  initialSearch?: string;
 }
 
 const AVAILABLE_SERVICES = [
@@ -27,15 +28,29 @@ const AVAILABLE_SERVICES = [
   { name: "com.amazonaws.us-east-1.sns", type: "Interface", desc: "Amazon SNS Interface Endpoint" },
 ];
 
-export default function EndpointsClient({ initialEndpoints, vpcs, routeTables, subnets }: Props) {
+export default function EndpointsClient({
+  initialEndpoints,
+  vpcs,
+  routeTables,
+  subnets,
+  initialSearch = "",
+}: Props) {
   const router = useRouter();
 
   const [endpoints, setEndpoints] = useState<VpcEndpointItem[]>(initialEndpoints);
-  const [selectedEndpointId, setSelectedEndpointId] = useState<string | null>(
-    initialEndpoints.length > 0 ? initialEndpoints[0].VpcEndpointId : null
-  );
+  const [selectedEndpointId, setSelectedEndpointId] = useState<string | null>(() => {
+    if (initialSearch) {
+      const match = initialEndpoints.find(
+        (e) =>
+          e.VpcEndpointId.toLowerCase().includes(initialSearch.toLowerCase()) ||
+          e.ServiceName.toLowerCase().includes(initialSearch.toLowerCase())
+      );
+      if (match) return match.VpcEndpointId;
+    }
+    return initialEndpoints.length > 0 ? initialEndpoints[0].VpcEndpointId : null;
+  });
   const [activeTab, setActiveTab] = useState<"details" | "routes_subnets" | "tags">("details");
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -80,7 +95,7 @@ export default function EndpointsClient({ initialEndpoints, vpcs, routeTables, s
       const res = await createVpcEndpointAction({
         serviceName: selectedService.name,
         vpcId: selectedVpcId,
-        endpointType: selectedService.type as "Gateway" | "Interface",
+        vpcEndpointType: selectedService.type as "Gateway" | "Interface",
         routeTableIds: selectedService.type === "Gateway" ? selectedRouteTableIds : undefined,
         subnetIds: selectedService.type === "Interface" ? selectedSubnetIds : undefined,
         name: endpointName.trim() || undefined,

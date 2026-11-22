@@ -57,7 +57,7 @@ export default function ElasticIpsClient({ initialElasticIps }: Props) {
     setMessage(null);
     try {
       const res = await allocateElasticIpAction({
-        tag: tagValue.trim() || undefined,
+        tags: tagValue.trim() ? { Name: tagValue.trim() } : undefined,
       });
       if (res.success && res.allocationId) {
         setIsAllocateModalOpen(false);

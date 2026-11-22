@@ -874,7 +874,7 @@ export async function listInternetGatewaysAction(): Promise<{
       });
 
       const attachment = igw.Attachments?.[0];
-      const isAttached = attachment && attachment.State === "available";
+      const isAttached = attachment && (attachment.State === "attached" || (attachment.State as string) === "available");
 
       return {
         InternetGatewayId: igw.InternetGatewayId || "",
@@ -978,7 +978,7 @@ export async function listNatGatewaysAction(vpcId?: string): Promise<{
 }> {
   try {
     const filters = vpcId ? [{ Name: "vpc-id", Values: [vpcId] }] : undefined;
-    const res = await ec2.send(new DescribeNatGatewaysCommand({ Filters: filters }));
+    const res = await ec2.send(new DescribeNatGatewaysCommand({ Filter: filters }));
 
     const natGateways: NatGatewayItem[] = (res.NatGateways || [])
       .filter((n) => n.State !== "deleted")
@@ -1016,7 +1016,8 @@ export async function listNatGatewaysAction(vpcId?: string): Promise<{
 
 export async function createNatGatewayAction(data: {
   subnetId: string;
-  allocationId: string;
+  allocationId?: string;
+  connectivityType?: "public" | "private";
   name?: string;
   tags?: Record<string, string>;
 }): Promise<{ success: boolean; natGatewayId?: string; error?: string }> {
@@ -1032,7 +1033,8 @@ export async function createNatGatewayAction(data: {
     const res = await ec2.send(
       new CreateNatGatewayCommand({
         SubnetId: data.subnetId,
-        AllocationId: data.allocationId,
+        AllocationId: data.allocationId || undefined,
+        ConnectivityType: data.connectivityType,
         TagSpecifications: tagList.length > 0 ? [{ ResourceType: "natgateway", Tags: tagList }] : undefined,
       })
     );
@@ -1657,6 +1659,7 @@ export async function listDhcpOptionsAction(): Promise<{
 }
 
 export async function createDhcpOptionsAction(data: {
+  name?: string;
   domainName?: string;
   domainNameServers?: string[];
   ntpServers?: string[];
@@ -1675,9 +1678,10 @@ export async function createDhcpOptionsAction(data: {
     }
 
     const tagList: { Key: string; Value: string }[] = [];
+    if (data.name?.trim()) tagList.push({ Key: "Name", Value: data.name.trim() });
     if (data.tags) {
       Object.entries(data.tags).forEach(([k, v]) => {
-        if (k && v) tagList.push({ Key: k, Value: v });
+        if (k && v && k.toLowerCase() !== "name") tagList.push({ Key: k, Value: v });
       });
     }
 
