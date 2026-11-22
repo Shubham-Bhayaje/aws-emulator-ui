@@ -12,6 +12,9 @@ const execAsync = promisify(exec);
 
 // Determine proper docker command prefix depending on host OS
 function getDockerPrefix(): string {
+  if (process.env.DOCKER_CMD) {
+    return process.env.DOCKER_CMD;
+  }
   if (process.platform === "win32") {
     return "wsl -e docker";
   }
@@ -100,7 +103,7 @@ export async function ensureInstanceContainer(instance: {
         const detected = await getContainerUserAndHome(containerName, prefix);
         if (detected.user === "ubuntu") {
           execAsync(
-            `${prefix} exec -u root ${containerName} bash -c "if [ -z \\"\\$(ls -A /var/lib/apt/lists 2>/dev/null)\\" ]; then apt-get update -qq; fi" 2>/dev/null || true`
+            `${prefix} exec -u root ${containerName} bash -c "if ! ls /var/lib/apt/lists/*_Packages >/dev/null 2>&1; then apt-get update -qq; fi" 2>/dev/null || true`
           ).catch(() => {});
         }
         return {
@@ -115,6 +118,11 @@ export async function ensureInstanceContainer(instance: {
       // If it exists but stopped, start it
       await execAsync(`${prefix} start ${containerName}`);
       const detected = await getContainerUserAndHome(containerName, prefix);
+      if (detected.user === "ubuntu") {
+        execAsync(
+          `${prefix} exec -u root ${containerName} bash -c "if ! ls /var/lib/apt/lists/*_Packages >/dev/null 2>&1; then apt-get update -qq; fi" 2>/dev/null || true`
+        ).catch(() => {});
+      }
       return {
         success: true,
         containerName,
@@ -136,6 +144,12 @@ export async function ensureInstanceContainer(instance: {
         );
       } catch {
         /* ignore */
+      }
+
+      if (user === "ubuntu") {
+        execAsync(
+          `${prefix} exec -u root ${containerName} bash -c "if ! ls /var/lib/apt/lists/*_Packages >/dev/null 2>&1; then apt-get update -qq; fi" 2>/dev/null || true`
+        ).catch(() => {});
       }
 
       return {

@@ -89,7 +89,7 @@ Welcome to Ubuntu 24.04 LTS (GNU/Linux 6.8.0-generic x86_64)
   Instance ID:           ${instance.id}
   Real Container:        ec2-instance-${instance.id.toLowerCase().replace(/[^a-z0-9_-]/g, "-")} (Full Ubuntu 24.04 LTS)
 
-Pre-installed utilities: sudo (passwordless), apt, python3, pip, gcc, make, curl, wget, git, vim, nano, htop
+Pre-installed utilities: sudo (passwordless), apt, python3, pip, gcc, make, curl, wget, git, vim, nano, htop, nginx, fish, tmux, zsh, tree
 Type 'help' to view available system commands.
 `
       : `

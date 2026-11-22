@@ -39,11 +39,48 @@ The official [AWS Emulator](https://github.com/aws/aws-emulator) provides a fast
 
 ## Quickstart
 
-### 1. Prerequisites
+### One-Command Setup (Recommended)
+
+Run both the AWS Emulator and the AWS Console UI with a single command:
+
+#### Linux / macOS / WSL
+```bash
+./start.sh
+```
+
+#### Windows PowerShell
+```powershell
+.\start.ps1
+```
+
+#### Windows Command Prompt
+```cmd
+start.bat
+```
+
+The launcher automatically:
+1. Verifies that Docker is installed and running (with automatic WSL 2 detection on Windows).
+2. Starts the AWS Emulator (`https://127.0.0.1:9297`) in Docker on port 9297.
+3. Automatically sets up Node dependencies (`npm install` if missing).
+4. Auto-configures self-signed CA certificates and credentials (`NODE_EXTRA_CA_CERTS`).
+5. Launches the Next.js Console UI with Turbopack in ~1 second and automatically opens **http://localhost:3000** in your default browser.
+
+To stop all services:
+```bash
+./stop.sh       # Linux / macOS / WSL
+.\stop.ps1      # Windows PowerShell
+stop.bat        # Windows CMD
+```
+
+---
+
+### Manual Setup (Development Mode)
+
+#### 1. Prerequisites
 - **Docker Desktop** (Windows / macOS) or **Docker Engine** (Linux / WSL)
 - **Node.js** (v20+ recommended) and **npm**
 
-### 2. Start the AWS Emulator
+#### 2. Start the AWS Emulator
 Run the official emulator on port `9297`:
 
 ```bash
@@ -55,7 +92,7 @@ New-Item -ItemType Directory -Force "$env:USERPROFILE\.aws\emulator"
 docker run -d --rm -p 127.0.0.1:9297:9297 -v "$env:USERPROFILE\.aws\emulator:/home/emulator/.aws/emulator" aws-emulator -p 9297 --telemetry off
 ```
 
-### 3. Launch the Console UI
+#### 3. Launch the Console UI
 ```bash
 git clone https://github.com/Shubham-Bhayaje/aws-emulator-ui.git
 cd aws-emulator-ui
@@ -1011,6 +1048,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 - **2026-11-22** - **AWS Transit Gateway**: Full implementation of AWS Transit Gateway Management Console with Transit Gateways inventory (`/vpc/transit-gateways`) and details (`/vpc/transit-gateways/[id]`), Create Transit Gateway wizard (`/vpc/transit-gateways/create`) with Amazon-side ASN (default 64512), VPN ECMP, DNS support, multicast, and CIDR blocks; Transit Gateway Attachments manager (`/vpc/transit-gateway-attachments`), Create VPC attachment wizard (`/vpc/transit-gateway-attachments/create`) with per-AZ subnet selection and appliance mode support, attachment details view (`/vpc/transit-gateway-attachments/[id]`); Transit Gateway Route Tables manager (`/vpc/transit-gateway-route-tables`), Create route table wizard (`/vpc/transit-gateway-route-tables/create`), route table details view (`/vpc/transit-gateway-route-tables/[id]`) with Associations tab (`AssociateTransitGatewayRouteTable`), Propagations tab (`EnableTransitGatewayRouteTablePropagation`, `DisableTransitGatewayRouteTablePropagation`), and Routes tab (`CreateTransitGatewayRoute`, blackhole routes, `SearchTransitGatewayRoutes`); full integration into Amazon VPC Route Tables (`/vpc/route-tables/[id]`) with Transit Gateway target selector; top-level redirect `/transit-gateway` -> `/vpc/transit-gateways`; learner guide (`docs/TRANSIT_GATEWAY.md`); and Action Support Matrix audit.
 
+- **2026-11-22** - **One-Command Containerized Setup**: Multi-stage production container build for Next.js console UI (`Dockerfile`), unified Docker Compose orchestration (`docker-compose.yml`) linking official AWS Emulator (`aws-emulator`) with the web console (`console-ui`) over a shared CA certificate volume, Docker-outside-of-Docker socket mount for running simulated Ubuntu 24.04 and Amazon Linux 2023 EC2 instances, cross-platform one-command launcher scripts (`start.sh`, `start.ps1`, `start.bat`) with automatic browser launch, graceful teardown scripts (`stop.sh`, `stop.ps1`, `stop.bat`), and lightweight container healthcheck endpoint (`/api/health`).
 - **2026-11-22** - **Amazon Virtual Private Cloud (VPC)**: Full implementation of Amazon VPC Management Console with VPC Dashboard featuring 11 live resource metric cards; Your VPCs inventory with "VPC only" and "VPC and more" visual multi-tier architecture generator, secondary IPv4 CIDR blocks, DNS hostnames and DNS resolution toggles, and smooth 90-degree orthogonal fillet SVG Resource Map with direct deep-link navigation; dedicated Subnet Detail page (`/vpc/subnets/[subnetId]`) featuring 5 interactive tabs (Details attribute grid with ARN and owner, Route table with inline association editor, Network ACL firewall rules, Subnet resource flow map, and Tags); dedicated Route Table Detail page (`/vpc/route-tables/[routeTableId]`) featuring 5 interactive tabs (Routes manager with Add/Remove route modals, Subnet associations with explicit association checklist and main fallback tables, Details, Edge associations, and Tags); Subnets manager across multiple Availability Zones with auto-assign public IPv4 address toggling; Route Tables manager with Routes tab (local, Internet Gateway, NAT Gateway targets) and explicit Subnet Associations tab; Internet Gateways manager with one-click VPC attach and detach workflows; NAT Gateways manager with Public and Private connectivity types, elastic IP allocation selection, and instant Elastic IP allocation shortcut; Security Groups manager with stateful inbound/outbound firewall rules editor (HTTP, HTTPS, SSH, custom TCP/UDP) and delete rule actions; Network ACLs manager with stateless numbered rules evaluation (ALLOW/DENY actions) and subnet associations; Elastic IP Addresses manager with allocate, associate, disassociate, and release lifecycles; VPC Endpoints manager supporting Gateway endpoints (Amazon S3, Amazon DynamoDB) with automatic route table insertion and Interface endpoints (AWS PrivateLink) with subnet ENI selection; Peering Connections manager with inter-VPC connection requests, accept request, and reject request actions; DHCP Option Sets manager with custom domain name, DNS servers (AmazonProvidedDNS), and VPC association workflows; comprehensive learner documentation (`docs/VPC.md`); and Action Support Matrix audit.
 
 - **2026-11-22** - **AWS Resource Explorer**: Full implementation of AWS Resource Explorer (Resource Explorer 2) Management Console with Resource Search page featuring interactive search bar, syntax guide, quick filter chips for popular services (`s3`, `dynamodb`, `sns`, `sqs`, `kms`, `ec2`, `lambda`, `iam`), view selector, matching resources table with deep links and quick ARN copy; Views manager with default indicator badges, create view wizard with custom query filters and tag inclusion toggle, view details view with inline filter expression editor; Settings page with regional index status, aggregator promotion/demotion, turn off/on index, and default view configuration; timestamp normalization client middleware resolving Smithy RFC-3339 deserialization edge cases; comprehensive learner documentation (`docs/Resource Explorer.md`); and Action Support Matrix audit.

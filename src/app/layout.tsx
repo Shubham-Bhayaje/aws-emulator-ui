@@ -17,6 +17,8 @@ const inter = Inter({
   display: "swap",
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Mini AWS Console",
   description: "A local AWS console for the AWS Emulator",
@@ -31,13 +33,15 @@ export default async function RootLayout({
   let userName = "emulator";
   const region = process.env.AWS_REGION || "us-east-1";
 
-  try {
-    const res = await sts.send(new GetCallerIdentityCommand({}));
-    accountId = res.Account ?? accountId;
-    const arnParts = (res.Arn ?? "").split("/");
-    userName = arnParts[arnParts.length - 1] || userName;
-  } catch {
-    // Use defaults if STS fails
+  if (process.env.BUILDING !== "true") {
+    try {
+      const res = await sts.send(new GetCallerIdentityCommand({}));
+      accountId = res.Account ?? accountId;
+      const arnParts = (res.Arn ?? "").split("/");
+      userName = arnParts[arnParts.length - 1] || userName;
+    } catch {
+      // Use defaults if STS fails
+    }
   }
 
   // Load the active identity from session cookies

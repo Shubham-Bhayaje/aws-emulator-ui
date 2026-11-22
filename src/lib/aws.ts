@@ -57,13 +57,20 @@ import https from "https";
 import { Readable } from "stream";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
-const ENDPOINT = "https://127.0.0.1:9297";
+const ENDPOINT = process.env.AWS_ENDPOINT_URL || process.env.EMULATOR_ENDPOINT || "https://127.0.0.1:9297";
 const DEFAULT_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1";
+
+let endpointHostname = "localhost";
+try {
+  endpointHostname = new URL(ENDPOINT).hostname;
+} catch {
+  endpointHostname = "localhost";
+}
 
 // --- EC2 / VPC ---
 const ec2HttpsAgent = new https.Agent({
   rejectUnauthorized: false,
-  servername: "localhost",
+  servername: endpointHostname,
 });
 
 export const ec2 = new EC2Client({
