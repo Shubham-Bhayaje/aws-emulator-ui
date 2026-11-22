@@ -13,6 +13,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Directory Service](Directory%20Service.md): Set up and manage Microsoft Active Directory, Simple AD, and AD Connector in the cloud, configure Access URL aliases, enable Single Sign-On (SSO), take point-in-time snapshots, reset domain admin credentials, and inspect trust relationships.
 - [AWS Key Management Service (KMS)](KMS.md): Create and manage customer keys, inspect AWS managed keys, configure key policies, toggle annual rotation, and test live encryption/decryption in the playground.
 - [AWS Private Certificate Authority (Private CA)](Private%20CA.md): Create and manage private root and subordinate certificate authorities, generate and export CSRs, install CA certificates, issue and revoke private X.509 certificates with standard templates, configure S3 CRL revocation, and manage soft-deletion retention windows.
+- [AWS Resource Explorer](Resource%20Explorer.md): Resource search and discovery service across AWS Regions. Create and configure regional and aggregator indexes, define custom views with fine-grained filter expressions, toggle tag inclusion, set default views, and execute rapid searches across cloud resources.
 - [AWS Secrets Manager](Secrets%20Manager.md): Store, retrieve, update, and manage sensitive credentials and API keys with KMS encryption at rest, version staging labels (AWSCURRENT, AWSPREVIOUS), resource permissions, and scheduled recovery windows.
 - [AWS Systems Manager Parameter Store](SSM%20Parameter%20Store.md): Secure, hierarchical storage for configuration data management and secrets management with KMS encryption (SecureString), version history tracking, version staging labels, and resource tagging.
 - [Amazon CloudWatch Logs](CloudWatch%20Logs.md): Centralized logging service, log groups and streams management, retention policies, live tail streaming terminal, filter and search engine, metric filters to numerical metrics, and real-time subscription filters into Amazon Kinesis and AWS Lambda.
@@ -72,6 +73,8 @@ The following table tracks inter-service integrations that are waiting on future
 | Route 53 Health Checks | AWS Cloud Map | Route 53 active endpoint health check monitoring for registered service instances | Connect Route 53 health checking when Route 53 Health Checks is built |
 | Amazon ECS | AWS Cloud Map | Automated ECS service discovery registration and deregistration for task container instances | Connect ECS service discovery when Amazon ECS is built |
 | AWS App Mesh | AWS Cloud Map | Service discovery provider integration for virtual nodes and proxy routing | Connect App Mesh service discovery provider when AWS App Mesh is built |
+| AWS Organizations | AWS Resource Explorer | Organization-wide multi-account resource search views | Connect multi-account search views when AWS Organizations cross-account indexing is built |
+| AWS CloudTrail | AWS Resource Explorer | Audit logging of search queries and view modifications | Connect CloudTrail log trails when AWS CloudTrail is built |
 
 ---
 

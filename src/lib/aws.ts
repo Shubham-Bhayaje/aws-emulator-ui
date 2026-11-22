@@ -49,8 +49,10 @@ import { AppConfigClient } from "@aws-sdk/client-appconfig";
 import { AppConfigDataClient } from "@aws-sdk/client-appconfigdata";
 import { LocationClient } from "@aws-sdk/client-location";
 import { ServiceDiscoveryClient } from "@aws-sdk/client-servicediscovery";
+import { ResourceExplorer2Client } from "@aws-sdk/client-resource-explorer-2";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import https from "https";
+import { Readable } from "stream";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -321,6 +323,67 @@ serviceDiscovery.middlewareStack.add(
     priority: "low",
   }
 );
+
+// --- AWS Resource Explorer (Resource Explorer 2) ---
+const resourceExplorerHttpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+  servername: "localhost",
+});
+
+export const resourceExplorer = new ResourceExplorer2Client({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
+  },
+  requestHandler: new NodeHttpHandler({ httpsAgent: resourceExplorerHttpsAgent }),
+});
+
+// Middleware to normalize numeric or bigDecimal LastUpdatedAt / CreatedAt / LastReportedAt timestamps
+// to ISO-8601 strings so that Smithy's RFC-3339 deserializer parses them cleanly
+resourceExplorer.middlewareStack.add(
+  (next) => async (args: any) => {
+    const result: any = await next(args);
+    const response: any = result?.response;
+    if (response && response.body && typeof response.body.on === "function") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of response.body) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      }
+      let rawText = Buffer.concat(chunks).toString("utf-8");
+
+      // 1. Handle bigDecimal object format: {"string": "1795328675.342319574", "type": "bigDecimal"}
+      rawText = rawText.replace(
+        /"(LastReportedAt|LastUpdatedAt|CreatedAt)":\s*\{\s*"string":\s*"([^"]+)",\s*"type":\s*"bigDecimal"\s*\}/g,
+        (_match, key, strVal) => {
+          const sec = parseFloat(strVal);
+          const dateStr = !isNaN(sec) ? new Date(sec * 1000).toISOString() : new Date().toISOString();
+          return `"${key}": "${dateStr}"`;
+        }
+      );
+
+      // 2. Handle numeric timestamp format: 1795328667.9542675
+      rawText = rawText.replace(
+        /"(LastReportedAt|LastUpdatedAt|CreatedAt)":\s*(\d+(?:\.\d+)?)/g,
+        (_match, key, num) => {
+          const dateStr = new Date(parseFloat(num) * 1000).toISOString();
+          return `"${key}": "${dateStr}"`;
+        }
+      );
+
+      response.body = Readable.from([Buffer.from(rawText, "utf-8")]);
+    }
+    return result;
+  },
+  {
+    step: "deserialize",
+    name: "normalizeResourceExplorerTimestamps",
+    priority: "low",
+  }
+);
+
+
 
 
 

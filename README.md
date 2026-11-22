@@ -96,6 +96,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | **Amazon SQS** | Application Integration | Built | [SQS Guide](docs/SQS.md) | 2026-11-21 |
 | **AWS IAM** | Security, Identity, & Compliance | Built | [Console](docs/README.md) | Initial |
 | **AWS Resource Access Manager (RAM)** | Security, Identity, & Compliance | Built | [Console](docs/README.md) | 2026-11-20 |
+| **AWS Resource Explorer** | Management & Governance | Built | [Resource Explorer Guide](docs/Resource%20Explorer.md) | 2026-11-22 |
 | **AWS Resource Groups & Tag Editor** | Management & Governance | Built | [Resource Groups Guide](docs/Resource%20Groups%20Tagging%20API.md) | 2026-11-20 |
 | **AWS Service Quotas** | Management & Governance | Built | [Service Quotas Guide](docs/Service%20Quotas.md) | 2026-11-20 |
 
@@ -142,6 +143,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
   - **AWS Systems Manager Parameter Store**: Secure, hierarchical storage for configuration data and secrets, multi-tier support (Standard vs Advanced), String/StringList/SecureString data types, KMS encryption with live reveal/decrypt controls, full version history with staging labels, tags management, and bulk deletion.
   - **AWS Account Management**: Display name, primary/alternate contacts, 32-region opt-in manager, account closure checklist.
   - **AWS Resource Groups & Tag Editor**: Global multi-service resource discovery, bulk tagging/untagging with diff review, tag autocompletion, query-based resource groups.
+  - **AWS Resource Explorer**: Fast, multi-region resource search and discovery service matching AWS Resource Explorer (Resource Explorer 2), Resource Search page with interactive query search bar and syntax guide, quick filter chips for popular services (s3, dynamodb, sns, sqs, kms, ec2, lambda, iam), view selector, matching resources inventory with deep-link navigation and quick ARN copy, Views management table with default indicator and deletion safety modal, Create View wizard with custom filter expressions and tag inclusion toggle, View Details view with inline filter and tag editing, and Settings page for regional and aggregator index management and default view assignment.
   - **AWS Service Quotas**: 200+ services catalog, default vs applied comparison, quota increase requests, org templates.
 
 - **Platform Tools & User Experience**:
@@ -774,6 +776,29 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | `UpdateInstanceCustomHealthStatus` | `servicediscovery:UpdateInstanceCustomHealthStatus` | Supported | One-click Set Healthy and Set Unhealthy actions on instances table |
 | `GetInstancesHealthStatus` | `servicediscovery:GetInstancesHealthStatus` | Supported | Real-time health badges in instances inventory table |
 
+### AWS Resource Explorer (Resource Explorer 2)
+| Action / Capability | Underlying CLI / Endpoint | Support Status | Console Implementation |
+| :--- | :--- | :--- | :--- |
+| `Search` | `resource-explorer-2:Search` | Supported | Interactive search bar and matching resources table on `/resource-explorer` |
+| `ListViews` | `resource-explorer-2:ListViews` | Supported | Views inventory table on `/resource-explorer/views` and view selector |
+| `GetView` | `resource-explorer-2:GetView` | Supported | View details view and filter editor on `/resource-explorer/views/[viewName]` |
+| `BatchGetView` | `resource-explorer-2:BatchGetView` | Supported | View metadata retrieval across inventory table and view details |
+| `CreateView` | `resource-explorer-2:CreateView` | Supported | Create view wizard on `/resource-explorer/views/create` |
+| `UpdateView` | `resource-explorer-2:UpdateView` | Supported | Inline filter expression and tags toggle editor on view details |
+| `DeleteView` | `resource-explorer-2:DeleteView` | Supported | Delete view confirmation modal on views table and view details |
+| `GetDefaultView` | `resource-explorer-2:GetDefaultView` | Supported | Default view indicator on search page, views table, and settings |
+| `AssociateDefaultView` | `resource-explorer-2:AssociateDefaultView` | Supported | Set as default view button on views table, view details, and settings |
+| `DisassociateDefaultView` | `resource-explorer-2:DisassociateDefaultView` | Supported | Remove default view button on views table, view details, and settings |
+| `GetIndex` | `resource-explorer-2:GetIndex` | Supported | Regional index state and type card on `/resource-explorer/settings` |
+| `ListIndexes` | `resource-explorer-2:ListIndexes` | Supported | Regional indexes list and status badges on `/resource-explorer/settings` |
+| `CreateIndex` | `resource-explorer-2:CreateIndex` | Supported | Turn on index in current Region action and Quick Setup wizard |
+| `DeleteIndex` | `resource-explorer-2:DeleteIndex` | Supported | Turn off index action on `/resource-explorer/settings` |
+| `UpdateIndexType` | `resource-explorer-2:UpdateIndexType` | Supported | Promote to Aggregator index / switch to Local index actions |
+| `ListTagsForResource` | `resource-explorer-2:ListTagsForResource` | Supported | Tag retrieval for views and indexed resources |
+| `TagResource` | `resource-explorer-2:TagResource` | Supported | Resource tags editor on Create View wizard |
+| `ListSupportedResourceTypes` | `resource-explorer-2:ListSupportedResourceTypes` | Unsupported (Emulator) | Graceful fallback in console filter suggestions |
+| `GetAccountLevelServiceConfiguration` | `resource-explorer-2:GetAccountLevelServiceConfiguration` | Unsupported (Emulator) | Graceful fallback in settings view |
+
 
 </details>
 
@@ -804,6 +829,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 ## Changelog
 
+- **2026-11-22** - **AWS Resource Explorer**: Full implementation of AWS Resource Explorer (Resource Explorer 2) Management Console with Resource Search page featuring interactive search bar, syntax guide, quick filter chips for popular services (`s3`, `dynamodb`, `sns`, `sqs`, `kms`, `ec2`, `lambda`, `iam`), view selector, matching resources table with deep links and quick ARN copy; Views manager with default indicator badges, create view wizard with custom query filters and tag inclusion toggle, view details view with inline filter expression editor; Settings page with regional index status, aggregator promotion/demotion, turn off/on index, and default view configuration; timestamp normalization client middleware resolving Smithy RFC-3339 deserialization edge cases; comprehensive learner documentation (`docs/Resource Explorer.md`); and Action Support Matrix audit.
 - **2026-11-22** - **AWS Cloud Map**: Full implementation of AWS Cloud Map (Service Discovery) Management Console with resource overview dashboard and real-time inventory counts (Namespaces, Services, Registered Instances); Namespaces manager with type filtering (HTTP, Private DNS, Public DNS), Create Namespace wizard supporting HTTP namespaces (API-only discovery), Private DNS namespaces with dynamic Amazon VPC association from EC2, and Public DNS namespaces, namespace detail view with managed Route 53 hosted zone indicators and child services table; Services manager with parent namespace filtering, Create Service wizard with routing policies (Multivalue Answer vs Weighted routing), DNS record types (`A`, `AAAA`, `SRV`, `CNAME` with custom TTL), and custom health check failure threshold; comprehensive Service detail view with Registered Instances management (IPv4, Port, and custom key-value attributes), one-click custom health status toggle (`Set Healthy` / `Set Unhealthy`), and interactive Discover Instances (API Playground) executing live `DiscoverInstances` queries with attribute filtering against the AWS emulator; comprehensive learner documentation (`docs/Cloud Map.md`); and Action Support Matrix audit.
 - **2026-11-22** - **Amazon Location Service**: Full implementation of Amazon Location Service Management Console with resource overview dashboard and real-time inventory counts (Maps, Trackers, Geofence Collections, Route Calculators, Place Indexes, API Keys); Maps manager with vector and raster basemap styles from Esri, HERE, and Open Data, Create Map wizard with visual style selector cards, Map detail view featuring an interactive SVG/Canvas viewport simulation with pan/zoom controls and MapLibre GL JS embed code generator; Trackers manager with position filtering strategies (Time-based, Distance-based, Accuracy-based) and KMS encryption, Tracker detail view with live device position ingestion simulator (BatchUpdateDevicePosition) and consumer geofence collection linking; Geofence Collections manager with Circle and Polygon boundary support (PutGeofence) and interactive perimeter coordinate validation; Route Calculators with road network providers (Esri, HERE) and route calculation playground; Place Indexes view with emulator compatibility status banner; API Keys view; comprehensive learner documentation (`docs/Location Service.md`); and Action Support Matrix audit.
 - **2026-11-22** - **AWS AppConfig**: Full implementation of AWS AppConfig Management Console with Applications inventory, metric cards, Create application wizard, Application details view with Environments and Configuration profiles & feature flags tabs; Environments manager with CloudWatch alarm monitors; Configuration profiles manager supporting Feature Flags (`AWS.AppConfig.FeatureFlags`) with interactive table toggle switch and JSON schema editor, and Freeform profiles (`AWS.Freeform`) with live SSM Parameter Store, Secrets Manager, and Amazon S3 source selectors; Hosted configuration versions management with immutable revisions and payload viewer; Deployment strategies manager with predefined AWS strategies (`AllAtOnce`, `Linear50PercentEvery30Seconds`, `Canary10Percent20Minutes`, `Linear20PercentEvery6Minutes`) and custom strategy creator (linear/exponential growth, duration, bake time, and SSM document replication); Deployments manager with deployment status tracking, progress indicators, and rollback stop-deployment actions; Interactive client test playground powered by `@aws-sdk/client-appconfigdata` (`StartConfigurationSession` + `GetLatestConfiguration`) fetching live evaluated configuration payloads; Extensions view with Lambda integration notices; Account settings encryption view; learner guide (`docs/AppConfig.md`); and Action Support Matrix audit.

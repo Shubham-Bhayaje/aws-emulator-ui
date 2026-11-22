@@ -70,6 +70,11 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "aws-cloud-map",
   "servicediscovery",
   "service-discovery",
+  "resource-explorer",
+  "resource-explorer-2",
+  "resourceexplorer",
+  "resourceexplorer2",
+  "aws-resource-explorer",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
@@ -78,6 +83,8 @@ export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
   if (clean === "cloudmap" || clean.startsWith("cloudmap/")) return true;
   if (clean === "servicediscovery" || clean.startsWith("servicediscovery/")) return true;
+  if (clean === "resource-explorer" || clean.startsWith("resource-explorer/")) return true;
+  if (clean === "resource-explorer-2" || clean.startsWith("resource-explorer-2/")) return true;
   if (clean === "location" || clean.startsWith("location/")) return true;
   if (clean === "appconfig" || clean.startsWith("appconfig/")) return true;
   if (clean === "ecr" || clean.startsWith("ecr/")) return true;
@@ -890,6 +897,17 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "status": "functional",
     "desc": "Quickly and safely deploy application configuration and feature flags across applications and environments",
     "aliases": ["appconfig", "app config", "feature flags", "feature flag", "configuration profiles", "deployment strategy", "application configuration"]
+  },
+  {
+    "id": "resource-explorer",
+    "name": "AWS Resource Explorer",
+    "shortName": "Resource Explorer",
+    "href": "/resource-explorer",
+    "category": "Management & Governance",
+    "color": "#C925D1",
+    "status": "functional",
+    "desc": "Search and discover your AWS resources across Regions using custom views and query filters",
+    "aliases": ["resource explorer", "resource-explorer", "resourceexplorer", "resource search", "search resources", "find resources", "tag search", "resource-explorer-2"]
   },
   {
     "id": "systems-manager",
