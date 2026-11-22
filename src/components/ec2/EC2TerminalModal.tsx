@@ -753,7 +753,7 @@ Type 'help' to view available system commands.
                 <span>Terminal: xterm-256color</span>
                 <span>Host: {promptHost}</span>
                 <span>Container: {containerName || "initializing"}</span>
-                <span>User: ec2-user (sudo)</span>
+                <span>User: {currentUser} (sudo)</span>
               </div>
               <div>Press Enter to execute • Up/Down for command history</div>
             </div>

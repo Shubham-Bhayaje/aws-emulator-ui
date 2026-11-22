@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { getResolverEndpointDetailAction } from "../resolver-actions";
+import { getResolverEndpointDetailAction } from "../../resolver-actions";
 import ResolverEndpointDetailClient from "./ResolverEndpointDetailClient";
 
 export const dynamic = "force-dynamic";

@@ -98,6 +98,11 @@ export async function ensureInstanceContainer(instance: {
       const { stdout } = await execAsync(inspectCmd);
       if (stdout.trim() === "true") {
         const detected = await getContainerUserAndHome(containerName, prefix);
+        if (detected.user === "ubuntu") {
+          execAsync(
+            `${prefix} exec -u root ${containerName} bash -c "if [ -z \\"\\$(ls -A /var/lib/apt/lists 2>/dev/null)\\" ]; then apt-get update -qq; fi" 2>/dev/null || true`
+          ).catch(() => {});
+        }
         return {
           success: true,
           containerName,
