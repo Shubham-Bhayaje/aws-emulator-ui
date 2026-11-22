@@ -16,6 +16,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Resource Explorer](Resource%20Explorer.md): Resource search and discovery service across AWS Regions. Create and configure regional and aggregator indexes, define custom views with fine-grained filter expressions, toggle tag inclusion, set default views, and execute rapid searches across cloud resources.
 - [AWS Secrets Manager](Secrets%20Manager.md): Store, retrieve, update, and manage sensitive credentials and API keys with KMS encryption at rest, version staging labels (AWSCURRENT, AWSPREVIOUS), resource permissions, and scheduled recovery windows.
 - [AWS Systems Manager Parameter Store](SSM%20Parameter%20Store.md): Secure, hierarchical storage for configuration data management and secrets management with KMS encryption (SecureString), version history tracking, version staging labels, and resource tagging.
+- [AWS Transit Gateway](TRANSIT_GATEWAY.md): Centralized regional network transit hub interconnecting Amazon VPCs and on-premises networks. Configure transit gateways, VPC attachments with per-AZ subnets, transit gateway route tables, associations, dynamic propagations, static and blackhole routes, and VPC route table routing targets.
 - [Amazon CloudWatch Logs](CloudWatch%20Logs.md): Centralized logging service, log groups and streams management, retention policies, live tail streaming terminal, filter and search engine, metric filters to numerical metrics, and real-time subscription filters into Amazon Kinesis and AWS Lambda.
 - [Amazon Elastic Container Registry (ECR)](ECR.md): Fully managed Docker container registry, private and public repositories, image tags immutability, automated vulnerability scanning on push, repository resource policies, automated image lifecycle cleanup policies, push commands for Docker CLI, and pull through cache rules.
 - [Amazon Location Service](Location%20Service.md): Fully managed geospatial service for interactive maps (Esri, HERE, Open Data), asset and IoT device position tracking with filtering, virtual geofence boundaries (Circle, Polygon) with EventBridge alerts, turn-by-turn route calculators, place indexes, and API keys.
@@ -77,7 +78,9 @@ The following table tracks inter-service integrations that are waiting on future
 | AWS Organizations | AWS Resource Explorer | Organization-wide multi-account resource search views | Connect multi-account search views when AWS Organizations cross-account indexing is built |
 | AWS CloudTrail | AWS Resource Explorer | Audit logging of search queries and view modifications | Connect CloudTrail log trails when AWS CloudTrail is built |
 | Amazon Route 53 | Amazon VPC | Private hosted zone VPC association | Connect Route 53 private hosted zones when Amazon Route 53 is built |
-| AWS Transit Gateway | Amazon VPC | Transit Gateway attachments and VPC route table targets | Connect Transit Gateway when AWS Transit Gateway is built |
+| AWS Transit Gateway | Amazon VPC | Transit Gateway attachments and VPC route table targets | Connected live Transit Gateway attachments and VPC route table targets |
+| AWS Site-to-Site VPN | AWS Transit Gateway | VPN attachments to Transit Gateway hub | Connect VPN attachments when AWS Site-to-Site VPN is built |
+| AWS Direct Connect | AWS Transit Gateway | Direct Connect gateway attachments to Transit Gateway hub | Connect Direct Connect gateway attachments when AWS Direct Connect is built |
 | AWS Network Firewall | Amazon VPC | Firewall endpoints and subnet routing rules | Connect Network Firewall when AWS Network Firewall is built |
 | AWS Client VPN | Amazon VPC | Client VPN endpoint subnet associations | Connect Client VPN when AWS Client VPN is built |
 

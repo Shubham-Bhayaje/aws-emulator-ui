@@ -928,6 +928,7 @@ export async function createRouteAction(data: {
   destinationCidrBlock: string;
   gatewayId?: string;
   natGatewayId?: string;
+  transitGatewayId?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     await ec2.send(
@@ -936,6 +937,7 @@ export async function createRouteAction(data: {
         DestinationCidrBlock: data.destinationCidrBlock,
         GatewayId: data.gatewayId,
         NatGatewayId: data.natGatewayId,
+        TransitGatewayId: data.transitGatewayId,
       })
     );
     return { success: true };

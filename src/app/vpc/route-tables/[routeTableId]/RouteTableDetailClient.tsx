@@ -16,6 +16,7 @@ import {
   disassociateRouteTableAction,
   deleteRouteTableAction,
 } from "../../actions";
+import { TransitGatewayItem } from "../../transit-gateway-actions";
 
 interface Props {
   routeTable: RouteTableItem;
@@ -25,6 +26,7 @@ interface Props {
   internetGateways: InternetGatewayItem[];
   natGateways: NatGatewayItem[];
   endpoints: VpcEndpointItem[];
+  transitGateways?: TransitGatewayItem[];
   vpc?: VpcItem;
 }
 
@@ -36,6 +38,7 @@ export default function RouteTableDetailClient({
   internetGateways,
   natGateways,
   endpoints,
+  transitGateways = [],
   vpc,
 }: Props) {
   const router = useRouter();
@@ -54,7 +57,7 @@ export default function RouteTableDetailClient({
   // Add Route Modal
   const [isAddRouteOpen, setIsAddRouteOpen] = useState(false);
   const [routeDestination, setRouteDestination] = useState("");
-  const [targetType, setTargetType] = useState<"igw" | "nat" | "vpce">("igw");
+  const [targetType, setTargetType] = useState<"igw" | "nat" | "vpce" | "tgw">("igw");
   const [targetId, setTargetId] = useState(internetGateways.length > 0 ? internetGateways[0].InternetGatewayId : "");
 
   // Edit Subnet Associations Modal
@@ -81,6 +84,7 @@ export default function RouteTableDetailClient({
         destinationCidrBlock: routeDestination.trim(),
         gatewayId: targetType === "igw" || targetType === "vpce" ? targetId : undefined,
         natGatewayId: targetType === "nat" ? targetId : undefined,
+        transitGatewayId: targetType === "tgw" ? targetId : undefined,
       });
 
       if (res.success) {
@@ -92,6 +96,7 @@ export default function RouteTableDetailClient({
               DestinationCidrBlock: routeDestination.trim(),
               GatewayId: targetType === "igw" || targetType === "vpce" ? targetId : undefined,
               NatGatewayId: targetType === "nat" ? targetId : undefined,
+              TransitGatewayId: targetType === "tgw" ? targetId : undefined,
               State: "active",
               Origin: "CreateRoute",
             },
@@ -446,6 +451,10 @@ export default function RouteTableDetailClient({
                           <Link href={`/vpc/endpoints?search=${target}`} className="hover:underline">
                             {target}
                           </Link>
+                        ) : target.startsWith("tgw-") ? (
+                          <Link href={`/vpc/transit-gateways/${target}`} className="hover:underline">
+                            {target}
+                          </Link>
                         ) : (
                           <span>{target}</span>
                         )}
@@ -725,6 +734,18 @@ export default function RouteTableDetailClient({
                     />
                     <span>Gateway Endpoint</span>
                   </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="targetType"
+                      checked={targetType === "tgw"}
+                      onChange={() => {
+                        setTargetType("tgw");
+                        setTargetId(transitGateways[0]?.TransitGatewayId || "");
+                      }}
+                    />
+                    <span>Transit Gateway</span>
+                  </label>
                 </div>
               </div>
 
@@ -756,9 +777,16 @@ export default function RouteTableDetailClient({
                         {ep.VpcEndpointId} ({ep.ServiceName.replace("com.amazonaws.us-east-1.", "")})
                       </option>
                     ))}
+                  {targetType === "tgw" &&
+                    transitGateways.map((t) => (
+                      <option key={t.TransitGatewayId} value={t.TransitGatewayId}>
+                        {t.TransitGatewayId} {t.Name ? `(${t.Name})` : ""}
+                      </option>
+                    ))}
                   {((targetType === "igw" && internetGateways.length === 0) ||
                     (targetType === "nat" && natGateways.length === 0) ||
-                    (targetType === "vpce" && endpoints.length === 0)) && (
+                    (targetType === "vpce" && endpoints.length === 0) ||
+                    (targetType === "tgw" && transitGateways.length === 0)) && (
                     <option value="">No targets of this type available</option>
                   )}
                 </select>

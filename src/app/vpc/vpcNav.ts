@@ -20,4 +20,9 @@ export const vpcNav: VpcNavItem[] = [
   // Security
   { label: "Network ACLs", href: "/vpc/network-acls", group: "Security" },
   { label: "Security groups", href: "/vpc/security-groups", group: "Security" },
+
+  // Transit Gateways
+  { label: "Transit gateways", href: "/vpc/transit-gateways", group: "Transit Gateways" },
+  { label: "Transit gateway attachments", href: "/vpc/transit-gateway-attachments", group: "Transit Gateways" },
+  { label: "Transit gateway route tables", href: "/vpc/transit-gateway-route-tables", group: "Transit Gateways" },
 ];
