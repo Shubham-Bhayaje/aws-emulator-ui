@@ -88,6 +88,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | **Amazon Timestream** | Database | Built | [Timestream Guide](docs/Timestream.md) | 2026-11-21 |
 | **Amazon S3** | Storage | Built | [S3 Guide](docs/S3.md) | 2026-11-21 |
 | **Amazon S3 Glacier** | Storage | Built | [S3 Glacier Guide](docs/S3%20Glacier.md) | 2026-11-21 |
+| **Amazon Simple Email Service (SES)** | Business Applications | Built | [SES Guide](docs/SES.md) | 2026-11-22 |
 | **Amazon SNS** | Application Integration | Built | [SNS Guide](docs/SNS.md) | 2026-11-21 |
 | **Amazon SQS** | Application Integration | Built | [SQS Guide](docs/SQS.md) | 2026-11-21 |
 | **AWS IAM** | Security, Identity, & Compliance | Built | [Console](docs/README.md) | Initial |
@@ -110,6 +111,9 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 - **Analytics & Real-Time Streaming**:
   - **Amazon Kinesis Data Streams**: Massively scalable and durable real-time streaming data service, global streams inventory with Region summary metrics (Total Data Streams, Open Shards, On-Demand Streams, Encrypted Streams), name search filter, Create Data Stream wizard with On-demand vs Provisioned capacity modes, interactive shard capacity estimator calculator, data retention period (24 to 8,760 hours / up to 365 days), live KMS customer managed key dropdown, comprehensive stream details with 6 interactive tabs (Configuration, Shards inventory table with hash key ranges, Data viewer with interactive live PutRecord ingestion utility and GetRecords stream browser supporting Trim Horizon / Latest / Sequence Number iterators, Enhanced fan-out consumers registration with dedicated 2 MB/sec throughput per shard, Monitoring with shard-level metrics toggles, and Tags), edit capacity mode and resharding, edit retention period, edit server-side encryption, and integrated DynamoDB streaming destinations.
+
+- **Business Applications & Messaging**:
+  - **Amazon Simple Email Service (SES)**: Fully managed cloud email service, Account dashboard with 24-hour send quota progress bar, sending rate, sandbox/production status banner, deliverability reputation gauges (bounce and complaint rates), Verified identities inventory with type filter (All, Email address, Domain), Create identity wizard with Easy DKIM (RSA 2048-bit) and custom MAIL FROM domain alignment, comprehensive identity details view with 5 interactive tabs (Overview & verification token, Authentication with 3 DKIM CNAME records, Notification topics linking live Amazon SNS topics for Bounces/Complaints/Deliveries, Configuration sets assignment, and Identity policies with JSON editor), Configuration sets inventory and creation wizard, Email templates manager with HTML and plain text editors and live rendered preview modal, Suppression list manager with add/remove actions, SMTP settings with endpoint ports, TLS requirements, and dedicated IAM SMTP credentials generator with standard RFC 2104 HMAC-SHA256 password derivation and CSV download, and Send Test Email utility supporting mailbox simulator scenarios (Success, Hard bounce, Complaint).
 
 - **Containers**:
   - **Amazon Elastic Container Registry (ECR)**: Fully managed Docker and OCI container image registry, global private repositories inventory with Region summary metrics (Total repositories, Immutable tags, Scan on push, KMS encrypted), name search filter, Create repository wizard with visibility settings (Private vs Public), tag immutability toggle (Mutable vs Immutable), automated vulnerability scan on push toggle, KMS customer managed key integration, and resource tags editor, comprehensive repository detail view with 4 interactive tabs (Images table with tag badges, size, push timestamp, scan status, and sha256 digests; Permissions with resource policy JSON editor; Lifecycle policy with automated age and count-based image expiration rules; Tags manager), View Push Commands modal with step-by-step Docker CLI authentication and build/tag/push commands for macOS/Linux and Windows, Public Repositories showcase gallery, and Registry Settings view managing vulnerability scanning configuration and pull through cache rules (Amazon ECR Public, Docker Hub, Quay, GitHub Container Registry).
@@ -635,6 +639,49 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 </details>
 
+<details>
+<summary><strong>Amazon Simple Email Service (SES)</strong> (26/26 operations verified)</summary>
+
+| API Action | CLI Command | Status | Notes |
+| :--- | :--- | :--- | :--- |
+| `ListIdentities` | `aws ses list-identities` | Supported | Verified identities inventory table on `/ses/identities` |
+| `VerifyEmailIdentity` | `aws ses verify-email-identity` | Supported | Email verification action on `/ses/identities/create` |
+| `VerifyDomainIdentity` | `aws ses verify-domain-identity` | Supported | Domain verification and token generation on `/ses/identities/create` |
+| `GetIdentityVerificationAttributes` | `aws ses get-identity-verification-attributes` | Supported | Identity verification status badges and tokens |
+| `GetIdentityDkimAttributes` | `aws ses get-identity-dkim-attributes` | Supported | Easy DKIM status card and 3 CNAME DNS records table |
+| `VerifyDomainDkim` | `aws ses verify-domain-dkim` | Supported | Generate DKIM tokens during domain creation |
+| `SetIdentityDkimEnabled` | `aws ses set-identity-dkim-enabled` | Supported | Enable or disable Easy DKIM signatures |
+| `GetIdentityMailFromDomainAttributes` | `aws ses get-identity-mail-from-domain-attributes` | Supported | Custom MAIL FROM domain status and MX failure behavior |
+| `SetIdentityMailFromDomain` | `aws ses set-identity-mail-from-domain` | Supported | Configure custom MAIL FROM domain and fallback behavior |
+| `GetIdentityNotificationAttributes` | `aws ses get-identity-notification-attributes` | Supported | Notification topics tab on identity details |
+| `SetIdentityNotificationTopic` | `aws ses set-identity-notification-topic` | Supported | Edit notification topics modal linking live Amazon SNS topics |
+| `SetIdentityFeedbackForwardingEnabled` | `aws ses set-identity-feedback-forwarding-enabled` | Supported | Toggle feedback forwarding on identity details |
+| `SetIdentityHeadersInNotificationsEnabled` | `aws ses set-identity-headers-in-notifications-enabled` | Supported | Toggle email headers in bounce notifications |
+| `ListIdentityPolicies` | `aws ses list-identity-policies` | Supported | Identity policies tab policy inventory |
+| `GetIdentityPolicies` | `aws ses get-identity-policies` | Supported | Identity policy JSON viewer on identity details |
+| `PutIdentityPolicy` | `aws ses put-identity-policy` | Supported | Create and edit identity access policy JSON modal |
+| `DeleteIdentityPolicy` | `aws ses delete-identity-policy` | Supported | Delete identity access policy action |
+| `DeleteIdentity` | `aws ses delete-identity` | Supported | Delete identity modal requiring confirmation |
+| `ListConfigurationSets` | `aws ses list-configuration-sets` | Supported | Configuration sets table on `/ses/configuration-sets` |
+| `DescribeConfigurationSet` | `aws ses describe-configuration-set` | Supported | Configuration set details and reputation options |
+| `CreateConfigurationSet` | `aws ses create-configuration-set` | Supported | Create configuration set wizard on `/ses/configuration-sets/create` |
+| `DeleteConfigurationSet` | `aws ses delete-configuration-set` | Supported | Delete configuration set modal |
+| `ListTemplates` | `aws ses list-templates` | Supported | Email templates table on `/ses/templates` |
+| `GetTemplate` | `aws ses get-template` | Supported | Email template preview modal (HTML and text) |
+| `CreateTemplate` | `aws ses create-template` | Supported | Create email template modal with HTML editor |
+| `UpdateTemplate` | `aws ses update-template` | Supported | Edit email template modal |
+| `DeleteTemplate` | `aws ses delete-template` | Supported | Delete email template modal |
+| `GetSendQuota` | `aws ses get-send-quota` | Supported | 24-hour send quota progress bar and max send rate |
+| `GetSendStatistics` | `aws ses get-send-statistics` | Supported | Historical send data points and reputation rate calculation |
+| `SendEmail` | `aws ses send-email` | Supported | Send test email modal with formatted and raw options |
+| `SendTemplatedEmail` | `aws ses send-templated-email` | Supported | Send test email with Mustache template data |
+| `GetAccount (SES v2)` | `aws sesv2 get-account` | Supported | Production access sandbox status and enforcement mode |
+| `ListSuppressedDestinations (SES v2)` | `aws sesv2 list-suppressed-destinations` | Supported | Suppression list table on `/ses/suppression-list` |
+| `PutSuppressedDestination (SES v2)` | `aws sesv2 put-suppressed-destination` | Supported | Add email address to suppression list modal |
+| `DeleteSuppressedDestination (SES v2)` | `aws sesv2 delete-suppressed-destination` | Supported | Remove email address from suppression list action |
+
+</details>
+
 ---
 
 ## Configuration & Environment Variables
@@ -662,6 +709,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 ## Changelog
 
+- **2026-11-22** - **Amazon Simple Email Service (SES)**: Full implementation of Amazon SES Management Console with Account dashboard (24h send quota, send rate, sandbox status, deliverability reputation bounce/complaint rate gauges), Verified identities inventory (email addresses and domains, Easy DKIM status, custom MAIL FROM), Create identity wizard with Easy DKIM (RSA 2048-bit) and MAIL FROM domain alignment, comprehensive identity details view with 5 interactive tabs (Overview, Authentication with 3 CNAME DNS records, Notification topics with live Amazon SNS integration, Configuration sets, Identity policies with JSON editor), Configuration sets inventory and creation, Email templates manager with HTML/text editors and live rendered preview modal, Suppression list manager with add/remove actions, SMTP settings with endpoint ports, TLS requirements, and dedicated IAM SMTP credentials generator with standard RFC 2104 HMAC-SHA256 password derivation and CSV download, Send Test Email modal supporting mailbox simulator scenarios (Success, Hard bounce, Complaint), comprehensive learner documentation (`docs/SES.md`), and Action Support Matrix audit.
 - **2026-11-22** - **Amazon Elastic Container Registry (ECR)**: Full implementation of Amazon ECR Management Console with private repositories inventory, Region summary metric cards (Total repositories, Immutable tags, Scan on push, KMS encrypted), Create repository wizard with visibility settings, tag immutability, automated scan on push, live AWS KMS customer managed key dropdown, and tags editor, comprehensive repository detail view with 4 interactive tabs (Images inventory with digest copy, size, push timestamps, and delete image modal; Permissions with interactive JSON resource policy editor; Lifecycle policy with rule cards and JSON editor; Tags manager), View Push Commands modal with platform-specific Docker CLI authentication and build/tag/push commands for macOS/Linux and Windows, Public Repositories showcase gallery, Registry Settings view managing vulnerability scanning configuration and pull through cache rules (Amazon ECR Public, Docker Hub, Quay, GitHub Container Registry), comprehensive learner documentation (`docs/ECR.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon CloudWatch Logs**: Full implementation of Amazon CloudWatch Logs Management Console with log groups inventory, Region summary metric cards (Log groups, Log streams, Ingested volume, Active metric filters), name prefix and log class search filters, Create log group wizard with retention settings (1 day to 10 years / Never expire) and live AWS KMS customer managed key dropdown, comprehensive log group details with 5 interactive tabs (Log streams inventory table with creation and last event times, Search log group with live time window selector and filter pattern evaluation, Metric filters with dynamic pattern matching and metric transformations, Subscription filters to Amazon Kinesis and AWS Lambda, and Tags manager), dedicated log stream monospace terminal viewer with live search and PutLogEvents simulator, Live Tail real-time event streaming terminal with pattern highlighting and auto-scrolling, CloudWatch Logs Insights query editor with sample query templates and results parser, navigation stubs for CloudWatch Alarms and Metrics, comprehensive learner documentation (`docs/CloudWatch Logs.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon Kinesis Data Streams**: Full implementation of Amazon Kinesis Data Streams Management Console with global data streams inventory, Region summary metrics (Total Data Streams, Open Shards, On-Demand Streams, Encrypted Streams), name search filter, Create Data Stream wizard with On-demand vs Provisioned capacity modes, interactive shard capacity calculator, data retention period (24 to 8760 hours / up to 365 days), live KMS customer managed key dropdown, comprehensive stream details with 6 interactive tabs (Configuration, Shards inventory table with hash key ranges, Data viewer with interactive live PutRecord ingestion utility and GetRecords stream browser supporting Trim Horizon / Latest / Sequence Number iterators, Enhanced fan-out consumers registration with dedicated 2 MB/sec throughput per shard, Monitoring with shard-level metrics toggles, and Tags), edit capacity mode and resharding, edit retention period, edit server-side encryption, unblocked DynamoDB Kinesis data stream destination integration, comprehensive learner documentation (`docs/Kinesis Data Streams.md`), and Action Support Matrix audit.

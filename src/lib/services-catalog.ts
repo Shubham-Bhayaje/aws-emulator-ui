@@ -57,6 +57,9 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "timestream",
   "kinesis",
   "ecr",
+  "ses",
+  "simple-email-service",
+  "amazon-ses",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
@@ -64,6 +67,7 @@ export function isServiceFullyBuilt(idOrHref: string): boolean {
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
   if (clean === "ecr" || clean.startsWith("ecr/")) return true;
+  if (clean === "ses" || clean.startsWith("ses/")) return true;
   if (clean === "kinesis" || clean.startsWith("kinesis/")) return true;
   if (clean === "timestream" || clean.startsWith("timestream/")) return true;
   if (clean === "keyspaces" || clean.startsWith("keyspaces/")) return true;
@@ -1655,8 +1659,10 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "shortName": "SES",
     "href": "/ses",
     "category": "Business Applications",
-    "color": "#0073bb",
-    "desc": "Cost-effective, flexible email service for sending transactional messages"
+    "color": "#DD344C",
+    "status": "functional",
+    "desc": "Cost-effective, flexible email service for sending transactional messages, marketing emails, and managing verified domains",
+    "aliases": ["ses", "email", "simple email service", "smtp", "mail", "templates", "identities", "dkim", "suppression list", "configuration sets"]
   },
   {
     "id": "chime",
@@ -3694,8 +3700,10 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "shortName": "SES",
         "href": "/ses",
         "category": "Business Applications",
-        "color": "#0073bb",
-        "desc": "Cost-effective, flexible email service for sending transactional messages"
+        "color": "#DD344C",
+        "status": "functional",
+        "desc": "Cost-effective, flexible email service for sending transactional messages, marketing emails, and managing verified domains",
+        "aliases": ["ses", "email", "simple email service", "smtp", "mail", "templates", "identities", "dkim", "suppression list", "configuration sets"]
       },
       {
         "id": "chime",

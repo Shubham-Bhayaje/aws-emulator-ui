@@ -20,6 +20,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [Amazon Keyspaces (for Apache Cassandra)](Keyspaces.md): Scalable, highly available, and managed Apache Cassandra-compatible database service. Manage keyspaces, multi-region replication, tables with dynamic Cassandra column schema builder, on-demand and provisioned capacity modes, KMS encryption at rest, Point-in-time recovery (PITR), and default Time to Live (TTL).
 - [Amazon S3 (Simple Storage Service)](S3.md): Scalable cloud object storage, buckets and prefixes navigation, versioning, default encryption with KMS, granular Block Public Access controls, bucket policies, static website hosting, and lifecycle management.
 - [Amazon S3 Glacier](S3%20Glacier.md): Low-cost cold data storage and archiving, vaults lifecycle management, archive uploads and checksum tracking, asynchronous inventory and archive retrieval jobs, and data retrieval policies.
+- [Amazon SES (Simple Email Service)](SES.md): Fully managed cloud email service, verified email and domain identities, Easy DKIM signing with RSA 2048-bit keys, custom MAIL FROM domain alignment, bounce and complaint notification tracking with Amazon SNS, reusable HTML and text email templates with Mustache variables, account-level suppression lists, and dedicated SMTP credentials.
 - [Amazon SNS (Simple Notification Service)](SNS.md): Fully managed pub/sub messaging service, Standard and FIFO topics, fanout architectures, protocol subscriptions (SQS, Lambda, HTTP/S, Email), message attributes, and subscription filter policies.
 - [Amazon SQS (Simple Queue Service)](SQS.md): Fully managed message queuing service for microservices, Standard and FIFO queues, visibility timeout, dead-letter queues (DLQs), message deduplication, and KMS encryption.
 - [Amazon Timestream](Timestream.md): Fast, scalable, serverless time-series database for IoT and operational applications. Dual storage tiering (in-memory hot store and magnetic cold store), automated retention policies, live data ingestion, SQL query editor, and KMS encryption.
@@ -54,6 +55,10 @@ The following table tracks inter-service integrations that are waiting on future
 | AWS Lambda | Amazon ECR | Container image deployment packages selected from ECR repositories | Connect container image package dropdown when AWS Lambda container packaging is built |
 | AWS App Runner | Amazon ECR | Service deployment source pulling container images from ECR | Connect ECR image selector when AWS App Runner is built |
 | Amazon ECR | Amazon Inspector | Enhanced vulnerability scanning for container images in registry settings | Connect Amazon Inspector when Amazon Inspector is built |
+| Amazon Route 53 | Amazon SES | 1-click automatic DNS record provisioning for DKIM CNAMEs, domain verification tokens, and Custom MAIL FROM MX/TXT records | Connect automated Route 53 resource record publishing when Amazon Route 53 is built |
+| Amazon EventBridge | Amazon SES | EventBridge event bus destinations for SES configuration set email sending events | Connect EventBridge event buses when Amazon EventBridge is built |
+| AWS Lambda | Amazon SES | Inbound email receipt rules triggering Lambda function processing | Connect Lambda function execution when AWS Lambda is built |
+| Amazon Pinpoint | Amazon SES | Cross-service transactional and marketing email delivery infrastructure | Connect Pinpoint campaigns when Amazon Pinpoint is built |
 
 ---
 

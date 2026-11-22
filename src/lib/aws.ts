@@ -43,6 +43,8 @@ import { TimestreamQueryClient } from "@aws-sdk/client-timestream-query";
 import { KinesisClient } from "@aws-sdk/client-kinesis";
 import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { ECRClient } from "@aws-sdk/client-ecr";
+import { SESClient } from "@aws-sdk/client-ses";
+import { SESv2Client } from "@aws-sdk/client-sesv2";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
@@ -233,6 +235,19 @@ export const cloudwatchLogs = new CloudWatchLogsClient({
 
 // --- Amazon Elastic Container Registry (ECR) ---
 export const ecr = new ECRClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  requestHandler: new NodeHttpHandler(),
+});
+
+// --- Amazon Simple Email Service (SES v1 & v2) ---
+export const ses = new SESClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  requestHandler: new NodeHttpHandler(),
+});
+
+export const sesv2 = new SESv2Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
   requestHandler: new NodeHttpHandler(),
