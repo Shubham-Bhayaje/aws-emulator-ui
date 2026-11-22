@@ -282,6 +282,15 @@ export default function RouteTablesClient({
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedRtb && (
+            <Link
+              href={`/vpc/route-tables/${selectedRtb.RouteTableId}`}
+              className="px-3 py-1.5 text-[13px] font-semibold text-white bg-[#ec7211] hover:bg-[#eb5f07] rounded flex items-center justify-center transition-colors"
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            >
+              View details
+            </Link>
+          )}
           <button
             onClick={() => {
               setDestinationCidr("0.0.0.0/0");
@@ -362,9 +371,11 @@ export default function RouteTablesClient({
                     <tr
                       key={rtb.RouteTableId}
                       onClick={() => setSelectedRtbId(rtb.RouteTableId)}
+                      onDoubleClick={() => router.push(`/vpc/route-tables/${rtb.RouteTableId}`)}
                       className={`cursor-pointer transition-colors ${
                         isSelected ? "bg-purple-50/50" : "hover:bg-[#f8f9fa]"
                       }`}
+                      title="Click to select, double click to open route table details"
                     >
                       <td className="py-2.5 px-4">
                         <input
@@ -376,7 +387,13 @@ export default function RouteTablesClient({
                         />
                       </td>
                       <td className="py-2.5 px-4 font-medium text-[#16191f]">
-                        {rtb.Name || "-"}
+                        <Link
+                          href={`/vpc/route-tables/${rtb.RouteTableId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[#0073bb] hover:underline font-semibold"
+                        >
+                          {rtb.Name || "-"}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-4 font-mono text-[12px] text-[#0073bb]">
                         <Link
@@ -458,6 +475,15 @@ export default function RouteTablesClient({
                 Tags
               </button>
             </div>
+
+            <Link
+              href={`/vpc/route-tables/${selectedRtb.RouteTableId}`}
+              className="px-3 py-1 text-xs font-semibold text-[#0073bb] bg-white border border-[#0073bb] rounded hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
+              style={{ height: "28px", minHeight: "28px", maxHeight: "28px", whiteSpace: "nowrap" }}
+            >
+              <span>Open route table page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           {activeTab === "routes" && (

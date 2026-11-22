@@ -163,6 +163,15 @@ export default function SubnetsClient({ initialSubnets, initialSearch = "" }: Pr
         </div>
 
         <div className="flex items-center gap-2">
+          {selectedSubnet && (
+            <Link
+              href={`/vpc/subnets/${selectedSubnet.SubnetId}`}
+              className="px-3 py-1.5 text-[13px] font-semibold text-white bg-[#ec7211] hover:bg-[#eb5f07] rounded flex items-center justify-center transition-colors"
+              style={{ height: "32px", minHeight: "32px", maxHeight: "32px", whiteSpace: "nowrap" }}
+            >
+              View details
+            </Link>
+          )}
           <button
             onClick={handleToggleAutoAssignPublicIp}
             disabled={!selectedSubnet || actionLoading}
@@ -225,9 +234,11 @@ export default function SubnetsClient({ initialSubnets, initialSearch = "" }: Pr
                     <tr
                       key={sub.SubnetId}
                       onClick={() => setSelectedSubnetId(sub.SubnetId)}
+                      onDoubleClick={() => router.push(`/vpc/subnets/${sub.SubnetId}`)}
                       className={`cursor-pointer transition-colors ${
                         isSelected ? "bg-purple-50/50" : "hover:bg-[#f8f9fa]"
                       }`}
+                      title="Click to select, double click to open subnet details"
                     >
                       <td className="py-2.5 px-4">
                         <input
@@ -239,7 +250,13 @@ export default function SubnetsClient({ initialSubnets, initialSearch = "" }: Pr
                         />
                       </td>
                       <td className="py-2.5 px-4 font-medium text-[#16191f]">
-                        {sub.Name || "-"}
+                        <Link
+                          href={`/vpc/subnets/${sub.SubnetId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-[#0073bb] hover:underline font-semibold"
+                        >
+                          {sub.Name || "-"}
+                        </Link>
                       </td>
                       <td className="py-2.5 px-4 font-mono text-[12px] text-[#0073bb]">
                         <Link
@@ -308,6 +325,15 @@ export default function SubnetsClient({ initialSubnets, initialSearch = "" }: Pr
                 Tags
               </button>
             </div>
+
+            <Link
+              href={`/vpc/subnets/${selectedSubnet.SubnetId}`}
+              className="px-3 py-1 text-xs font-semibold text-[#0073bb] bg-white border border-[#0073bb] rounded hover:bg-blue-50 flex items-center gap-1.5 transition-colors"
+              style={{ height: "28px", minHeight: "28px", maxHeight: "28px", whiteSpace: "nowrap" }}
+            >
+              <span>Open subnet page</span>
+              <span>↗</span>
+            </Link>
           </div>
 
           {activeTab === "details" && (
