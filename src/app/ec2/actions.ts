@@ -156,9 +156,21 @@ function mapAwsInstanceToModel(inst: any): EC2Instance {
     privateIp,
     publicDns,
     privateDns,
-    amiId: inst.ImageId || "ami-0c7217cdde317cfec",
-    amiName: "Amazon Linux 2023 AMI",
-    platform: inst.PlatformDetails || "Linux/UNIX",
+    amiId: inst.ImageId || "ami-080e1f13689e07408",
+    amiName: inst.ImageId === "ami-0c7217cdde317cfec"
+      ? "Amazon Linux 2023 AMI"
+      : inst.ImageId === "ami-0c101f26f147fa7ab"
+      ? "Red Hat Enterprise Linux 9"
+      : inst.ImageId === "ami-0d5eff06f840b45e9"
+      ? "Microsoft Windows Server 2022 Base"
+      : "Ubuntu Server 24.04 LTS",
+    platform: inst.ImageId === "ami-0c7217cdde317cfec"
+      ? "Amazon Linux"
+      : inst.ImageId === "ami-0c101f26f147fa7ab"
+      ? "Red Hat"
+      : inst.ImageId === "ami-0d5eff06f840b45e9"
+      ? "Windows"
+      : "Ubuntu",
     architecture: (inst.Architecture as any) || "x86_64",
     securityGroupId: sg?.GroupId || "sg-0000000000000000d",
     securityGroupName: sg?.GroupName || "default",
@@ -413,6 +425,9 @@ export async function ensureEC2ContainerAction(instance: {
   id: string;
   privateIp?: string;
   publicIp?: string;
+  platform?: string;
+  amiId?: string;
+  amiName?: string;
 }) {
   return await ensureInstanceContainer(instance);
 }

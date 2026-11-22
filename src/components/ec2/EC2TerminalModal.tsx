@@ -59,16 +59,40 @@ export default function EC2TerminalModal({ isOpen, onClose, instance }: Props) {
   const inputRef = useRef<HTMLInputElement>(null);
   const editorTextareaRef = useRef<HTMLTextAreaElement>(null);
 
+  const isInstanceUbuntu =
+    !instance.amiName?.toLowerCase().includes("amazon") ||
+    instance.platform?.toLowerCase().includes("ubuntu") ||
+    instance.amiName?.toLowerCase().includes("ubuntu") ||
+    instance.amiId === "ami-080e1f13689e07408";
+
+  const [currentUser, setCurrentUser] = useState(isInstanceUbuntu ? "ubuntu" : "ec2-user");
   const privateIpFormatted = (instance.privateIp || "172.31.0.4").replace(/\./g, "-");
-  const promptUser = "ec2-user";
   const promptHost = `ip-${privateIpFormatted}`;
-  const promptString = `[${promptUser}@${promptHost} ~]$ `;
+  const promptString = currentUser === "ubuntu" ? `${currentUser}@${promptHost}:~$ ` : `[${currentUser}@${promptHost} ~]$ `;
 
   // Initialize terminal session & spawn/ensure real Docker container
   useEffect(() => {
     if (!isOpen) return;
 
-    const bannerText = `
+    const bannerText = isInstanceUbuntu
+      ? `
+Welcome to Ubuntu 24.04 LTS (GNU/Linux 6.8.0-generic x86_64)
+
+ * Documentation:  https://help.ubuntu.com
+ * Management:     https://landscape.canonical.com
+ * Support:        https://ubuntu.com/pro
+
+  System information as of ${new Date().toUTCString()}:
+
+  IPv4 address for eth0: ${instance.privateIp || "172.31.0.4"}
+  Public IPv4 address:   ${instance.publicIp || "54.0.0.2"}
+  Instance ID:           ${instance.id}
+  Real Container:        ec2-instance-${instance.id.toLowerCase().replace(/[^a-z0-9_-]/g, "-")} (Full Ubuntu 24.04 LTS)
+
+Pre-installed utilities: sudo (passwordless), apt, python3, pip, gcc, make, curl, wget, git, vim, nano, htop
+Type 'help' to view available system commands.
+`
+      : `
    ,     #_
   ~\\_  ####_        Amazon Linux 2023 (Kernel 6.1 / Nitro Host)
  ~~  \\ ####\\       https://aws.amazon.com/linux/amazon-linux-2023/
@@ -82,7 +106,7 @@ export default function EC2TerminalModal({ isOpen, onClose, instance }: Props) {
 
     setHistory([
       { type: "banner", text: bannerText },
-      { type: "output", text: "Connecting to dedicated Amazon Linux 2023 container..." },
+      { type: "output", text: `Connecting to dedicated ${isInstanceUbuntu ? "Ubuntu 24.04" : "Amazon Linux 2023"} container...` },
     ]);
     setInputVal("");
     setConnectedTime(0);
@@ -95,15 +119,21 @@ export default function EC2TerminalModal({ isOpen, onClose, instance }: Props) {
       id: instance.id,
       privateIp: instance.privateIp,
       publicIp: instance.publicIp,
+      platform: instance.platform,
+      amiId: instance.amiId,
+      amiName: instance.amiName,
     }).then((res) => {
       if (res.success) {
         setContainerReady(true);
         setContainerName(res.containerName);
+        if (res.user) {
+          setCurrentUser(res.user);
+        }
         setHistory((prev) => [
           ...prev,
           {
             type: "output",
-            text: `Container ${res.containerName} is ready (Amazon Linux 2023, ec2-user). Last login: ${new Date().toUTCString()} from 127.0.0.1`,
+            text: `Container ${res.containerName} is ready (${res.osType === "ubuntu" ? "Ubuntu 24.04 LTS" : "Amazon Linux 2023"}, user: ${res.user}). Last login: ${new Date().toUTCString()} from 127.0.0.1`,
           },
         ]);
       } else {
@@ -296,7 +326,18 @@ export default function EC2TerminalModal({ isOpen, onClose, instance }: Props) {
         ...prev,
         {
           type: "output",
-          text: `Amazon Linux 2023 Real Container Environment:
+          text: currentUser === "ubuntu"
+            ? `Ubuntu 24.04 LTS Full Container Environment:
+  Commands run directly inside the dedicated container (ec2-instance-${instance.id}):
+  - Standard Shell:   ls, cat, touch, rm, mkdir, cp, mv, grep, find, echo, tar, gzip, unzip
+  - Text Editors:     nano <file>, vi/vim <file>
+  - System Info:      whoami, id, pwd, uname -a, uptime, date
+  - Diagnostics:      ps aux, top -b -n 1, htop, free -m, df -h, ip a, ip route
+  - Network:          ping -c 3 <host>, curl <url>, wget <url>, dig <domain>, nslookup <domain>
+  - Package Manager:  sudo apt update && sudo apt install -y <package> (full root sudo access)
+  - Compilers & Dev:  gcc, g++, make, python3, pip, python3-venv, git, jq
+  - Terminal Controls: clear, exit`
+            : `Amazon Linux 2023 Real Container Environment:
   Commands run directly inside the dedicated container (ec2-instance-${instance.id}):
   - Standard Shell:  ls, cat, touch, rm, mkdir, cp, mv, grep, find, echo
   - Text Editors:    nano <file>, vi/vim <file> (also aliases 'vm')

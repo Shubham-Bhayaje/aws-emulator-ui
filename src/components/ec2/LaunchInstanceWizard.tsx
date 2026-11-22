@@ -18,18 +18,18 @@ import { launchLiveInstance } from "@/app/ec2/actions";
 
 const AMI_OPTIONS = [
   {
-    id: "ami-0c7217cdde317cfec",
-    name: "Amazon Linux 2023 AMI",
-    platform: "Amazon Linux",
-    desc: "Amazon Linux 2023.5.20240916.0 provided by Amazon Web Services",
+    id: "ami-080e1f13689e07408",
+    name: "Ubuntu Server 24.04 LTS",
+    platform: "Ubuntu",
+    desc: "Canonical, Ubuntu, 24.04 LTS, amd64 noble image with full developer and system tools",
     arch: "64-bit (x86)",
     freeTier: true,
   },
   {
-    id: "ami-080e1f13689e07408",
-    name: "Ubuntu Server 24.04 LTS",
-    platform: "Ubuntu",
-    desc: "Canonical, Ubuntu, 24.04 LTS, amd64 noble image build on 2024-09-12",
+    id: "ami-0c7217cdde317cfec",
+    name: "Amazon Linux 2023 AMI",
+    platform: "Amazon Linux",
+    desc: "Amazon Linux 2023.5.20240916.0 provided by Amazon Web Services",
     arch: "64-bit (x86)",
     freeTier: true,
   },
