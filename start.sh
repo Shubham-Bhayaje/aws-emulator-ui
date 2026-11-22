@@ -27,11 +27,12 @@ fi
 echo "[1/4] Docker daemon verified."
 
 # 2. Ensure AWS Emulator container is running on port 9297
-echo "[2/4] Checking AWS Emulator on port 9297..."
-if curl -k -s https://127.0.0.1:9297 >/dev/null 2>&1 || nc -z 127.0.0.1 9297 >/dev/null 2>&1; then
-  echo "AWS Emulator is already running on port 9297."
+echo "[2/4] Checking AWS Emulator status..."
+if [ -n "$(docker ps -q --filter "name=aws-emulator" 2>/dev/null)" ]; then
+  echo "AWS Emulator container is already running."
 else
   echo "Starting AWS Emulator container on port 9297..."
+  docker rm -f aws-emulator >/dev/null 2>&1 || true
   EMU_DIR="$HOME/.aws/emulator"
   mkdir -p "$EMU_DIR"
   docker run -d --rm -p 127.0.0.1:9297:9297 -v "$EMU_DIR:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
@@ -47,7 +48,7 @@ else
 fi
 
 # 4. Check if UI is already running on port 3000
-if curl -s -f http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
+if curl -s -f --connect-timeout 1 --max-time 2 http://127.0.0.1:3000/api/health >/dev/null 2>&1; then
   echo "[4/4] Console UI is already running on http://localhost:3000."
   echo "Opening web console in browser..."
   if command -v wslview >/dev/null 2>&1; then
