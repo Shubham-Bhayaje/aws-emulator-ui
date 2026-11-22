@@ -933,10 +933,21 @@ export default function VpcsClient({
           {activeTab === "resourcemap" && (
             <div className="pt-2 space-y-4">
               {/* Header Action Bar */}
-              <div className="flex items-center justify-between pb-1">
-                <span className="text-[13px] text-[#545b64]">
-                  Interactive topology map for <span className="font-mono font-semibold text-[#16191f]">{selectedVpc.Name || selectedVpc.VpcId}</span>. Click or hover any card to trace its network path.
-                </span>
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-1">
+                <div className="flex items-center gap-3">
+                  <span className="text-[13px] text-[#545b64]">
+                    Interactive topology map for <span className="font-mono font-semibold text-[#16191f]">{selectedVpc.Name || selectedVpc.VpcId}</span>. Click or hover any card to trace its network path.
+                  </span>
+                  {(selectedSubnetId || selectedRtbId || selectedGwId) && (
+                    <button
+                      type="button"
+                      onClick={clearSelection}
+                      className="text-[12px] font-medium text-[#0073bb] hover:underline bg-[#f1faff] border border-[#0073bb] px-2 py-0.5 rounded"
+                    >
+                      Clear selection
+                    </button>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={handleCreateSampleMultiTierVpc}
@@ -947,42 +958,6 @@ export default function VpcsClient({
                   {actionLoading ? "Provisioning..." : "Provision sample 4-subnet multi-tier VPC"}
                 </button>
               </div>
-
-              {/* Optional Active Selection Bar */}
-              {isAnyActive && (
-                <div className="flex items-center justify-between p-2.5 bg-blue-50 border border-blue-200 rounded text-xs text-blue-900">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold">Active Path Highlighted:</span>
-                    {activeSubnet && (
-                      <span className="bg-white px-2 py-0.5 rounded border border-blue-200 font-mono">
-                        Subnet: {activeSubnet}
-                      </span>
-                    )}
-                    {activeRtb && (
-                      <>
-                        <span>➔</span>
-                        <span className="bg-white px-2 py-0.5 rounded border border-blue-200 font-mono">
-                          Route Table: {activeRtb}
-                        </span>
-                      </>
-                    )}
-                    {activeGw && (
-                      <>
-                        <span>➔</span>
-                        <span className="bg-white px-2 py-0.5 rounded border border-blue-200 font-mono">
-                          Gateway: {activeGw}
-                        </span>
-                      </>
-                    )}
-                  </div>
-                  <button
-                    onClick={clearSelection}
-                    className="text-xs text-[#0073bb] hover:underline font-semibold"
-                  >
-                    Clear selection
-                  </button>
-                </div>
-              )}
 
               {/* Relative Container Holding Columns & Connected SVG Overlay */}
               <div
