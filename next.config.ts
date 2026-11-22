@@ -233,6 +233,26 @@ const nextConfig: NextConfig = {
         destination: "/direct-connect/:path*",
         permanent: false,
       },
+      {
+        source: "/route53resolver",
+        destination: "/route53/resolver",
+        permanent: false,
+      },
+      {
+        source: "/route53resolver/:path*",
+        destination: "/route53/resolver/:path*",
+        permanent: false,
+      },
+      {
+        source: "/resolver",
+        destination: "/route53/resolver",
+        permanent: false,
+      },
+      {
+        source: "/resolver/:path*",
+        destination: "/route53/resolver/:path*",
+        permanent: false,
+      },
     ];
   },
 };

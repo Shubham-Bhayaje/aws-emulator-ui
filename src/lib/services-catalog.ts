@@ -540,6 +540,17 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "desc": "Highly available and scalable Domain Name System (DNS) web service"
   },
   {
+    "id": "route53-resolver",
+    "name": "Route 53 Resolver",
+    "shortName": "Resolver",
+    "href": "/route53/resolver",
+    "category": "Networking & Content Delivery",
+    "color": "#8C4FFF",
+    "status": "functional",
+    "desc": "Recursive DNS resolver for Amazon VPC and hybrid networks",
+    "aliases": ["route53 resolver", "route 53 resolver", "resolver", "route53resolver", "dns resolver", "inbound endpoint", "outbound endpoint", "dns firewall"]
+  },
+  {
     "id": "apigateway",
     "name": "Amazon API Gateway",
     "shortName": "API Gateway",
@@ -2600,6 +2611,17 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "category": "Networking & Content Delivery",
         "color": "#8C4FFF",
         "desc": "Highly available and scalable Domain Name System (DNS) web service"
+      },
+      {
+        "id": "route53-resolver",
+        "name": "Route 53 Resolver",
+        "shortName": "Resolver",
+        "href": "/route53/resolver",
+        "category": "Networking & Content Delivery",
+        "color": "#8C4FFF",
+        "status": "functional",
+        "desc": "Recursive DNS resolver for Amazon VPC and hybrid networks",
+        "aliases": ["route53 resolver", "route 53 resolver", "resolver", "route53resolver", "dns resolver", "inbound endpoint", "outbound endpoint", "dns firewall"]
       },
       {
         "id": "apigateway",

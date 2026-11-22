@@ -4,6 +4,7 @@ import ComingSoon from "@/components/ComingSoon";
 const nav = [
   { label: "Hosted zones", href: "/route53" },
   { label: "Health checks", href: "/route53/health-checks" },
+  { label: "Resolver", href: "/route53/resolver" },
 ];
 
 export default function Route53Page() {

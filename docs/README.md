@@ -16,6 +16,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Key Management Service (KMS)](KMS.md): Create and manage customer keys, inspect AWS managed keys, configure key policies, toggle annual rotation, and test live encryption/decryption in the playground.
 - [AWS Private Certificate Authority (Private CA)](Private%20CA.md): Create and manage private root and subordinate certificate authorities, generate and export CSRs, install CA certificates, issue and revoke private X.509 certificates with standard templates, configure S3 CRL revocation, and manage soft-deletion retention windows.
 - [AWS Resource Explorer](Resource%20Explorer.md): Resource search and discovery service across AWS Regions. Create and configure regional and aggregator indexes, define custom views with fine-grained filter expressions, toggle tag inclusion, set default views, and execute rapid searches across cloud resources.
+- [AWS Route 53 Resolver](Route%2053%20Resolver.md): Regional hybrid DNS service connecting Amazon VPCs and on-premises networks. Inbound endpoints for resolving AWS private hosted zones from on-premises networks, outbound endpoints for forwarding VPC DNS queries to corporate DNS resolvers, conditional forwarding and system rules, VPC rule associations, centralized query logging to CloudWatch Logs and S3, and DNS Firewall.
 - [AWS Secrets Manager](Secrets%20Manager.md): Store, retrieve, update, and manage sensitive credentials and API keys with KMS encryption at rest, version staging labels (AWSCURRENT, AWSPREVIOUS), resource permissions, and scheduled recovery windows.
 - [AWS Site-to-Site VPN](SITE_TO_SITE_VPN.md): Secure encrypted hybrid networking connecting on-premises branch offices and corporate data centers to Amazon VPC and AWS Transit Gateway. Manage Customer Gateways, Virtual Private Gateways, dual redundant IPsec tunnels, BGP dynamic and static routing, router sample configuration downloads, and VPC route table targets.
 - [AWS Systems Manager Parameter Store](SSM%20Parameter%20Store.md): Secure, hierarchical storage for configuration data management and secrets management with KMS encryption (SecureString), version history tracking, version staging labels, and resource tagging.
@@ -86,6 +87,7 @@ The following table tracks inter-service integrations that are waiting on future
 | AWS Direct Connect | AWS Transit Gateway | Direct Connect gateway attachments to Transit Gateway hub | Connected live Direct Connect gateway attachment workflow and Direct Connect management links |
 | AWS Network Firewall | Amazon VPC | Firewall endpoints and subnet routing rules | Connect Network Firewall when AWS Network Firewall is built |
 | AWS Client VPN | Amazon VPC | Client VPN endpoint subnet associations | Connected live Client VPN target network associations and client routing |
+| Route 53 Resolver | Amazon Data Firehose | Query logging destination for streaming DNS queries | Connect Firehose delivery stream destination when Amazon Data Firehose is built |
 
 ---
 
