@@ -1,18 +1,16 @@
-import SecurityGroupsClient from "./SecurityGroupsClient";
-import { listSecurityGroupsAction, listVpcsAction } from "../actions";
+import SecurityGroupsClient from "@/components/ec2/SecurityGroupsClient";
+import { fetchLiveSecurityGroups } from "@/app/ec2/actions";
 
 export const dynamic = "force-dynamic";
 
-export default async function SecurityGroupsPage() {
-  const [sgsRes, vpcsRes] = await Promise.all([
-    listSecurityGroupsAction(),
-    listVpcsAction(),
-  ]);
+export default async function VpcSecurityGroupsPage() {
+  const { securityGroups, isLive, error } = await fetchLiveSecurityGroups();
 
   return (
     <SecurityGroupsClient
-      initialSecurityGroups={sgsRes.success ? sgsRes.securityGroups : []}
-      vpcs={vpcsRes.success ? vpcsRes.vpcs : []}
+      initialSecurityGroups={securityGroups || []}
+      isLive={isLive}
+      liveError={error}
     />
   );
 }

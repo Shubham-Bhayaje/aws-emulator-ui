@@ -493,6 +493,7 @@ export async function createLiveSecurityGroup(
       })
     );
     revalidatePath("/ec2/security-groups");
+    revalidatePath("/vpc/security-groups");
     return {
       success: true,
       securityGroup: {
@@ -517,6 +518,7 @@ export async function deleteLiveSecurityGroup(groupId: string): Promise<{ succes
   try {
     await ec2.send(new DeleteSecurityGroupCommand({ GroupId: groupId }));
     revalidatePath("/ec2/security-groups");
+    revalidatePath("/vpc/security-groups");
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
@@ -584,6 +586,7 @@ export async function updateLiveSecurityGroupRules(
     }
 
     revalidatePath("/ec2/security-groups");
+    revalidatePath("/vpc/security-groups");
     revalidatePath("/ec2/instances");
     return { success: true };
   } catch (err: any) {
@@ -652,6 +655,7 @@ export async function updateLiveSecurityGroupOutboundRules(
     }
 
     revalidatePath("/ec2/security-groups");
+    revalidatePath("/vpc/security-groups");
     return { success: true };
   } catch (err: any) {
     return { success: false, error: err.message };
