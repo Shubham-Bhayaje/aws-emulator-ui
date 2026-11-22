@@ -231,7 +231,7 @@ export default function TransitGatewayDetailClient({
 
               <div>
                 <dt className="text-[#545b64] font-medium">Description</dt>
-                <dd className="mt-1 text-[#16191f]">{tgw.Description || "-"}</dd>
+                <dd className="mt-1 text-[#16191f]" suppressHydrationWarning>{tgw.Description || "-"}</dd>
               </div>
 
               <div>
@@ -266,7 +266,7 @@ export default function TransitGatewayDetailClient({
 
               <div>
                 <dt className="text-[#545b64] font-medium">Creation time</dt>
-                <dd className="mt-1 text-[#16191f]">
+                <dd className="mt-1 text-[#16191f]" suppressHydrationWarning>
                   {tgw.CreationTime ? new Date(tgw.CreationTime).toLocaleString() : "-"}
                 </dd>
               </div>

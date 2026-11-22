@@ -49,10 +49,9 @@ export default async function RootLayout({
 
   return (
     <html lang="en" className={inter.className}>
-      <body>
-        <Script
+      <head>
+        <script
           id="perf-measure-fix"
-          strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               if (typeof window !== "undefined" && window.performance && window.performance.measure) {
@@ -68,6 +67,8 @@ export default async function RootLayout({
             `,
           }}
         />
+      </head>
+      <body>
         <TopBar
           accountId={accountId}
           userName={userName}

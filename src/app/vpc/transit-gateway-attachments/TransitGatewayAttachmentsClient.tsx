@@ -322,7 +322,7 @@ export default function TransitGatewayAttachmentsClient({ initialAttachments }: 
                 </div>
                 <div>
                   <dt className="text-gray-500 font-medium">Transit gateway ID</dt>
-                  <dd className="text-gray-900 mt-1">
+                  <dd className="text-gray-900 mt-1" suppressHydrationWarning>
                     <Link
                       href={`/vpc/transit-gateways/${selectedAtt.TransitGatewayId}`}
                       className="text-[#0073bb] hover:underline font-mono"
@@ -368,7 +368,7 @@ export default function TransitGatewayAttachmentsClient({ initialAttachments }: 
                 </div>
                 <div>
                   <dt className="text-gray-500 font-medium">Created at</dt>
-                  <dd className="text-gray-900 mt-1">
+                  <dd className="text-gray-900 mt-1" suppressHydrationWarning>
                     {selectedAtt.CreationTime ? new Date(selectedAtt.CreationTime).toLocaleString() : "-"}
                   </dd>
                 </div>

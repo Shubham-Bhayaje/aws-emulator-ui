@@ -395,7 +395,7 @@ export default function TransitGatewayRouteTableDetailClient({
 
               <div>
                 <dt className="text-gray-500">Creation time</dt>
-                <dd className="text-gray-900 font-mono">
+                <dd className="text-gray-900 font-mono" suppressHydrationWarning>
                   {routeTable.CreationTime
                     ? new Date(routeTable.CreationTime).toLocaleString()
                     : "-"}

@@ -360,7 +360,7 @@ export default function TransitGatewaysClient({ initialTransitGateways }: Props)
                 </div>
                 <div>
                   <dt className="text-gray-500 font-medium">Description</dt>
-                  <dd className="text-gray-900 mt-1">{selectedTgw.Description || "-"}</dd>
+                  <dd className="text-gray-900 mt-1" suppressHydrationWarning>{selectedTgw.Description || "-"}</dd>
                 </div>
                 <div>
                   <dt className="text-gray-500 font-medium">Amazon side ASN</dt>
@@ -392,7 +392,7 @@ export default function TransitGatewaysClient({ initialTransitGateways }: Props)
                 </div>
                 <div>
                   <dt className="text-gray-500 font-medium">Created at</dt>
-                  <dd className="text-gray-900 mt-1">
+                  <dd className="text-gray-900 mt-1" suppressHydrationWarning>
                     {selectedTgw.CreationTime ? new Date(selectedTgw.CreationTime).toLocaleString() : "-"}
                   </dd>
                 </div>

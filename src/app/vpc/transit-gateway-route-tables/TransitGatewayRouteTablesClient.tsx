@@ -274,7 +274,7 @@ export default function TransitGatewayRouteTablesClient({ initialRouteTables }: 
                     <td className="py-2.5 px-3 text-gray-700">
                       {rtb.DefaultPropagationRouteTable ? "Yes" : "No"}
                     </td>
-                    <td className="py-2.5 px-3 text-gray-500 font-mono">
+                    <td className="py-2.5 px-3 text-gray-500 font-mono" suppressHydrationWarning>
                       {rtb.CreationTime ? new Date(rtb.CreationTime).toLocaleString() : "-"}
                     </td>
                   </tr>
@@ -386,7 +386,7 @@ export default function TransitGatewayRouteTablesClient({ initialRouteTables }: 
                 </div>
                 <div>
                   <dt className="text-gray-500">Creation time</dt>
-                  <dd className="font-mono text-gray-900">
+                  <dd className="font-mono text-gray-900" suppressHydrationWarning>
                     {selectedRtb.CreationTime ? new Date(selectedRtb.CreationTime).toLocaleString() : "-"}
                   </dd>
                 </div>
