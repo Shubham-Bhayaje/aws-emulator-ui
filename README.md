@@ -73,6 +73,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | :--- | :--- | :--- | :--- | :--- |
 | **AWS Management Console Home** | General | Built | [Console Home Guide](docs/Console%20Home.md) | 2026-11-21 |
 | **AWS Account Management** | Management & Governance | Built | [Account Management Guide](docs/Account%20Management.md) | 2026-11-20 |
+| **AWS AppConfig** | Management & Governance | Built | [AppConfig Guide](docs/AppConfig.md) | 2026-11-22 |
 | **AWS Certificate Manager (ACM)** | Security, Identity, & Compliance | Built | [ACM Guide](docs/ACM.md) | 2026-11-21 |
 | **AWS CloudHSM** | Security, Identity, & Compliance | Built | [CloudHSM Guide](docs/CloudHSM.md) | 2026-11-21 |
 | **AWS Directory Service** | Security, Identity, & Compliance | Built | [Directory Service Guide](docs/Directory%20Service.md) | 2026-11-21 |
@@ -680,6 +681,39 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | `PutSuppressedDestination (SES v2)` | `aws sesv2 put-suppressed-destination` | Supported | Add email address to suppression list modal |
 | `DeleteSuppressedDestination (SES v2)` | `aws sesv2 delete-suppressed-destination` | Supported | Remove email address from suppression list action |
 
+### AWS AppConfig
+| API Operation | CLI Command | Support Status | Console Implementation |
+| :--- | :--- | :--- | :--- |
+| `ListApplications` | `aws appconfig list-applications` | Supported | Applications inventory table on `/appconfig/applications` |
+| `GetApplication` | `aws appconfig get-application` | Supported | Application details view on `/appconfig/applications/<appId>` |
+| `CreateApplication` | `aws appconfig create-application` | Supported | Create application form on `/appconfig/applications/create` |
+| `UpdateApplication` | `aws appconfig update-application` | Supported | Edit application modal |
+| `DeleteApplication` | `aws appconfig delete-application` | Supported | Delete application confirmation modal |
+| `ListEnvironments` | `aws appconfig list-environments` | Supported | Environments table on application details view |
+| `GetEnvironment` | `aws appconfig get-environment` | Supported | Environment details view on `/appconfig/applications/<appId>/environments/<envId>` |
+| `CreateEnvironment` | `aws appconfig create-environment` | Supported | Create environment form on `/appconfig/applications/<appId>/environments/create` |
+| `UpdateEnvironment` | `aws appconfig update-environment` | Supported | Environment settings and monitor updates |
+| `DeleteEnvironment` | `aws appconfig delete-environment` | Supported | Delete environment confirmation modal |
+| `ListConfigurationProfiles` | `aws appconfig list-configuration-profiles` | Supported | Configuration profiles table on application details view |
+| `GetConfigurationProfile` | `aws appconfig get-configuration-profile` | Supported | Profile details view on `/appconfig/applications/<appId>/configuration-profiles/<profId>` |
+| `CreateConfigurationProfile` | `aws appconfig create-configuration-profile` | Supported | Create profile wizard with Feature Flags & Freeform sources |
+| `UpdateConfigurationProfile` | `aws appconfig update-configuration-profile` | Supported | Edit configuration profile modal |
+| `DeleteConfigurationProfile` | `aws appconfig delete-configuration-profile` | Supported | Delete configuration profile confirmation modal |
+| `ListHostedConfigurationVersions` | `aws appconfig list-hosted-configuration-versions` | Supported | Version history table on profile details view |
+| `GetHostedConfigurationVersion` | `aws appconfig get-hosted-configuration-version` | Supported | Version payload modal inspector and editor |
+| `CreateHostedConfigurationVersion` | `aws appconfig create-hosted-configuration-version` | Supported | Visual table toggle and raw JSON schema version saver |
+| `DeleteHostedConfigurationVersion` | `aws appconfig delete-hosted-configuration-version` | Supported | Delete version action in version history table |
+| `ListDeploymentStrategies` | `aws appconfig list-deployment-strategies` | Supported | Deployment strategies table on `/appconfig/deployment-strategies` |
+| `GetDeploymentStrategy` | `aws appconfig get-deployment-strategy` | Supported | Strategy details inspector and deployment parameter preview |
+| `CreateDeploymentStrategy` | `aws appconfig create-deployment-strategy` | Supported | Create strategy form on `/appconfig/deployment-strategies/create` |
+| `DeleteDeploymentStrategy` | `aws appconfig delete-deployment-strategy` | Supported | Delete custom deployment strategy modal |
+| `ListDeployments` | `aws appconfig list-deployments` | Supported | Deployments table on environment details view |
+| `GetDeployment` | `aws appconfig get-deployment` | Supported | Deployment progress bar, percentage, and state tracker |
+| `StartDeployment` | `aws appconfig start-deployment` | Supported | Start deployment wizard on `/appconfig/applications/<appId>/deploy` |
+| `StopDeployment` | `aws appconfig stop-deployment` | Supported | Stop deployment action rolling back active rollouts |
+| `StartConfigurationSession` | `aws appconfigdata start-configuration-session` | Supported | Client test playground session initializer on environment view |
+| `GetLatestConfiguration` | `aws appconfigdata get-latest-configuration` | Supported | Live evaluated client configuration payload retrieval |
+
 </details>
 
 ---
@@ -709,6 +743,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 ## Changelog
 
+- **2026-11-22** - **AWS AppConfig**: Full implementation of AWS AppConfig Management Console with Applications inventory, metric cards, Create application wizard, Application details view with Environments and Configuration profiles & feature flags tabs; Environments manager with CloudWatch alarm monitors; Configuration profiles manager supporting Feature Flags (`AWS.AppConfig.FeatureFlags`) with interactive table toggle switch and JSON schema editor, and Freeform profiles (`AWS.Freeform`) with live SSM Parameter Store, Secrets Manager, and Amazon S3 source selectors; Hosted configuration versions management with immutable revisions and payload viewer; Deployment strategies manager with predefined AWS strategies (`AllAtOnce`, `Linear50PercentEvery30Seconds`, `Canary10Percent20Minutes`, `Linear20PercentEvery6Minutes`) and custom strategy creator (linear/exponential growth, duration, bake time, and SSM document replication); Deployments manager with deployment status tracking, progress indicators, and rollback stop-deployment actions; Interactive client test playground powered by `@aws-sdk/client-appconfigdata` (`StartConfigurationSession` + `GetLatestConfiguration`) fetching live evaluated configuration payloads; Extensions view with Lambda integration notices; Account settings encryption view; learner guide (`docs/AppConfig.md`); and Action Support Matrix audit.
 - **2026-11-22** - **Amazon Simple Email Service (SES)**: Full implementation of Amazon SES Management Console with Account dashboard (24h send quota, send rate, sandbox status, deliverability reputation bounce/complaint rate gauges), Verified identities inventory (email addresses and domains, Easy DKIM status, custom MAIL FROM), Create identity wizard with Easy DKIM (RSA 2048-bit) and MAIL FROM domain alignment, comprehensive identity details view with 5 interactive tabs (Overview, Authentication with 3 CNAME DNS records, Notification topics with live Amazon SNS integration, Configuration sets, Identity policies with JSON editor), Configuration sets inventory and creation, Email templates manager with HTML/text editors and live rendered preview modal, Suppression list manager with add/remove actions, SMTP settings with endpoint ports, TLS requirements, and dedicated IAM SMTP credentials generator with standard RFC 2104 HMAC-SHA256 password derivation and CSV download, Send Test Email modal supporting mailbox simulator scenarios (Success, Hard bounce, Complaint), comprehensive learner documentation (`docs/SES.md`), and Action Support Matrix audit.
 - **2026-11-22** - **Amazon Elastic Container Registry (ECR)**: Full implementation of Amazon ECR Management Console with private repositories inventory, Region summary metric cards (Total repositories, Immutable tags, Scan on push, KMS encrypted), Create repository wizard with visibility settings, tag immutability, automated scan on push, live AWS KMS customer managed key dropdown, and tags editor, comprehensive repository detail view with 4 interactive tabs (Images inventory with digest copy, size, push timestamps, and delete image modal; Permissions with interactive JSON resource policy editor; Lifecycle policy with rule cards and JSON editor; Tags manager), View Push Commands modal with platform-specific Docker CLI authentication and build/tag/push commands for macOS/Linux and Windows, Public Repositories showcase gallery, Registry Settings view managing vulnerability scanning configuration and pull through cache rules (Amazon ECR Public, Docker Hub, Quay, GitHub Container Registry), comprehensive learner documentation (`docs/ECR.md`), and Action Support Matrix audit.
 - **2026-11-21** - **Amazon CloudWatch Logs**: Full implementation of Amazon CloudWatch Logs Management Console with log groups inventory, Region summary metric cards (Log groups, Log streams, Ingested volume, Active metric filters), name prefix and log class search filters, Create log group wizard with retention settings (1 day to 10 years / Never expire) and live AWS KMS customer managed key dropdown, comprehensive log group details with 5 interactive tabs (Log streams inventory table with creation and last event times, Search log group with live time window selector and filter pattern evaluation, Metric filters with dynamic pattern matching and metric transformations, Subscription filters to Amazon Kinesis and AWS Lambda, and Tags manager), dedicated log stream monospace terminal viewer with live search and PutLogEvents simulator, Live Tail real-time event streaming terminal with pattern highlighting and auto-scrolling, CloudWatch Logs Insights query editor with sample query templates and results parser, navigation stubs for CloudWatch Alarms and Metrics, comprehensive learner documentation (`docs/CloudWatch Logs.md`), and Action Support Matrix audit.

@@ -45,6 +45,8 @@ import { CloudWatchLogsClient } from "@aws-sdk/client-cloudwatch-logs";
 import { ECRClient } from "@aws-sdk/client-ecr";
 import { SESClient } from "@aws-sdk/client-ses";
 import { SESv2Client } from "@aws-sdk/client-sesv2";
+import { AppConfigClient } from "@aws-sdk/client-appconfig";
+import { AppConfigDataClient } from "@aws-sdk/client-appconfigdata";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
@@ -252,6 +254,20 @@ export const sesv2 = new SESv2Client({
   region: DEFAULT_REGION,
   requestHandler: new NodeHttpHandler(),
 });
+
+// --- AWS AppConfig & AppConfigData ---
+export const appconfig = new AppConfigClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  requestHandler: new NodeHttpHandler(),
+});
+
+export const appconfigData = new AppConfigDataClient({
+  endpoint: ENDPOINT,
+  region: DEFAULT_REGION,
+  requestHandler: new NodeHttpHandler(),
+});
+
 
 
 

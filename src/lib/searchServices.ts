@@ -776,10 +776,46 @@ export const COMMON_FEATURES: ServiceFeatureItem[] = [
     color: "#DD344C",
     aliases: ["suppression list", "suppressed", "bounces", "complaints", "blocklist"],
   },
+
+  // AWS AppConfig
+  {
+    id: "feat-appconfig-applications",
+    name: "AppConfig Applications",
+    href: "/appconfig/applications",
+    serviceId: "appconfig",
+    serviceName: "AWS AppConfig",
+    category: "Management & Governance",
+    desc: "Create and manage applications, environments, and configuration profiles",
+    color: "#C925D1",
+    aliases: ["appconfig applications", "applications", "apps", "app config"],
+  },
+  {
+    id: "feat-appconfig-strategies",
+    name: "Deployment Strategies",
+    href: "/appconfig/deployment-strategies",
+    serviceId: "appconfig",
+    serviceName: "AWS AppConfig",
+    category: "Management & Governance",
+    desc: "Configure deployment duration, growth type, and bake time for safe deployments",
+    color: "#C925D1",
+    aliases: ["deployment strategies", "deployment strategy", "bake time", "linear", "canary", "allatonce"],
+  },
+  {
+    id: "feat-appconfig-feature-flags",
+    name: "Feature Flags",
+    href: "/appconfig/applications",
+    serviceId: "appconfig",
+    serviceName: "AWS AppConfig",
+    category: "Management & Governance",
+    desc: "Safely create, toggle, and deploy dynamic feature flags to applications",
+    color: "#C925D1",
+    aliases: ["feature flags", "feature flag", "flags", "toggles", "appconfig flags"],
+  },
 ];
 
 // Acronym and common synonym expansion dictionary
 const ACRONYM_MAP: Record<string, string[]> = {
+  appconfig: ["appconfig", "app", "config", "feature", "flags", "deployment", "strategy", "configuration", "profiles"],
   ses: ["simple", "email", "service", "smtp", "mail", "identities", "templates", "dkim", "sendmail"],
   ecr: ["elastic", "container", "registry", "docker", "images", "repositories", "oci", "containers"],
   kinesis: ["kinesis", "kds", "streams", "streaming", "shards", "analytics", "records", "data streams"],

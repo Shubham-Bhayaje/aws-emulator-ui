@@ -60,12 +60,15 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "ses",
   "simple-email-service",
   "amazon-ses",
+  "appconfig",
+  "aws-appconfig",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (!idOrHref) return false;
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "appconfig" || clean.startsWith("appconfig/")) return true;
   if (clean === "ecr" || clean.startsWith("ecr/")) return true;
   if (clean === "ses" || clean.startsWith("ses/")) return true;
   if (clean === "kinesis" || clean.startsWith("kinesis/")) return true;
@@ -855,6 +858,17 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "category": "Management & Governance",
     "color": "#545b64",
     "desc": "Model, provision, and manage AWS and third-party resources as code templates"
+  },
+  {
+    "id": "appconfig",
+    "name": "AWS AppConfig",
+    "shortName": "AppConfig",
+    "href": "/appconfig",
+    "category": "Management & Governance",
+    "color": "#C925D1",
+    "status": "functional",
+    "desc": "Quickly and safely deploy application configuration and feature flags across applications and environments",
+    "aliases": ["appconfig", "app config", "feature flags", "feature flag", "configuration profiles", "deployment strategy", "application configuration"]
   },
   {
     "id": "systems-manager",

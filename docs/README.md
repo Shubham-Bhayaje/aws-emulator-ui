@@ -6,6 +6,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 
 - [AWS Management Console Home](Console%20Home.md): Central customizable dashboard for cloud monitoring, operational health telemetry, security compliance posture (Security Hub), cost and usage tracking, quick-start solution templates, and recent service navigation.
 - [AWS Account Management](Account%20Management.md): Manage account details, primary and alternate contacts (Billing, Operations, Security), AWS Region opt-in availability, and account closure.
+- [AWS AppConfig](AppConfig.md): Quickly and safely deploy dynamic application configuration and feature flags across applications and environments without code deployments, with progressive deployment strategies, bake times, automatic alarm rollbacks, and interactive AppConfigData client retrieval.
 - [AWS Certificate Manager (ACM)](ACM.md): Provision, request, and manage SSL/TLS certificates, validate domain ownership via DNS (Route 53 CNAME) or email, import third-party X.509 certificates and private keys, inspect certificate PEM bodies, and toggle Certificate Transparency logging.
 - [AWS CloudHSM](CloudHSM.md): Dedicated hardware security module (HSM) cluster management inside Amazon VPC, multi-AZ HSM provisioning, cluster CSR export, cluster initialization workflow, automated backup retention, and teardown safety controls.
 - [AWS Directory Service](Directory%20Service.md): Set up and manage Microsoft Active Directory, Simple AD, and AD Connector in the cloud, configure Access URL aliases, enable Single Sign-On (SSO), take point-in-time snapshots, reset domain admin credentials, and inspect trust relationships.
@@ -59,6 +60,9 @@ The following table tracks inter-service integrations that are waiting on future
 | Amazon EventBridge | Amazon SES | EventBridge event bus destinations for SES configuration set email sending events | Connect EventBridge event buses when Amazon EventBridge is built |
 | AWS Lambda | Amazon SES | Inbound email receipt rules triggering Lambda function processing | Connect Lambda function execution when AWS Lambda is built |
 | Amazon Pinpoint | Amazon SES | Cross-service transactional and marketing email delivery infrastructure | Connect Pinpoint campaigns when Amazon Pinpoint is built |
+| AWS Lambda | AWS AppConfig | Custom extension action points invoking Lambda functions before/during deployments | Connect Lambda function selection when AWS Lambda is built |
+| Amazon EventBridge | AWS AppConfig | Forward deployment event transitions (started, completed, rolled back) to EventBridge | Connect custom EventBridge event buses when Amazon EventBridge is built |
+| AWS CodePipeline | AWS AppConfig | AppConfig deployment action provider in continuous delivery pipelines | Connect AppConfig deploy stage when AWS CodePipeline is built |
 
 ---
 
