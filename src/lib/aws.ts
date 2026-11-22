@@ -47,7 +47,9 @@ import { SESClient } from "@aws-sdk/client-ses";
 import { SESv2Client } from "@aws-sdk/client-sesv2";
 import { AppConfigClient } from "@aws-sdk/client-appconfig";
 import { AppConfigDataClient } from "@aws-sdk/client-appconfigdata";
+import { LocationClient } from "@aws-sdk/client-location";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
+import https from "https";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = "https://127.0.0.1:9297";
@@ -267,6 +269,24 @@ export const appconfigData = new AppConfigDataClient({
   region: DEFAULT_REGION,
   requestHandler: new NodeHttpHandler(),
 });
+
+// Custom HTTPS agent to support subdomain endpoint prefixes in LocationClient (e.g. cp.maps.localhost, cp.tracking.localhost)
+const locationHttpsAgent = new https.Agent({
+  rejectUnauthorized: false,
+  checkServerIdentity: () => undefined,
+});
+
+// --- Amazon Location Service ---
+export const location = new LocationClient({
+  endpoint: "https://localhost:9297",
+  region: DEFAULT_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID || "EMULATOR46BF1B4915F9",
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || "74CCE172721E16381ABA11BA4F9DFD6A122EEBC4",
+  },
+  requestHandler: new NodeHttpHandler({ httpsAgent: locationHttpsAgent }),
+});
+
 
 
 

@@ -62,12 +62,17 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "amazon-ses",
   "appconfig",
   "aws-appconfig",
+  "location",
+  "amazon-location",
+  "amazon-location-service",
+  "geo",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
   if (!idOrHref) return false;
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
+  if (clean === "location" || clean.startsWith("location/")) return true;
   if (clean === "appconfig" || clean.startsWith("appconfig/")) return true;
   if (clean === "ecr" || clean.startsWith("ecr/")) return true;
   if (clean === "ses" || clean.startsWith("ses/")) return true;
@@ -1592,7 +1597,8 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "shortName": "Location Service",
     "href": "/location",
     "category": "Front-End Web & Mobile",
-    "color": "#FF9900",
+    "color": "#00A4A6",
+    "status": "functional",
     "desc": "Add location data, maps, geocoding, and tracking to applications securely"
   },
   {
@@ -3628,7 +3634,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "shortName": "Location Service",
         "href": "/location",
         "category": "Front-End Web & Mobile",
-        "color": "#FF9900",
+        "color": "#00A4A6",
+        "status": "functional",
         "desc": "Add location data, maps, geocoding, and tracking to applications securely"
       },
       {

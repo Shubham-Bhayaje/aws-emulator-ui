@@ -84,6 +84,7 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | **Amazon CloudWatch Logs** | Management & Governance | Built | [CloudWatch Logs Guide](docs/CloudWatch%20Logs.md) | 2026-11-21 |
 | **Amazon DynamoDB** | Database | Built | [DynamoDB Guide](docs/DynamoDB.md) | 2026-11-21 |
 | **Amazon Elastic Container Registry (ECR)** | Containers | Built | [ECR Guide](docs/ECR.md) | 2026-11-22 |
+| **Amazon Location Service** | Front-End Web & Mobile | Built | [Location Service Guide](docs/Location%20Service.md) | 2026-11-22 |
 | **Amazon Kinesis Data Streams** | Analytics | Built | [Kinesis Guide](docs/Kinesis%20Data%20Streams.md) | 2026-11-21 |
 | **Amazon Keyspaces** | Database | Built | [Keyspaces Guide](docs/Keyspaces.md) | 2026-11-21 |
 | **Amazon Timestream** | Database | Built | [Timestream Guide](docs/Timestream.md) | 2026-11-21 |
@@ -118,6 +119,9 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 
 - **Containers**:
   - **Amazon Elastic Container Registry (ECR)**: Fully managed Docker and OCI container image registry, global private repositories inventory with Region summary metrics (Total repositories, Immutable tags, Scan on push, KMS encrypted), name search filter, Create repository wizard with visibility settings (Private vs Public), tag immutability toggle (Mutable vs Immutable), automated vulnerability scan on push toggle, KMS customer managed key integration, and resource tags editor, comprehensive repository detail view with 4 interactive tabs (Images table with tag badges, size, push timestamp, scan status, and sha256 digests; Permissions with resource policy JSON editor; Lifecycle policy with automated age and count-based image expiration rules; Tags manager), View Push Commands modal with step-by-step Docker CLI authentication and build/tag/push commands for macOS/Linux and Windows, Public Repositories showcase gallery, and Registry Settings view managing vulnerability scanning configuration and pull through cache rules (Amazon ECR Public, Docker Hub, Quay, GitHub Container Registry).
+
+- **Geospatial & Location**:
+  - **Amazon Location Service**: Fully managed geospatial platform matching AWS Amazon Location Service, resource overview dashboard with real-time inventory counts (Maps, Trackers, Geofence Collections, Route Calculators, Place Indexes, API Keys), interactive Maps manager with vector and raster basemap styles from Esri, HERE, and Open Data, Create Map wizard with visual style selector cards, Map detail view featuring an interactive SVG/Canvas viewport simulation with pan/zoom controls and MapLibre GL JS embed code generator, Trackers manager with position filtering strategies (Time-based, Distance-based, Accuracy-based) and KMS encryption, Tracker detail view with live device position ingestion simulator (BatchUpdateDevicePosition) and consumer geofence collection linking, Geofence Collections manager with Circle and Polygon boundary support (PutGeofence) and interactive perimeter coordinate validation, Route Calculators with road network providers (Esri, HERE) and route calculation playground, Place Indexes view with emulator compatibility status banner, and API Keys view.
 
 - **Security, Identity, & Compliance**:
   - **AWS IAM**: Users, roles with trust policies, policy inspector with syntax-highlighted JSON documents.
@@ -714,6 +718,37 @@ Open your browser to: **[http://localhost:3000](http://localhost:3000)**
 | `StartConfigurationSession` | `aws appconfigdata start-configuration-session` | Supported | Client test playground session initializer on environment view |
 | `GetLatestConfiguration` | `aws appconfigdata get-latest-configuration` | Supported | Live evaluated client configuration payload retrieval |
 
+### Amazon Location Service
+| API Operation | CLI Command | Support Status | Console Implementation |
+| :--- | :--- | :--- | :--- |
+| `ListMaps` | `aws location list-maps` | Scaffolded (Fallback) | Maps inventory table on `/location/maps` using emulator registry & live `DescribeMap` |
+| `CreateMap` | `aws location create-map` | Supported | Create map wizard with Esri, HERE, and Open Data style cards on `/location/maps/create` |
+| `DescribeMap` | `aws location describe-map` | Supported | Map details view on `/location/maps/<mapName>` with interactive SVG canvas and MapLibre GL JS embed snippet |
+| `DeleteMap` | `aws location delete-map` | Supported | Delete map confirmation modal |
+| `ListTrackers` | `aws location list-trackers` | Supported | Trackers inventory table on `/location/trackers` |
+| `CreateTracker` | `aws location create-tracker` | Supported | Create tracker wizard on `/location/trackers/create` with position filtering and KMS options |
+| `DescribeTracker` | `aws location describe-tracker` | Supported | Tracker details view on `/location/trackers/<trackerName>` |
+| `DeleteTracker` | `aws location delete-tracker` | Supported | Delete tracker confirmation modal |
+| `BatchUpdateDevicePosition` | `aws location batch-update-device-position` | Supported | Live telemetry simulator ingesting real device updates |
+| `GetDevicePosition` | `aws location get-device-position` | Supported | Retrieves and renders device telemetry records and coordinates |
+| `AssociateTrackerConsumer` | `aws location associate-tracker-consumer` | Supported | Link consumer geofence collection modal |
+| `ListTrackerConsumers` | `aws location list-tracker-consumers` | Supported | Linked geofence collections list on tracker detail view |
+| `DisassociateTrackerConsumer` | `aws location disassociate-tracker-consumer` | Supported | Unlink consumer geofence collection action |
+| `ListGeofenceCollections` | `aws location list-geofence-collections` | Supported | Geofence collections table on `/location/geofences` |
+| `CreateGeofenceCollection` | `aws location create-geofence-collection` | Supported | Create collection wizard on `/location/geofences/create` |
+| `DescribeGeofenceCollection` | `aws location describe-geofence-collection` | Supported | Collection details view on `/location/geofences/<collectionName>` |
+| `DeleteGeofenceCollection` | `aws location delete-geofence-collection` | Supported | Delete geofence collection confirmation modal |
+| `PutGeofence` | `aws location put-geofence` | Supported | Add geofence modal supporting Circle and Polygon boundaries |
+| `GetGeofence` | `aws location get-geofence` | Supported | Retrieves geofence geometry coordinates and status |
+| `BatchDeleteGeofence` | `aws location batch-delete-geofence` | Supported | Delete geofence action in collection geofences table |
+| `ListRouteCalculators` | `aws location list-route-calculators` | Scaffolded (Fallback) | Route calculators table on `/location/routes` using registry & live `DescribeRouteCalculator` |
+| `CreateRouteCalculator` | `aws location create-route-calculator` | Supported | Create calculator form on `/location/routes/create` with Esri and HERE providers |
+| `DescribeRouteCalculator` | `aws location describe-route-calculator` | Supported | Route calculator details view on `/location/routes/<calculatorName>` |
+| `DeleteRouteCalculator` | `aws location delete-route-calculator` | Supported | Delete route calculator confirmation modal |
+| `CalculateRoute` | `aws location calculate-route` | Scaffolded (NotImplemented) | Route calculation playground with geodesic approximation and emulator notice |
+| `CreatePlaceIndex` / `ListPlaceIndexes` | `aws location list-place-indexes` | Scaffolded (NotImplemented) | Place Indexes view on `/location/places` with emulator compatibility banner |
+| `CreateKey` / `ListKeys` | `aws location list-keys` | Scaffolded (NotImplemented) | API Keys view on `/location/api-keys` with emulator compatibility banner |
+
 </details>
 
 ---
@@ -743,6 +778,7 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 
 ## Changelog
 
+- **2026-11-22** - **Amazon Location Service**: Full implementation of Amazon Location Service Management Console with resource overview dashboard and real-time inventory counts (Maps, Trackers, Geofence Collections, Route Calculators, Place Indexes, API Keys); Maps manager with vector and raster basemap styles from Esri, HERE, and Open Data, Create Map wizard with visual style selector cards, Map detail view featuring an interactive SVG/Canvas viewport simulation with pan/zoom controls and MapLibre GL JS embed code generator; Trackers manager with position filtering strategies (Time-based, Distance-based, Accuracy-based) and KMS encryption, Tracker detail view with live device position ingestion simulator (BatchUpdateDevicePosition) and consumer geofence collection linking; Geofence Collections manager with Circle and Polygon boundary support (PutGeofence) and interactive perimeter coordinate validation; Route Calculators with road network providers (Esri, HERE) and route calculation playground; Place Indexes view with emulator compatibility status banner; API Keys view; comprehensive learner documentation (`docs/Location Service.md`); and Action Support Matrix audit.
 - **2026-11-22** - **AWS AppConfig**: Full implementation of AWS AppConfig Management Console with Applications inventory, metric cards, Create application wizard, Application details view with Environments and Configuration profiles & feature flags tabs; Environments manager with CloudWatch alarm monitors; Configuration profiles manager supporting Feature Flags (`AWS.AppConfig.FeatureFlags`) with interactive table toggle switch and JSON schema editor, and Freeform profiles (`AWS.Freeform`) with live SSM Parameter Store, Secrets Manager, and Amazon S3 source selectors; Hosted configuration versions management with immutable revisions and payload viewer; Deployment strategies manager with predefined AWS strategies (`AllAtOnce`, `Linear50PercentEvery30Seconds`, `Canary10Percent20Minutes`, `Linear20PercentEvery6Minutes`) and custom strategy creator (linear/exponential growth, duration, bake time, and SSM document replication); Deployments manager with deployment status tracking, progress indicators, and rollback stop-deployment actions; Interactive client test playground powered by `@aws-sdk/client-appconfigdata` (`StartConfigurationSession` + `GetLatestConfiguration`) fetching live evaluated configuration payloads; Extensions view with Lambda integration notices; Account settings encryption view; learner guide (`docs/AppConfig.md`); and Action Support Matrix audit.
 - **2026-11-22** - **Amazon Simple Email Service (SES)**: Full implementation of Amazon SES Management Console with Account dashboard (24h send quota, send rate, sandbox status, deliverability reputation bounce/complaint rate gauges), Verified identities inventory (email addresses and domains, Easy DKIM status, custom MAIL FROM), Create identity wizard with Easy DKIM (RSA 2048-bit) and MAIL FROM domain alignment, comprehensive identity details view with 5 interactive tabs (Overview, Authentication with 3 CNAME DNS records, Notification topics with live Amazon SNS integration, Configuration sets, Identity policies with JSON editor), Configuration sets inventory and creation, Email templates manager with HTML/text editors and live rendered preview modal, Suppression list manager with add/remove actions, SMTP settings with endpoint ports, TLS requirements, and dedicated IAM SMTP credentials generator with standard RFC 2104 HMAC-SHA256 password derivation and CSV download, Send Test Email modal supporting mailbox simulator scenarios (Success, Hard bounce, Complaint), comprehensive learner documentation (`docs/SES.md`), and Action Support Matrix audit.
 - **2026-11-22** - **Amazon Elastic Container Registry (ECR)**: Full implementation of Amazon ECR Management Console with private repositories inventory, Region summary metric cards (Total repositories, Immutable tags, Scan on push, KMS encrypted), Create repository wizard with visibility settings, tag immutability, automated scan on push, live AWS KMS customer managed key dropdown, and tags editor, comprehensive repository detail view with 4 interactive tabs (Images inventory with digest copy, size, push timestamps, and delete image modal; Permissions with interactive JSON resource policy editor; Lifecycle policy with rule cards and JSON editor; Tags manager), View Push Commands modal with platform-specific Docker CLI authentication and build/tag/push commands for macOS/Linux and Windows, Public Repositories showcase gallery, Registry Settings view managing vulnerability scanning configuration and pull through cache rules (Amazon ECR Public, Docker Hub, Quay, GitHub Container Registry), comprehensive learner documentation (`docs/ECR.md`), and Action Support Matrix audit.

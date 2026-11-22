@@ -54,6 +54,7 @@
     "@aws-sdk/client-kinesis": "^3.1175.0",
     "@aws-sdk/client-kms": "^3.1172.0",
     "@aws-sdk/client-lambda": "^3.1171.0",
+    "@aws-sdk/client-location": "^3.1175.0",
     "@aws-sdk/client-organizations": "^3.1172.0",
     "@aws-sdk/client-ram": "^3.1173.0",
     "@aws-sdk/client-resource-groups": "^3.1173.0",

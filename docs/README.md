@@ -16,6 +16,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 - [AWS Systems Manager Parameter Store](SSM%20Parameter%20Store.md): Secure, hierarchical storage for configuration data management and secrets management with KMS encryption (SecureString), version history tracking, version staging labels, and resource tagging.
 - [Amazon CloudWatch Logs](CloudWatch%20Logs.md): Centralized logging service, log groups and streams management, retention policies, live tail streaming terminal, filter and search engine, metric filters to numerical metrics, and real-time subscription filters into Amazon Kinesis and AWS Lambda.
 - [Amazon Elastic Container Registry (ECR)](ECR.md): Fully managed Docker container registry, private and public repositories, image tags immutability, automated vulnerability scanning on push, repository resource policies, automated image lifecycle cleanup policies, push commands for Docker CLI, and pull through cache rules.
+- [Amazon Location Service](Location%20Service.md): Fully managed geospatial service for interactive maps (Esri, HERE, Open Data), asset and IoT device position tracking with filtering, virtual geofence boundaries (Circle, Polygon) with EventBridge alerts, turn-by-turn route calculators, place indexes, and API keys.
 - [Amazon DynamoDB](DynamoDB.md): Fast and flexible NoSQL database service, global tables inventory, partition and sort keys, on-demand and provisioned capacity modes, item explorer with scan and query engine, Time to Live (TTL), Point-in-time recovery (PITR), on-demand backups, and DynamoDB Streams.
 - [Amazon Kinesis Data Streams](Kinesis%20Data%20Streams.md): Massively scalable real-time streaming data service, on-demand and provisioned shard capacity modes, live data ingestion and record viewer, retention period management (up to 365 days), AWS KMS encryption at rest, enhanced fan-out consumer registration, and DynamoDB streaming destinations.
 - [Amazon Keyspaces (for Apache Cassandra)](Keyspaces.md): Scalable, highly available, and managed Apache Cassandra-compatible database service. Manage keyspaces, multi-region replication, tables with dynamic Cassandra column schema builder, on-demand and provisioned capacity modes, KMS encryption at rest, Point-in-time recovery (PITR), and default Time to Live (TTL).
@@ -63,6 +64,10 @@ The following table tracks inter-service integrations that are waiting on future
 | AWS Lambda | AWS AppConfig | Custom extension action points invoking Lambda functions before/during deployments | Connect Lambda function selection when AWS Lambda is built |
 | Amazon EventBridge | AWS AppConfig | Forward deployment event transitions (started, completed, rolled back) to EventBridge | Connect custom EventBridge event buses when Amazon EventBridge is built |
 | AWS CodePipeline | AWS AppConfig | AppConfig deployment action provider in continuous delivery pipelines | Connect AppConfig deploy stage when AWS CodePipeline is built |
+| Amazon EventBridge | Amazon Location Service | Geofence enter and exit events emitted from tracker-geofence collection evaluations | Connect EventBridge event rules when Amazon EventBridge is built |
+| Amazon Cognito | Amazon Location Service | Cognito Identity Pool temporary credentials for client-side map rendering | Connect Cognito Identity Pools when Amazon Cognito is built |
+| AWS CloudWatch | Amazon Location Service | Tracking request volume, tile cache hits, and device positions metrics | Connect CloudWatch metrics dashboard when Amazon CloudWatch is built |
+| AWS IoT Core | Amazon Location Service | IoT topic rules directly ingesting device telemetry into Location Trackers | Connect IoT Core rule actions when AWS IoT Core is built |
 
 ---
 
