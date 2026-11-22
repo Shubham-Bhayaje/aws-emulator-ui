@@ -53,10 +53,10 @@ if ($emulatorPortOpen) {
     New-Item -ItemType Directory -Force $emuDir | Out-Null
 
     if ($dockerPrefix -eq "docker") {
-        docker run -d --rm -p 127.0.0.1:9297:9297 -v "${emuDir}:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
+        docker run -d --rm -p 9297:9297 -v "${emuDir}:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
     } else {
         $wslEmuDir = (wsl -e wslpath -u $emuDir).Trim()
-        wsl -e docker run -d --rm -p 127.0.0.1:9297:9297 -v "${wslEmuDir}:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
+        wsl -e docker run -d --rm -p 9297:9297 -v "${wslEmuDir}:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
     }
     Start-Sleep -Seconds 2
 }

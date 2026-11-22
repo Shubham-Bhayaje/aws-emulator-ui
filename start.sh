@@ -35,7 +35,7 @@ else
   docker rm -f aws-emulator >/dev/null 2>&1 || true
   EMU_DIR="$HOME/.aws/emulator"
   mkdir -p "$EMU_DIR"
-  docker run -d --rm -p 127.0.0.1:9297:9297 -v "$EMU_DIR:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
+  docker run -d --rm -p 9297:9297 -v "$EMU_DIR:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
   sleep 2
 fi
 

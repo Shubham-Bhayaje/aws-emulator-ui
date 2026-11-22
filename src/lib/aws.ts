@@ -62,7 +62,10 @@ const DEFAULT_REGION = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION 
 
 let endpointHostname = "localhost";
 try {
-  endpointHostname = new URL(ENDPOINT).hostname;
+  const parsed = new URL(ENDPOINT).hostname;
+  if (parsed && !/^(?:\d{1,3}\.){3}\d{1,3}$/.test(parsed) && !parsed.includes(":")) {
+    endpointHostname = parsed;
+  }
 } catch {
   endpointHostname = "localhost";
 }
