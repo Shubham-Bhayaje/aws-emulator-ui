@@ -108,7 +108,9 @@ export default function InstancesClient({
           if (fresh.isLive) setInstances(fresh.instances);
         }, 1200);
       } else {
-        setActionMessage(`Error stopping: ${res.error}`);
+        setActionMessage(res.error || "Failed to stop instance");
+        const fresh = await fetchLiveEC2Instances();
+        if (fresh.isLive) setInstances(fresh.instances);
       }
     });
   }
@@ -131,7 +133,9 @@ export default function InstancesClient({
           if (fresh.isLive) setInstances(fresh.instances);
         }, 1500);
       } else {
-        setActionMessage(`Error rebooting: ${res.error}`);
+        setActionMessage(res.error || "Failed to reboot instance");
+        const fresh = await fetchLiveEC2Instances();
+        if (fresh.isLive) setInstances(fresh.instances);
       }
     });
   }
@@ -154,7 +158,9 @@ export default function InstancesClient({
           if (fresh.isLive) setInstances(fresh.instances);
         }, 1200);
       } else {
-        setActionMessage(`Error terminating: ${res.error}`);
+        setActionMessage(res.error || "Failed to terminate instance");
+        const fresh = await fetchLiveEC2Instances();
+        if (fresh.isLive) setInstances(fresh.instances);
       }
     });
   }
@@ -189,8 +195,14 @@ export default function InstancesClient({
           <span className="text-[#545b64]">|</span>
           <span>Instances queried directly from Docker container (127.0.0.1:9297)</span>
         </div>
-        {actionMessage && <span className="font-medium text-[#0073bb]">{actionMessage}</span>}
+        {actionMessage && !actionMessage.includes("AccessDenied") && !actionMessage.toLowerCase().includes("not authorized") && (
+          <span className="font-medium text-[#0073bb]">{actionMessage}</span>
+        )}
       </div>
+
+      {actionMessage && (actionMessage.includes("AccessDenied") || actionMessage.toLowerCase().includes("not authorized")) && (
+        <EmulatorOfflineBanner error={actionMessage} onRetry={() => setActionMessage(null)} />
+      )}
 
       {!isLive || liveError ? (
         <EmulatorOfflineBanner error={liveError} onRetry={refreshInstances} />

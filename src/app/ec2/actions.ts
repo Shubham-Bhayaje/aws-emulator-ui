@@ -108,6 +108,8 @@ import {
   ElasticIp,
   SecurityGroupRule,
 } from "@/lib/ec2-data";
+import { getActiveIdentity } from "@/lib/identity";
+import { assertPermission } from "@/lib/permissions";
 
 export type { EC2Instance };
 
@@ -364,6 +366,9 @@ export async function fetchLiveInstanceDetail(instanceId: string): Promise<{
 
 export async function startLiveInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:StartInstances", `arn:aws:ec2:us-east-1:${identity.accountId}:instance/${instanceId}`);
+
     await ec2.send(new StartInstancesCommand({ InstanceIds: [instanceId] }));
     await startInstanceContainer(instanceId);
     revalidatePath("/ec2");
@@ -377,6 +382,9 @@ export async function startLiveInstance(instanceId: string): Promise<{ success: 
 
 export async function stopLiveInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:StopInstances", `arn:aws:ec2:us-east-1:${identity.accountId}:instance/${instanceId}`);
+
     await ec2.send(new StopInstancesCommand({ InstanceIds: [instanceId] }));
     await stopInstanceContainer(instanceId);
     revalidatePath("/ec2");
@@ -390,6 +398,9 @@ export async function stopLiveInstance(instanceId: string): Promise<{ success: b
 
 export async function rebootLiveInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:RebootInstances", `arn:aws:ec2:us-east-1:${identity.accountId}:instance/${instanceId}`);
+
     await ec2.send(new RebootInstancesCommand({ InstanceIds: [instanceId] }));
     revalidatePath("/ec2");
     revalidatePath("/ec2/instances");
@@ -402,6 +413,9 @@ export async function rebootLiveInstance(instanceId: string): Promise<{ success:
 
 export async function terminateLiveInstance(instanceId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:TerminateInstances", `arn:aws:ec2:us-east-1:${identity.accountId}:instance/${instanceId}`);
+
     await ec2.send(new TerminateInstancesCommand({ InstanceIds: [instanceId] }));
     await terminateInstanceContainer(instanceId);
     revalidatePath("/ec2");
@@ -448,6 +462,9 @@ export async function launchLiveInstance(params: {
   securityGroupId?: string;
 }): Promise<{ success: boolean; instance?: EC2Instance; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:RunInstances", "*");
+
     const res = await ec2.send(
       new RunInstancesCommand({
         ImageId: params.imageId || "ami-0c7217cdde317cfec",
@@ -504,6 +521,9 @@ export async function createLiveSecurityGroup(
   description: string
 ): Promise<{ success: boolean; securityGroup?: SecurityGroup; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:CreateSecurityGroup", "*");
+
     const res = await ec2.send(
       new CreateSecurityGroupCommand({
         GroupName: groupName,
@@ -534,6 +554,9 @@ export async function createLiveSecurityGroup(
 
 export async function deleteLiveSecurityGroup(groupId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DeleteSecurityGroup", `arn:aws:ec2:us-east-1:${identity.accountId}:security-group/${groupId}`);
+
     await ec2.send(new DeleteSecurityGroupCommand({ GroupId: groupId }));
     revalidatePath("/ec2/security-groups");
     revalidatePath("/vpc/security-groups");
@@ -548,6 +571,9 @@ export async function updateLiveSecurityGroupRules(
   rules: SecurityGroupRule[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:AuthorizeSecurityGroupIngress", `arn:aws:ec2:us-east-1:${identity.accountId}:security-group/${groupId}`);
+
     // 1. Fetch current permissions
     const desc = await ec2.send(
       new DescribeSecurityGroupsCommand({ GroupIds: [groupId] })
@@ -617,6 +643,9 @@ export async function updateLiveSecurityGroupOutboundRules(
   rules: SecurityGroupRule[]
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:AuthorizeSecurityGroupEgress", `arn:aws:ec2:us-east-1:${identity.accountId}:security-group/${groupId}`);
+
     // 1. Fetch current egress permissions
     const desc = await ec2.send(
       new DescribeSecurityGroupsCommand({ GroupIds: [groupId] })
@@ -701,6 +730,9 @@ export async function createLiveKeyPair(
   keyFormat: "pem" | "ppk" = "pem"
 ): Promise<{ success: boolean; keyPair?: KeyPair; keyMaterial?: string; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:CreateKeyPair", "*");
+
     const res = await ec2.send(
       new CreateKeyPairCommand({
         KeyName: keyName,
@@ -733,6 +765,9 @@ export async function importLiveKeyPair(params: {
   publicKeyMaterial: string;
 }): Promise<{ success: boolean; keyPair?: KeyPair; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:ImportKeyPair", "*");
+
     const res = await ec2.send(
       new ImportKeyPairCommand({
         KeyName: params.keyName,
@@ -760,6 +795,9 @@ export async function importLiveKeyPair(params: {
 
 export async function deleteLiveKeyPair(keyName: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DeleteKeyPair", `arn:aws:ec2:us-east-1:${identity.accountId}:key-pair/${keyName}`);
+
     await ec2.send(new DeleteKeyPairCommand({ KeyName: keyName }));
     revalidatePath("/ec2/key-pairs");
     return { success: true };
@@ -804,6 +842,9 @@ export async function fetchLiveElasticIps(): Promise<{ elasticIps: ElasticIp[]; 
 
 export async function allocateLiveElasticIp(): Promise<{ success: boolean; elasticIp?: ElasticIp; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:AllocateAddress", "*");
+
     const res = await ec2.send(new AllocateAddressCommand({ Domain: "vpc" }));
     revalidatePath("/ec2/elastic-ips");
     return {
@@ -829,6 +870,9 @@ export async function associateLiveElasticIp(params: {
   allowReassociation?: boolean;
 }): Promise<{ success: boolean; associationId?: string; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:AssociateAddress", "*");
+
     const res = await ec2.send(
       new AssociateAddressCommand({
         AllocationId: params.allocationId,
@@ -848,6 +892,9 @@ export async function associateLiveElasticIp(params: {
 
 export async function disassociateLiveElasticIp(associationId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DisassociateAddress", "*");
+
     await ec2.send(
       new DisassociateAddressCommand({
         AssociationId: associationId,
@@ -863,6 +910,9 @@ export async function disassociateLiveElasticIp(associationId: string): Promise<
 
 export async function releaseLiveElasticIp(allocationId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:ReleaseAddress", `arn:aws:ec2:us-east-1:${identity.accountId}:elastic-ip/${allocationId}`);
+
     await ec2.send(new ReleaseAddressCommand({ AllocationId: allocationId }));
     revalidatePath("/ec2/elastic-ips");
     return { success: true };
@@ -954,6 +1004,9 @@ export async function createLiveVolume(params: {
   name?: string;
 }): Promise<{ success: boolean; volume?: EBSVolume; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:CreateVolume", "*");
+
     const input: any = {
       Size: params.sizeGb || 20,
       AvailabilityZone: params.availabilityZone || "us-east-1a",
@@ -1009,6 +1062,9 @@ export async function attachLiveVolume(params: {
   device?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:AttachVolume", `arn:aws:ec2:us-east-1:${identity.accountId}:volume/${params.volumeId}`);
+
     await ec2.send(
       new AttachVolumeCommand({
         VolumeId: params.volumeId,
@@ -1029,6 +1085,9 @@ export async function detachLiveVolume(params: {
   force?: boolean;
 }): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DetachVolume", `arn:aws:ec2:us-east-1:${identity.accountId}:volume/${params.volumeId}`);
+
     await ec2.send(
       new DetachVolumeCommand({
         VolumeId: params.volumeId,
@@ -1045,6 +1104,9 @@ export async function detachLiveVolume(params: {
 
 export async function deleteLiveVolume(volumeId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DeleteVolume", `arn:aws:ec2:us-east-1:${identity.accountId}:volume/${volumeId}`);
+
     await ec2.send(new DeleteVolumeCommand({ VolumeId: volumeId }));
     revalidatePath("/ec2/volumes");
     return { success: true };
@@ -1674,6 +1736,9 @@ export async function createLiveSnapshot(
   name?: string
 ): Promise<{ success: boolean; snapshotId?: string; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:CreateSnapshot", `arn:aws:ec2:us-east-1:${identity.accountId}:volume/${volumeId}`);
+
     const input: any = {
       VolumeId: volumeId,
       Description: description || "Created via AWS Console UI",
@@ -1696,6 +1761,9 @@ export async function createLiveSnapshot(
 
 export async function deleteLiveSnapshot(snapshotId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DeleteSnapshot", `arn:aws:ec2:us-east-1:${identity.accountId}:snapshot/${snapshotId}`);
+
     await ec2.send(new DeleteSnapshotCommand({ SnapshotId: snapshotId }));
     revalidatePath("/ec2/snapshots");
     return { success: true };
@@ -1718,6 +1786,9 @@ export async function createLiveLaunchTemplate(params: {
   monitoring?: boolean;
 }): Promise<{ success: boolean; templateId?: string; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:CreateLaunchTemplate", "*");
+
     const res = await ec2.send(
       new CreateLaunchTemplateCommand({
         LaunchTemplateName: params.name,
@@ -1858,6 +1929,9 @@ export async function launchInstanceFromTemplate(params: {
 
 export async function deleteLiveLaunchTemplate(templateId: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DeleteLaunchTemplate", `arn:aws:ec2:us-east-1:${identity.accountId}:launch-template/${templateId}`);
+
     await ec2.send(new DeleteLaunchTemplateCommand({ LaunchTemplateId: templateId }));
     revalidatePath("/ec2/launch-templates");
     return { success: true };
@@ -1873,6 +1947,9 @@ export async function createLivePlacementGroup(
   spreadLevel?: string
 ): Promise<{ success: boolean; groupId?: string; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:CreatePlacementGroup", "*");
+
     const input: any = {
       GroupName: groupName,
       Strategy: strategy as any,
@@ -1893,6 +1970,9 @@ export async function createLivePlacementGroup(
 
 export async function deleteLivePlacementGroup(groupName: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DeletePlacementGroup", "*");
+
     await ec2.send(new DeletePlacementGroupCommand({ GroupName: groupName }));
     revalidatePath("/ec2/placement-groups");
     return { success: true };
@@ -1912,6 +1992,9 @@ export async function createLiveNetworkInterface(
   descFallback?: string
 ): Promise<{ success: boolean; interfaceId?: string; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:CreateNetworkInterface", "*");
+
     let subnetId = "subnet-00000000000000001";
     let description = "Created via AWS Console UI";
     let privateIpAddress: string | undefined = undefined;
@@ -1960,6 +2043,9 @@ export async function deleteLiveNetworkInterface(
   networkInterfaceId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "ec2:DeleteNetworkInterface", `arn:aws:ec2:us-east-1:${identity.accountId}:network-interface/${networkInterfaceId}`);
+
     await ec2.send(new DeleteNetworkInterfaceCommand({ NetworkInterfaceId: networkInterfaceId }));
     revalidatePath("/ec2/network-interfaces");
     return { success: true };

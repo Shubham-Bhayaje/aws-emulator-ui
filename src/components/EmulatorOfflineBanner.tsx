@@ -28,6 +28,10 @@ export default function EmulatorOfflineBanner({
   onRetry,
   className = "",
 }: Props) {
+  const isAccessDenied = Boolean(
+    error && (error.includes("AccessDenied") || error.toLowerCase().includes("not authorized"))
+  );
+
   const message = formatEmulatorErrorMessage(error);
 
   const handleRetry = () => {
@@ -37,6 +41,53 @@ export default function EmulatorOfflineBanner({
       window.location.reload();
     }
   };
+
+  if (isAccessDenied) {
+    return (
+      <div
+        role="alert"
+        className={`p-4 bg-[#fdf3f1] border-l-4 border-l-[#d13212] border-y border-r border-[#f5b8b0] rounded-sm text-[#16191f] shadow-xs ${className}`}
+      >
+        <div className="flex items-start gap-3">
+          <div className="mt-0.5 w-4 h-4 rounded-full bg-[#d13212] text-white flex items-center justify-center text-[10px] font-bold shrink-0">
+            !
+          </div>
+          <div className="space-y-1.5 flex-1">
+            <div className="font-bold text-[#d13212] text-[14px]">
+              Access Denied (AccessDeniedException)
+            </div>
+            <p className="text-[12px] font-mono text-[#545b64] bg-white/70 p-2 rounded border border-[#eaeded] break-all">
+              {error}
+            </p>
+            <div className="text-[12px] text-[#545b64] space-y-1">
+              <p>
+                The active identity does not have permission to execute this operation. To resolve this:
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[#545b64]">
+                <li>
+                  Attach an IAM policy (e.g. <span className="font-mono text-[#16191f]">AmazonEC2FullAccess</span> or <span className="font-mono text-[#16191f]">AdministratorAccess</span>) directly to this user in{" "}
+                  <Link href="/iam/users" className="text-[#0073bb] underline hover:text-[#005276]">
+                    IAM Users
+                  </Link>
+                  .
+                </li>
+                <li>
+                  Add this user to an IAM user group that has the required policies in{" "}
+                  <Link href="/iam/user-groups" className="text-[#0073bb] underline hover:text-[#005276]">
+                    IAM User Groups
+                  </Link>
+                  .
+                </li>
+                <li>
+                  Or switch back to the Administrator (<span className="font-mono text-[#16191f]">emulator</span>) identity via the user menu in the top navigation bar.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

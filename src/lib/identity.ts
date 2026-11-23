@@ -20,6 +20,10 @@ import {
   ListAttachedRolePoliciesCommand,
   ListRolePoliciesCommand,
   GetRolePolicyCommand,
+  ListGroupsForUserCommand,
+  ListAttachedGroupPoliciesCommand,
+  ListGroupPoliciesCommand,
+  GetGroupPolicyCommand,
 } from "@aws-sdk/client-iam";
 import { ActiveIdentity, PolicyDocument } from "./permissions";
 
@@ -39,6 +43,91 @@ const DEFAULT_ADMIN: ActiveIdentity = {
     },
   ],
 };
+
+/**
+ * Standard AWS Managed Policies reference documents for local evaluation.
+ * Used when a policy ARN points to an official AWS-managed policy.
+ */
+const WELL_KNOWN_MANAGED_POLICIES: Record<string, PolicyDocument> = {
+  "arn:aws:iam::aws:policy/AdministratorAccess": {
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Action: "*", Resource: "*" }],
+  },
+  "arn:aws:iam::aws:policy/AmazonEC2FullAccess": {
+    Version: "2012-10-17",
+    Statement: [
+      { Effect: "Allow", Action: "ec2:*", Resource: "*" },
+      { Effect: "Allow", Action: "elasticloadbalancing:*", Resource: "*" },
+      { Effect: "Allow", Action: "cloudwatch:*", Resource: "*" },
+      { Effect: "Allow", Action: "autoscaling:*", Resource: "*" },
+    ],
+  },
+  "arn:aws:iam::aws:policy/AmazonEC2ReadOnlyAccess": {
+    Version: "2012-10-17",
+    Statement: [
+      { Effect: "Allow", Action: ["ec2:Describe*", "ec2:Get*"], Resource: "*" },
+      { Effect: "Allow", Action: "elasticloadbalancing:Describe*", Resource: "*" },
+      { Effect: "Allow", Action: "cloudwatch:Describe*", Resource: "*" },
+      { Effect: "Allow", Action: "autoscaling:Describe*", Resource: "*" },
+    ],
+  },
+  "arn:aws:iam::aws:policy/AmazonS3FullAccess": {
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Action: "s3:*", Resource: "*" }],
+  },
+  "arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess": {
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Action: ["s3:Get*", "s3:List*", "s3:Describe*"], Resource: "*" }],
+  },
+  "arn:aws:iam::aws:policy/AWSLambda_FullAccess": {
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Action: ["lambda:*", "iam:PassRole"], Resource: "*" }],
+  },
+  "arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess": {
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Action: "dynamodb:*", Resource: "*" }],
+  },
+  "arn:aws:iam::aws:policy/ReadOnlyAccess": {
+    Version: "2012-10-17",
+    Statement: [{ Effect: "Allow", Action: ["*:Describe*", "*:Get*", "*:List*"], Resource: "*" }],
+  },
+  "arn:aws:iam::aws:policy/PowerUserAccess": {
+    Version: "2012-10-17",
+    Statement: [
+      { Effect: "Allow", Action: "*", Resource: "*" },
+      { Effect: "Deny", Action: ["iam:*", "organizations:*", "account:*"], Resource: "*" },
+    ],
+  },
+};
+
+/**
+ * Resolves a policy document from well-known definitions or queries the local emulator.
+ */
+async function resolvePolicyDocument(policyArn: string): Promise<PolicyDocument | undefined> {
+  if (WELL_KNOWN_MANAGED_POLICIES[policyArn]) {
+    return WELL_KNOWN_MANAGED_POLICIES[policyArn];
+  }
+
+  const nameOnly = policyArn.split("/").pop() || "";
+  const matchedArn = Object.keys(WELL_KNOWN_MANAGED_POLICIES).find((k) => k.endsWith(`/${nameOnly}`));
+  if (matchedArn) {
+    return WELL_KNOWN_MANAGED_POLICIES[matchedArn];
+  }
+
+  try {
+    const pol = await iam.send(new GetPolicyCommand({ PolicyArn: policyArn }));
+    const defaultVerId = pol.Policy?.DefaultVersionId;
+    if (!defaultVerId) return undefined;
+
+    const verRes = await iam.send(
+      new GetPolicyVersionCommand({ PolicyArn: policyArn, VersionId: defaultVerId })
+    );
+    return parsePolicyDocument(verRes.PolicyVersion?.Document);
+  } catch (err) {
+    console.warn(`Failed to load policy document for ${policyArn}:`, err);
+    return undefined;
+  }
+}
 
 /**
  * Helper to safely parse policy document whether raw JSON string, URL-encoded string, or object.
@@ -94,33 +183,24 @@ export async function getActiveIdentity(): Promise<ActiveIdentity> {
 }
 
 /**
- * Loads all policy documents for a given IAM User (attached managed + inline policies).
+ * Loads all policy documents for a given IAM User (attached managed + inline policies + user groups).
  */
 async function fetchUserPolicyDocuments(userName: string): Promise<{ name: string; document?: PolicyDocument }[]> {
   try {
     const results: { name: string; document?: PolicyDocument }[] = [];
 
-    // 1. Attached managed policies
-    const attachedRes = await iam.send(new ListAttachedUserPoliciesCommand({ UserName: userName }));
-    const attached = attachedRes.AttachedPolicies || [];
-
-    for (const p of attached) {
-      if (!p.PolicyArn) continue;
-      try {
-        const pol = await iam.send(new GetPolicyCommand({ PolicyArn: p.PolicyArn }));
-        const defaultVerId = pol.Policy?.DefaultVersionId;
-        if (!defaultVerId) continue;
-
-        const verRes = await iam.send(
-          new GetPolicyVersionCommand({ PolicyArn: p.PolicyArn, VersionId: defaultVerId })
-        );
-        const parsed = parsePolicyDocument(verRes.PolicyVersion?.Document);
-        if (parsed) {
-          results.push({ name: p.PolicyName || p.PolicyArn, document: parsed });
+    // 1. Attached managed policies directly on user
+    try {
+      const attachedRes = await iam.send(new ListAttachedUserPoliciesCommand({ UserName: userName }));
+      for (const p of attachedRes.AttachedPolicies || []) {
+        if (!p.PolicyArn) continue;
+        const doc = await resolvePolicyDocument(p.PolicyArn);
+        if (doc) {
+          results.push({ name: p.PolicyName || p.PolicyArn, document: doc });
         }
-      } catch (err) {
-        console.warn(`Failed to load policy document for ${p.PolicyArn}:`, err);
       }
+    } catch (e) {
+      console.warn(`Failed to list attached policies for user ${userName}:`, e);
     }
 
     // 2. Inline user policies
@@ -137,6 +217,47 @@ async function fetchUserPolicyDocuments(userName: string): Promise<{ name: strin
       }
     } catch { /* ignore */ }
 
+    // 3. User Groups & Group Policies (Inherited permissions)
+    try {
+      const groupsRes = await iam.send(new ListGroupsForUserCommand({ UserName: userName }));
+      for (const group of groupsRes.Groups || []) {
+        if (!group.GroupName) continue;
+        const gName = group.GroupName;
+
+        // Group Attached Managed Policies
+        try {
+          const gAttachedRes = await iam.send(new ListAttachedGroupPoliciesCommand({ GroupName: gName }));
+          for (const p of gAttachedRes.AttachedPolicies || []) {
+            if (!p.PolicyArn) continue;
+            const doc = await resolvePolicyDocument(p.PolicyArn);
+            if (doc) {
+              results.push({ name: `[Group: ${gName}] ${p.PolicyName || p.PolicyArn}`, document: doc });
+            }
+          }
+        } catch (e) {
+          console.warn(`Failed to list attached policies for group ${gName}:`, e);
+        }
+
+        // Group Inline Policies
+        try {
+          const gInlineRes = await iam.send(new ListGroupPoliciesCommand({ GroupName: gName }));
+          for (const polName of gInlineRes.PolicyNames || []) {
+            try {
+              const polRes = await iam.send(new GetGroupPolicyCommand({ GroupName: gName, PolicyName: polName }));
+              const parsed = parsePolicyDocument(polRes.PolicyDocument);
+              if (parsed) {
+                results.push({ name: `[Group: ${gName}] ${polName}`, document: parsed });
+              }
+            } catch { /* ignore */ }
+          }
+        } catch (e) {
+          console.warn(`Failed to list inline policies for group ${gName}:`, e);
+        }
+      }
+    } catch (e) {
+      console.warn(`Failed to list groups for user ${userName}:`, e);
+    }
+
     return results;
   } catch (e) {
     console.warn(`Failed to list policies for user ${userName}:`, e);
@@ -152,26 +273,17 @@ async function fetchRolePolicyDocuments(roleName: string): Promise<{ name: strin
     const results: { name: string; document?: PolicyDocument }[] = [];
 
     // 1. Attached managed policies
-    const attachedRes = await iam.send(new ListAttachedRolePoliciesCommand({ RoleName: roleName }));
-    const attached = attachedRes.AttachedPolicies || [];
-
-    for (const p of attached) {
-      if (!p.PolicyArn) continue;
-      try {
-        const pol = await iam.send(new GetPolicyCommand({ PolicyArn: p.PolicyArn }));
-        const defaultVerId = pol.Policy?.DefaultVersionId;
-        if (!defaultVerId) continue;
-
-        const verRes = await iam.send(
-          new GetPolicyVersionCommand({ PolicyArn: p.PolicyArn, VersionId: defaultVerId })
-        );
-        const parsed = parsePolicyDocument(verRes.PolicyVersion?.Document);
-        if (parsed) {
-          results.push({ name: p.PolicyName || p.PolicyArn, document: parsed });
+    try {
+      const attachedRes = await iam.send(new ListAttachedRolePoliciesCommand({ RoleName: roleName }));
+      for (const p of attachedRes.AttachedPolicies || []) {
+        if (!p.PolicyArn) continue;
+        const doc = await resolvePolicyDocument(p.PolicyArn);
+        if (doc) {
+          results.push({ name: p.PolicyName || p.PolicyArn, document: doc });
         }
-      } catch (err) {
-        console.warn(`Failed to load policy document for ${p.PolicyArn}:`, err);
       }
+    } catch (e) {
+      console.warn(`Failed to list attached policies for role ${roleName}:`, e);
     }
 
     // 2. Inline role policies

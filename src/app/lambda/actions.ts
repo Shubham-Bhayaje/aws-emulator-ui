@@ -24,6 +24,8 @@ import {
   DEFAULT_LAMBDA_FUNCTIONS,
   LAMBDA_RUNTIMES,
 } from "@/lib/lambda-data";
+import { getActiveIdentity } from "@/lib/identity";
+import { assertPermission } from "@/lib/permissions";
 
 // -------------------------------------------------------------
 // Mapper: AWS SDK FunctionConfiguration to LambdaFunction model
@@ -127,6 +129,9 @@ export async function createLiveFunction(params: {
   codeContent?: string;
 }): Promise<{ success: boolean; fn?: LambdaFunction; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "lambda:CreateFunction", `arn:aws:lambda:us-east-1:${identity.accountId}:function:${params.name}`);
+
     const runtimePreset = LAMBDA_RUNTIMES.find((r) => r.id === params.runtime) || LAMBDA_RUNTIMES[0];
     const extension = runtimePreset.defaultExtension;
     const fileName = extension === "py" ? "lambda_function.py" : extension === "mjs" ? "index.mjs" : "index.js";
@@ -243,6 +248,9 @@ export async function deleteLiveFunction(functionName: string): Promise<{
   error?: string;
 }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "lambda:DeleteFunction", `arn:aws:lambda:us-east-1:${identity.accountId}:function:${functionName}`);
+
     await lambda.send(new DeleteFunctionCommand({ FunctionName: functionName }));
     revalidatePath("/lambda");
     revalidatePath("/lambda/functions");

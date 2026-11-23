@@ -35,6 +35,8 @@ import { ListAliasesCommand, ListKeysCommand, DescribeKeyCommand } from "@aws-sd
 import { ListFunctionsCommand } from "@aws-sdk/client-lambda";
 import { ListBucketsCommand } from "@aws-sdk/client-s3";
 import { revalidatePath } from "next/cache";
+import { getActiveIdentity } from "@/lib/identity";
+import { assertPermission } from "@/lib/permissions";
 import {
   TableSummary,
   TableDetail,
@@ -372,6 +374,9 @@ export async function createTableAction(input: {
   }
 
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "dynamodb:CreateTable", `arn:aws:dynamodb:us-east-1:${identity.accountId}:table/${tableName.trim()}`);
+
     await dynamodb.send(
       new CreateTableCommand({
         TableName: tableName.trim(),
@@ -476,6 +481,9 @@ export async function updateTableAction(input: {
 // 5. Delete a DynamoDB table
 export async function deleteTableAction(tableName: string): Promise<{ success: boolean; error?: string }> {
   try {
+    const identity = await getActiveIdentity();
+    assertPermission(identity, "dynamodb:DeleteTable", `arn:aws:dynamodb:us-east-1:${identity.accountId}:table/${tableName}`);
+
     await dynamodb.send(new DeleteTableCommand({ TableName: tableName }));
     revalidatePath("/dynamodb");
     revalidatePath("/dynamodb/tables");
