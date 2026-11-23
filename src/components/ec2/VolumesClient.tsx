@@ -7,6 +7,7 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 import {
   EBSVolume,
   EC2Instance,
@@ -212,24 +213,24 @@ export default function VolumesClient({
 
   return (
     <div className="space-y-6 max-w-[1400px]">
-      {/* Live Badge */}
-      <div className="flex items-center justify-between bg-white border border-[#d5dbdb] px-4 py-2.5 rounded-sm awsui-shadow">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-block w-2.5 h-2.5 rounded-full ${
-                isLive ? "bg-[#1d8102]" : "bg-[#ec7211]"
-              }`}
-            />
-            <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "EBS Volume Service Connected (AWS Emulator)" : "Disconnected from AWS Emulator (127.0.0.1:9297)"}
-            </span>
+      {!isLive ? (
+        <EmulatorOfflineBanner />
+      ) : (
+        /* Live Badge */
+        <div className="flex items-center justify-between bg-white border border-[#d5dbdb] px-4 py-2.5 rounded-sm awsui-shadow">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="inline-block w-2.5 h-2.5 rounded-full bg-[#1d8102]" />
+              <span className="text-[12px] font-semibold text-[#16191f]">
+                EBS Volume Service Connected (AWS Emulator)
+              </span>
+            </div>
+            <span className="text-[#95a5a6] text-[12px]">|</span>
+            <span className="text-[12px] font-mono text-[#545b64]">Region: us-east-1</span>
           </div>
-          <span className="text-[#95a5a6] text-[12px]">|</span>
-          <span className="text-[12px] font-mono text-[#545b64]">Region: us-east-1</span>
+          {feedback && <span className="text-[12px] text-[#0073bb] font-medium">{feedback}</span>}
         </div>
-        {feedback && <span className="text-[12px] text-[#0073bb] font-medium">{feedback}</span>}
-      </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">

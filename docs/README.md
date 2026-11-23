@@ -4,6 +4,7 @@ Welcome to the documentation for the AWS Emulator UI. This directory contains de
 
 ## Available Guides
 
+- [Troubleshooting & Diagnostics Guide](troubleshooting.md): Solutions for loopback connection timeouts (`ETIMEDOUT`), container launch failures (`ECONNREFUSED`), out-of-memory (`Killed`) errors, WSL networking configuration, and emulator certificate handling.
 - [AWS Management Console Home](Console%20Home.md): Central customizable dashboard for cloud monitoring, operational health telemetry, security compliance posture (Security Hub), cost and usage tracking, quick-start solution templates, and recent service navigation.
 - [AWS Account Management](Account%20Management.md): Manage account details, primary and alternate contacts (Billing, Operations, Security), AWS Region opt-in availability, and account closure.
 - [AWS AppConfig](AppConfig.md): Quickly and safely deploy dynamic application configuration and feature flags across applications and environments without code deployments, with progressive deployment strategies, bake times, automatic alarm rollbacks, and interactive AppConfigData client retrieval.

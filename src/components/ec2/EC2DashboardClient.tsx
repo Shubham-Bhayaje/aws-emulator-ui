@@ -8,6 +8,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 import {
   EC2Instance,
   SecurityGroup,
@@ -75,20 +76,18 @@ export default function EC2DashboardClient({
 
   return (
     <div className="space-y-6 max-w-[1400px]">
-      {/* Live Emulator Connection Banner */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#f2f8f0] border border-[#b8dfaf] rounded-sm text-[12px] text-[#1d8102]">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-[#1d8102] animate-pulse" />
-          <span className="font-semibold">AWS Emulator Connected</span>
-          <span className="text-[#545b64]">|</span>
-          <span className="text-[#545b64]">Endpoint: https://127.0.0.1:9297 (Region: us-east-1)</span>
-        </div>
-        <span className="font-mono text-[11px] text-[#2b7d2b]">Live EC2 API Protocol</span>
-      </div>
-
-      {liveError && (
-        <div className="p-3 bg-[#fdf3f1] border border-[#f5b8b0] text-[#d13212] text-[12px] rounded-sm">
-          Warning: Could not connect to emulator: {liveError}. Falling back to cached data.
+      {/* Connection Status / Offline Warning Banner */}
+      {!isLive || liveError ? (
+        <EmulatorOfflineBanner error={liveError} />
+      ) : (
+        <div className="flex items-center justify-between px-4 py-2.5 bg-[#f2f8f0] border border-[#b8dfaf] rounded-sm text-[12px] text-[#1d8102]">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#1d8102] animate-pulse" />
+            <span className="font-semibold">AWS Emulator Connected</span>
+            <span className="text-[#545b64]">|</span>
+            <span className="text-[#545b64]">Endpoint: https://127.0.0.1:9297 (Region: us-east-1)</span>
+          </div>
+          <span className="font-mono text-[11px] text-[#2b7d2b]">Live EC2 API Protocol</span>
         </div>
       )}
 

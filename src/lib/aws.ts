@@ -70,28 +70,37 @@ try {
   endpointHostname = "localhost";
 }
 
-// --- EC2 / VPC ---
+// --- Shared 5-second timeout HTTP Handler with TLS SNI hostname ---
 const ec2HttpsAgent = new https.Agent({
   rejectUnauthorized: false,
   servername: endpointHostname,
 });
 
+const defaultHttpHandler = new NodeHttpHandler({
+  httpsAgent: ec2HttpsAgent,
+  connectionTimeout: 5000,
+  requestTimeout: 5000,
+});
+
+// --- EC2 / VPC ---
 export const ec2 = new EC2Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
+  requestHandler: defaultHttpHandler,
 });
 
 // --- ELB v2 (Elastic Load Balancing) ---
 export const elbv2 = new ElasticLoadBalancingV2Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  requestHandler: defaultHttpHandler,
 });
 
 // --- Auto Scaling ---
 export const autoScaling = new AutoScalingClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  requestHandler: defaultHttpHandler,
 });
 
 // --- S3 ---
@@ -99,36 +108,42 @@ export const s3 = new S3Client({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
   forcePathStyle: true, // required: emulator doesn't support virtual-hosted buckets
+  requestHandler: defaultHttpHandler,
 });
 
 // --- SQS ---
 export const sqs = new SQSClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  requestHandler: defaultHttpHandler,
 });
 
 // --- DynamoDB ---
 export const dynamodb = new DynamoDBClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  requestHandler: defaultHttpHandler,
 });
 
 // --- IAM ---
 export const iam = new IAMClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  requestHandler: defaultHttpHandler,
 });
 
 // --- STS (Security Token Service – used to verify identity) ---
 export const sts = new STSClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  requestHandler: defaultHttpHandler,
 });
 
 // --- Lambda ---
 export const lambda = new LambdaClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
+  requestHandler: defaultHttpHandler,
 });
 
 // --- Organizations ---

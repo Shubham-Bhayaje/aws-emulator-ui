@@ -13,6 +13,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 import { EC2Instance } from "@/lib/ec2-data";
 import EC2TerminalModal from "./EC2TerminalModal";
 import {
@@ -191,11 +192,9 @@ export default function InstancesClient({
         {actionMessage && <span className="font-medium text-[#0073bb]">{actionMessage}</span>}
       </div>
 
-      {liveError && (
-        <div className="p-3 bg-[#fdf3f1] border border-[#f5b8b0] text-[#d13212] text-[12px] rounded-sm">
-          Emulator notice: {liveError}
-        </div>
-      )}
+      {!isLive || liveError ? (
+        <EmulatorOfflineBanner error={liveError} onRetry={refreshInstances} />
+      ) : null}
 
       {/* Page Title & Breadcrumb */}
       <div className="flex flex-wrap items-center justify-between gap-4">

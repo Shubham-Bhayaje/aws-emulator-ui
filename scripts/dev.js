@@ -41,6 +41,8 @@ const env = {
   AWS_SHARED_CREDENTIALS_FILE: credentialsFile,
   AWS_CONFIG_FILE: configFile,
   AWS_EC2_METADATA_DISABLED: "true",
+  AWS_ENDPOINT_URL: process.env.AWS_ENDPOINT_URL || `https://127.0.0.1:${emulatorPort}`,
+  EMULATOR_ENDPOINT: process.env.EMULATOR_ENDPOINT || `https://127.0.0.1:${emulatorPort}`,
 };
 
 if (fs.existsSync(credentialsFile)) {
@@ -70,7 +72,7 @@ if (fs.existsSync(caCert)) {
 
 const isWindows = process.platform === "win32";
 const nextCmd = isWindows ? "npx.cmd" : "npx";
-const hostname = process.env.HOST || "0.0.0.0";
+const hostname = process.env.HOST || "127.0.0.1";
 
 console.log(`[AWS Emulator UI] Starting Next.js dev server on http://localhost:3000 (binding to ${hostname}) ...`);
 

@@ -68,7 +68,7 @@ export async function fetchLiveLambdaFunctions(): Promise<{
   } catch (err: any) {
     console.warn("[Lambda Action] Emulator connection notice:", err.message);
     return {
-      functions: DEFAULT_LAMBDA_FUNCTIONS,
+      functions: [],
       isLive: false,
       error: err.message,
     };
@@ -101,10 +101,9 @@ export async function fetchLiveFunctionDetail(functionName: string): Promise<{
     };
   } catch (err: any) {
     console.warn(`[Lambda Action] Error getting function ${functionName}:`, err.message);
-    const fallback = DEFAULT_LAMBDA_FUNCTIONS.find((f) => f.name === functionName) || null;
     return {
-      fn: fallback,
-      codeString: LAMBDA_RUNTIMES[0].starterCode,
+      fn: null,
+      codeString: "",
       isLive: false,
       error: err.message,
     };

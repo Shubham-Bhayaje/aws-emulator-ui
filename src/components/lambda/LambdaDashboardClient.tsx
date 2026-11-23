@@ -85,7 +85,7 @@ export default function LambdaDashboardClient({
               }`}
             />
             <span className="text-[12px] font-semibold text-[#16191f]">
-              {isLive ? "AWS Emulator Connected" : "Local Mock Fallback"}
+              {isLive ? "AWS Emulator Connected" : "Disconnected from Emulator"}
             </span>
           </div>
           <span className="text-[#95a5a6] text-[12px]">|</span>

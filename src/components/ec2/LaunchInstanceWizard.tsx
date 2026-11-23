@@ -9,6 +9,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 import {
   EC2Instance,
   SecurityGroup,
@@ -158,14 +159,12 @@ export default function LaunchInstanceWizard({
       </div>
 
       {launchError && (
-        <div className="p-3 bg-[#fdf3f1] border border-[#f5b8b0] text-[#d13212] text-[13px] rounded-sm flex items-center gap-2">
-          <svg className="w-4 h-4 shrink-0 text-[#d13212]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" y1="8" x2="12" y2="12" />
-            <line x1="12" y1="16" x2="12.01" y2="16" />
-          </svg>
-          <span>Error launching instance: {launchError}</span>
-        </div>
+        <EmulatorOfflineBanner
+          error={launchError}
+          onRetry={() => {
+            setLaunchError(null);
+          }}
+        />
       )}
 
       <form onSubmit={handleLaunch} className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

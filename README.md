@@ -95,25 +95,39 @@ stop.bat        # Windows CMD
 
 ---
 
+---
+
+## System Requirements
+
+- **Operating System:** Linux, macOS, or Windows 10/11 (via Docker Desktop or WSL 2).
+- **Node.js:** Node.js v20.x or newer (with npm).
+  > [!NOTE]
+  > The AWS SDK for JavaScript (v3) versions published after the first week of January 2027 will require **Node.js >= 22**. Upgrading to Node.js v22 LTS is recommended for future compatibility.
+- **Docker:** Docker Desktop (Windows / macOS) or Docker Engine (Linux / WSL).
+- **RAM & Swap Requirements:**
+  - Minimum 4 GB of available system memory.
+  - Next.js development server (`next dev` with Turbopack) peaks at approximately 2.2 GB of memory during on-demand route compilation.
+  - When running inside **WSL 2**, ensure your `%USERPROFILE%\.wslconfig` allocates at least `memory=5GB` and `swap=6GB` to prevent kernel out-of-memory process termination.
+  - Ensure WSL is configured with `networkingMode=nat` (do not use `mirrored`).
+
+---
+
 ### Manual Setup (Development Mode)
 
-#### 1. Prerequisites
-- **Docker Desktop** (Windows / macOS) or **Docker Engine** (Linux / WSL)
-- **Node.js** (v20+ recommended) and **npm**
-
-#### 2. Start the AWS Emulator
-Run the official emulator on port `9297`:
+#### 1. Start the AWS Emulator
+Run the official emulator on local loopback port `9297`:
 
 ```bash
-# Using the bundled script (Linux / macOS / WSL)
-./scripts/emulator.sh start
-
-# Or via Docker on Windows PowerShell
-New-Item -ItemType Directory -Force "$env:USERPROFILE\.aws\emulator"
-docker run -d --rm -p 127.0.0.1:9297:9297 -v "$env:USERPROFILE\.aws\emulator:/home/emulator/.aws/emulator" aws-emulator -p 9297 --telemetry off
+# Using Docker directly:
+docker run -d --name aws-emulator --restart unless-stopped \
+  --memory=2g --memory-swap=2g \
+  -p 127.0.0.1:9297:9297 \
+  --user "$(id -u):$(id -g)" \
+  -e HOME="$HOME" -v "$HOME/.aws/emulator:$HOME/.aws/emulator" \
+  aws-emulator:latest -p 9297 --telemetry off
 ```
 
-#### 3. Launch the Console UI
+#### 2. Launch the Console UI
 ```bash
 git clone https://github.com/Shubham-Bhayaje/aws-emulator-ui.git
 cd aws-emulator-ui
@@ -121,7 +135,36 @@ npm install
 npm run dev
 ```
 
-Open your browser to: **[http://localhost:3000](http://localhost:3000)**
+Open your browser to: **[http://localhost:3000](http://localhost:3000)** or **[http://127.0.0.1:3000](http://127.0.0.1:3000)**.
+
+---
+
+## Troubleshooting
+
+If you encounter connection timeouts (`connect ETIMEDOUT 127.0.0.1:9297`), connection refused (`ECONNREFUSED`), browser `ERR_CONNECTION_REFUSED`, out-of-memory (`Killed`) errors, or certificate mismatches after restarting the emulator, consult the dedicated troubleshooting guide:
+
+- **[Learner Troubleshooting & Diagnostics Guide](docs/troubleshooting.md)**
+
+### Three Most Common Fixes
+
+1. **WSL 2 Loopback Timeouts (`ETIMEDOUT`):**
+   If `wslinfo --networking-mode` outputs `mirrored`, local loopback binding to container ports may hang. Revert to `networkingMode=nat` in `%USERPROFILE%\.wslconfig` and execute `wsl --shutdown` in PowerShell.
+2. **Out of Memory (`Killed` during Next.js compilation):**
+   `next dev` with Turbopack requires ~2.2 GB free memory during compilation. Set `memory=5GB` and `swap=6GB` in `%USERPROFILE%\.wslconfig` and shut down unneeded background services (e.g. MySQL, Tomcat).
+3. **Emulator Restarted Without Restarting Console (`SELF_SIGNED_CERT_IN_CHAIN`):**
+   The AWS Emulator regenerates a new `ca.pem` on each container startup. Node.js only loads `NODE_EXTRA_CA_CERTS` at launch. Always restart `npm run dev` or `./start.sh` whenever the emulator container restarts.
+
+Key diagnostics:
+```bash
+# Verify emulator container state
+docker ps --filter "name=aws-emulator"
+
+# Test health check over loopback HTTPS with CA cert
+curl -sS -m 5 --cacert ~/.aws/emulator/9297/ca.pem https://127.0.0.1:9297/__admin/health
+
+# Verify WSL networking mode
+wslinfo --networking-mode
+```
 
 ---
 
@@ -1058,6 +1101,14 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 ---
 
 ## Changelog
+
+- **2026-11-23** - **Launcher Hardening & Reliability Framework**: Comprehensive diagnostic and resilience hardening for development scripts and Next.js frontend:
+  - **Preflight Diagnostics in `start.sh`:** Automated detection of WSL 2 `networkingMode=mirrored` preventing loopback container communication, ephemeral loopback self-test on `127.0.0.1`, and system memory preflight check (<2000 MB available warning) with top consumer diagnostics.
+  - **Container Lifecycle & Health Verifications:** Reusable named container `aws-emulator` with restart policy `--restart unless-stopped`, build fallback from `Dockerfile.emulator`, 30s HTTPS CA healthcheck poll against `https://127.0.0.1:9297/__admin/health`, and automated container-IP diagnostic fallback.
+  - **Graceful Teardown in `stop.sh`:** Complete cleanup of container resources and dangling `next dev` and `dev.js` processes, accompanied by user notifications explaining in-memory emulated state reset behavior.
+  - **Local Loopback Network Security:** Replaced `0.0.0.0` bindings with strict `127.0.0.1` binding across both `start.sh` container publication and `scripts/dev.js` Next.js server.
+  - **Elimination of Stale Mock Data:** Removed fallback to cached/mock instances and functions across EC2 and Lambda server actions when emulator is unreachable; implemented `EmulatorOfflineBanner` with clear `ECONNREFUSED` vs `ETIMEDOUT` diagnostics, 5-second connection timeout, retry button, and direct link to documentation.
+  - **Learner Documentation:** Dedicated troubleshooting guide (`docs/troubleshooting.md` and `public/docs/troubleshooting.md`) detailing common symptoms, root causes, `.wslconfig` recommendations, and step-by-step diagnostic commands.
 
 - **2026-11-22** - **AWS Route 53 Resolver**: Full implementation of AWS Route 53 Resolver Management Console with Dashboard (`/route53/resolver`) featuring metric cards and interactive hybrid DNS resolution architecture diagram; Inbound and Outbound Endpoints manager (`/route53/resolver/endpoints`), Create Endpoint wizard (`/route53/resolver/endpoints/create`) with multi-AZ subnet ENI allocation, Do53/DoH protocols, and endpoint detail view (`/route53/resolver/endpoints/[id]`) with IP addresses table; Rules manager (`/route53/resolver/rules`) with FORWARD and SYSTEM conditional forwarding, Create Rule wizard (`/route53/resolver/rules/create`), and Rule details view (`/route53/resolver/rules/[id]`) with live VPC associations and target IP addresses; Query Logging Configurations manager (`/route53/resolver/query-logging`), Create configuration wizard (`/route53/resolver/query-logging/create`) with CloudWatch Logs and Amazon S3 destinations, and detail view (`/route53/resolver/query-logging/[id]`); DNS Firewall view (`/route53/resolver/firewall`) with VPC configurations, AWS-managed threat domain lists, and rule groups; Route 53 sidebar navigation integration; top-level redirects `/route53resolver` and `/resolver`; learner documentation (`docs/Route 53 Resolver.md`); and Action Support Matrix audit.
 
