@@ -35,8 +35,13 @@ else
   docker rm -f aws-emulator >/dev/null 2>&1 || true
   EMU_DIR="$HOME/.aws/emulator"
   mkdir -p "$EMU_DIR"
-  docker run -d --rm -p 9297:9297 -v "$EMU_DIR:/home/emulator/.aws/emulator" --name aws-emulator aws-emulator:latest -p 9297 --telemetry off
-  sleep 2
+  docker run -d --name aws-emulator --restart unless-stopped \
+    --memory=2g --memory-swap=2g \
+    -p 9297:9297 \
+    --user "$(id -u):$(id -g)" \
+    -e HOME="$HOME" -v "$EMU_DIR:$HOME/.aws/emulator" \
+    aws-emulator:latest -p 9297 --telemetry off
+  sleep 3
 fi
 
 # 3. Ensure Node.js dependencies are installed
