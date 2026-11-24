@@ -20,13 +20,18 @@ echo "[1/5] Running preflight system and environment checks..."
 # 1a. Docker Installation & Daemon Check
 if ! command -v docker >/dev/null 2>&1; then
   echo "[Preflight Error] Docker is not installed or not found in PATH."
-  echo "Fix: Install Docker: https://docs.docker.com/get-docker/"
+  echo "Fix: Follow the Docker Setup Guide in README.md or visit: https://docs.docker.com/get-docker/"
   exit 1
 fi
 
 if ! docker info >/dev/null 2>&1; then
   echo "[Preflight Error] Docker daemon is not active or running."
-  echo "Fix: Start the Docker service/daemon and rerun ./start.sh."
+  if grep -qi microsoft /proc/version 2>/dev/null; then
+    echo "Fix (WSL): Run 'sudo service docker start' to start Docker Engine,"
+    echo "           or open Docker Desktop on Windows if using WSL integration."
+  else
+    echo "Fix: Start the Docker service ('sudo systemctl start docker' or launch Docker Desktop)."
+  fi
   exit 1
 fi
 

@@ -8,6 +8,7 @@ This guide provides troubleshooting steps, diagnostic commands, and resolutions 
 
 | Symptom | Cause | Fix |
 | :--- | :--- | :--- |
+| **`[Preflight Error] Docker is not installed` or `daemon is not active`** | Docker is not installed in the current environment, or the Docker daemon/service is stopped. | 1. If in WSL without Docker Desktop: run `sudo service docker start`.<br>2. If on Windows/macOS with Docker Desktop: start Docker Desktop application.<br>3. To install Docker from scratch, follow the **[Docker Setup Guide](../README.md#prerequisites-docker-setup-guide)** in `README.md`. |
 | **`connect ETIMEDOUT 127.0.0.1:9297`** | WSL loopback networking is hung, or `networkingMode=mirrored` is enabled in `%USERPROFILE%\.wslconfig`. | 1. Check `%USERPROFILE%\.wslconfig` in Windows. Ensure `networkingMode` is either omitted or set to `nat`.<br>2. Run `wsl --shutdown` in Windows PowerShell.<br>3. Restart via `./start.sh`. |
 | **`connect ECONNREFUSED 127.0.0.1:9297`** | The `aws-emulator` Docker container is stopped or has not been launched yet. | Run `./start.sh` (or `start.bat` on Windows). The launcher automatically creates or restarts the `aws-emulator` container. |
 | **Process `Killed` with no error message** | WSL 2 kernel Out-Of-Memory (OOM) killer terminated `next-server` or `next-build`. | Next.js compilation requires ~2.2 GB free memory. Increase WSL memory allocation in `%USERPROFILE%\.wslconfig` (`memory=5GB`, `swap=6GB`), stop heavy background services (e.g. MySQL, Tomcat, Jenkins), and run `wsl --shutdown`. |

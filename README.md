@@ -95,20 +95,149 @@ stop.bat        # Windows CMD
 
 ---
 
----
-
 ## System Requirements
 
 - **Operating System:** Linux, macOS, or Windows 10/11 (via Docker Desktop or WSL 2).
 - **Node.js:** Node.js v20.x or newer (with npm).
   > [!NOTE]
   > The AWS SDK for JavaScript (v3) versions published after the first week of January 2027 will require **Node.js >= 22**. Upgrading to Node.js v22 LTS is recommended for future compatibility.
-- **Docker:** Docker Desktop (Windows / macOS) or Docker Engine (Linux / WSL).
+- **Docker:** Docker Desktop (Windows / macOS) or Docker Engine (Linux / WSL). See the [Docker Setup Guide](#prerequisites-docker-setup-guide) below.
 - **RAM & Swap Requirements:**
   - Minimum 4 GB of available system memory.
   - Next.js development server (`next dev` with Turbopack) peaks at approximately 2.2 GB of memory during on-demand route compilation.
   - When running inside **WSL 2**, ensure your `%USERPROFILE%\.wslconfig` allocates at least `memory=5GB` and `swap=6GB` to prevent kernel out-of-memory process termination.
   - Ensure WSL is configured with `networkingMode=nat` (do not use `mirrored`).
+
+---
+
+## Prerequisites: Docker Setup Guide
+
+The AWS Emulator runs as a local container (`aws-emulator`) on port `9297`. Before running `./start.sh` or `start.bat`, Docker must be installed and active on your system.
+
+Choose your operating system below for copy-paste installation commands:
+
+### 1. WSL 2 (Ubuntu / Debian on Windows) — Free Lightweight Docker Engine
+
+> [!TIP]
+> **You do not need Docker Desktop on Windows!** Installing Docker Engine directly inside WSL 2 is completely free, uses significantly less RAM (~200 MB vs ~2 GB for Docker Desktop), and avoids commercial license requirements.
+
+Open your WSL terminal (`wsl` in Windows PowerShell or Terminal) and run:
+
+```bash
+# 1. Install Docker Engine using the official convenience script
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# 2. Add your current user to the docker group (avoids needing sudo for docker commands)
+sudo usermod -aG docker $USER
+
+# 3. Enable passwordless start for the Docker service (optional but recommended)
+echo "$USER ALL=(ALL) NOPASSWD: /usr/sbin/service docker *" | sudo tee /etc/sudoers.d/docker-service
+
+# 4. Start the Docker service
+sudo service docker start
+
+# 5. Apply the new group membership to your current shell
+newgrp docker
+
+# 6. (Optional) Auto-start Docker whenever you open WSL:
+echo 'if service docker status 2>&1 | grep -q "is not running"; then sudo service docker start >/dev/null 2>&1; fi' >> ~/.bashrc
+```
+
+---
+
+### 2. Windows 10 / 11 (Native)
+
+#### Option A: Docker Desktop (GUI)
+Install Docker Desktop via Windows Package Manager (**winget**) in Windows PowerShell:
+```powershell
+winget install Docker.DockerDesktop
+```
+* Alternatively, download the official installer from [Docker for Windows](https://docs.docker.com/desktop/setup/install/windows-install/).
+* After installation, open **Docker Desktop**, go to **Settings > General**, and verify **Use the WSL 2 based engine** is checked.
+* Go to **Settings > Resources > WSL Integration**, and turn on integration for your active WSL distribution (e.g. `Ubuntu-24.04`).
+
+#### Option B: Standalone in WSL 2 (No Docker Desktop needed)
+If you prefer not to install Docker Desktop on Windows, follow the [WSL 2 steps above](#1-wsl-2-ubuntu--debian-on-windows--free-lightweight-docker-engine). You can then run `./start.sh` entirely inside WSL 2.
+
+---
+
+### 3. macOS (Apple Silicon & Intel)
+
+#### Option A: Docker Desktop (via Homebrew)
+```bash
+brew install --cask docker
+```
+* Open Docker from your Applications folder to complete the initial setup and grant system permissions.
+
+#### Option B: OrbStack (Fast, Lightweight Alternative)
+OrbStack is a high-performance alternative to Docker Desktop that starts in under 2 seconds and uses minimal battery and memory:
+```bash
+brew install orbstack
+```
+
+#### Option C: Colima (Minimal Open-Source Container Runtime)
+```bash
+brew install colima docker
+colima start
+```
+
+---
+
+### 4. Linux (Native Ubuntu / Debian / Fedora / Arch)
+
+#### Ubuntu / Debian
+```bash
+# 1. Install Docker Engine
+curl -fsSL https://get.docker.com | sudo sh
+
+# 2. Grant current user docker access
+sudo usermod -aG docker $USER
+
+# 3. Enable and start systemd service
+sudo systemctl enable --now docker
+
+# 4. Activate group in current terminal
+newgrp docker
+```
+
+#### Fedora / RHEL
+```bash
+# 1. Add repository and install
+sudo dnf install -y dnf-plugins-core
+sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
+sudo dnf install -y docker-ce docker-ce-cli containerd.io
+
+# 2. Enable service and grant permissions
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+#### Arch Linux
+```bash
+sudo pacman -S docker
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+---
+
+### 5. Verify Your Docker Setup
+
+After installing, verify that Docker is operational and running:
+
+```bash
+docker --version
+docker ps
+```
+
+If `docker ps` outputs the table header without errors:
+```text
+CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS    PORTS     NAMES
+```
+Your Docker environment is ready. You can now run `./start.sh` (Linux/macOS/WSL) or `start.bat` / `.\start.ps1` (Windows).
 
 ---
 
@@ -1101,6 +1230,10 @@ When running `npm run dev`, [`scripts/dev.js`](scripts/dev.js) automatically set
 ---
 
 ## Changelog
+
+- **2026-11-24** - **Cross-Platform Docker Setup Guide & IAM Access Control Hardening**:
+  - **Docker Setup Documentation:** Added comprehensive setup guides with copy-paste installation commands for WSL 2 (standalone Docker Engine without Docker Desktop, user group configuration, and service auto-start), Windows 10/11 (Docker Desktop winget installer and WSL 2 integration), macOS (Docker Desktop, OrbStack, and Colima via Homebrew), and Linux distributions (Ubuntu, Debian, Fedora, Arch).
+  - **Dynamic IAM Policy Resolution & Access Control:** Implemented user group policy inheritance in `identity.ts`, built-in AWS managed policy definitions, and server-side `assertPermission` enforcement across EC2, Lambda, and DynamoDB actions with authentic AWS `AccessDeniedException` UI banners.
 
 - **2026-11-23** - **Launcher Hardening & Reliability Framework**: Comprehensive diagnostic and resilience hardening for development scripts and Next.js frontend:
   - **Preflight Diagnostics in `start.sh`:** Automated detection of WSL 2 `networkingMode=mirrored` preventing loopback container communication, ephemeral loopback self-test on `127.0.0.1`, and system memory preflight check (<2000 MB available warning) with top consumer diagnostics.
