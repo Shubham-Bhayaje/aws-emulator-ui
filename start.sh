@@ -8,6 +8,18 @@ set -e
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$DIR"
 
+# Source NVM if present so node/npm are in PATH for non-login shells
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  export NVM_DIR="$HOME/.nvm"
+  # shellcheck source=/dev/null
+  . "$NVM_DIR/nvm.sh"
+elif [ -d "$HOME/.nvm/versions/node" ]; then
+  NODE_BIN=$(find "$HOME/.nvm/versions/node" -maxdepth 2 -type d -name bin 2>/dev/null | sort -V | tail -n 1)
+  if [ -n "$NODE_BIN" ]; then
+    export PATH="$NODE_BIN:$PATH"
+  fi
+fi
+
 echo "============================================================"
 echo " AWS Emulator & Management Console UI - One-Command Setup"
 echo "============================================================"
