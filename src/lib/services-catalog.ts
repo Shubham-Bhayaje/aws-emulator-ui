@@ -78,6 +78,9 @@ export const FULLY_BUILT_SERVICE_IDS = new Set<string>([
   "vpc",
   "amazon-vpc",
   "virtual-private-cloud",
+  "networkfirewall",
+  "network-firewall",
+  "firewalls",
 ]);
 
 export function isServiceFullyBuilt(idOrHref: string): boolean {
@@ -85,6 +88,7 @@ export function isServiceFullyBuilt(idOrHref: string): boolean {
   const clean = idOrHref.toLowerCase().trim().replace(/^\//, "");
   if (FULLY_BUILT_SERVICE_IDS.has(clean)) return true;
   if (clean === "vpc" || clean.startsWith("vpc/")) return true;
+  if (clean === "networkfirewall" || clean === "network-firewall" || clean.startsWith("networkfirewall/") || clean.startsWith("network-firewall/")) return true;
   if (clean === "cloudmap" || clean.startsWith("cloudmap/")) return true;
   if (clean === "servicediscovery" || clean.startsWith("servicediscovery/")) return true;
   if (clean === "resource-explorer" || clean.startsWith("resource-explorer/")) return true;
@@ -638,7 +642,7 @@ export const ALL_SERVICES: ServiceDefinition[] = [
     "id": "networkfirewall",
     "name": "AWS Network Firewall",
     "shortName": "Network Firewall",
-    "href": "/networkfirewall",
+    "href": "/vpc/firewalls",
     "category": "Networking & Content Delivery",
     "color": "#8C4FFF",
     "desc": "Stateful network inspection and firewall protection for Amazon VPCs"
@@ -2711,7 +2715,7 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
         "id": "networkfirewall",
         "name": "AWS Network Firewall",
         "shortName": "Network Firewall",
-        "href": "/networkfirewall",
+        "href": "/vpc/firewalls",
         "category": "Networking & Content Delivery",
         "color": "#8C4FFF",
         "desc": "Stateful network inspection and firewall protection for Amazon VPCs"

@@ -20,10 +20,19 @@ type Props = {
 export default async function DynamicServicePage(props: Props) {
   const { service: slug } = await props.params;
 
-  // Handle common aliases and glacier redirects immediately
+  // Handle common aliases and service redirects immediately
   const cleanSlug = slug.toLowerCase().replace(/[-_\s]+/g, "");
   if (cleanSlug === "s3glacier" || cleanSlug === "glaciervaults") {
     redirect("/glacier");
+  }
+  if (
+    cleanSlug === "networkfirewall" ||
+    cleanSlug === "networkfirewalls" ||
+    cleanSlug === "awsnetworkfirewall" ||
+    cleanSlug === "firewall" ||
+    cleanSlug === "firewalls"
+  ) {
+    redirect("/vpc/firewalls");
   }
 
   let service = findServiceByHref("/" + slug) || findServiceById(slug);
