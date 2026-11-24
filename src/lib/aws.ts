@@ -52,6 +52,7 @@ import { ServiceDiscoveryClient } from "@aws-sdk/client-servicediscovery";
 import { ResourceExplorer2Client } from "@aws-sdk/client-resource-explorer-2";
 import { DirectConnectClient } from "@aws-sdk/client-direct-connect";
 import { Route53ResolverClient } from "@aws-sdk/client-route53resolver";
+import { NetworkFirewallClient } from "@aws-sdk/client-network-firewall";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import https from "https";
 import { Readable } from "stream";
@@ -563,6 +564,16 @@ export const route53Resolver = withIAMEnforcement(
     requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
   }),
   "route53resolver"
+);
+
+// --- AWS Network Firewall ---
+export const networkFirewall = withIAMEnforcement(
+  new NetworkFirewallClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
+  }),
+  "network-firewall"
 );
 
 

@@ -63,7 +63,7 @@ export default function RouteTablesClient({
   // Add route modal
   const [isAddRouteModalOpen, setIsAddRouteModalOpen] = useState(false);
   const [destinationCidr, setDestinationCidr] = useState("0.0.0.0/0");
-  const [targetType, setTargetType] = useState<"igw" | "nat" | "local">("igw");
+  const [targetType, setTargetType] = useState<"igw" | "nat" | "local" | "vpce">("igw");
   const [targetId, setTargetId] = useState("");
 
   // Subnet association modal
@@ -125,6 +125,7 @@ export default function RouteTablesClient({
         destinationCidrBlock: destinationCidr.trim(),
         gatewayId: targetType === "igw" ? targetId : undefined,
         natGatewayId: targetType === "nat" ? targetId : undefined,
+        vpcEndpointId: targetType === "vpce" ? targetId : undefined,
       });
       if (res.success) {
         setIsAddRouteModalOpen(false);
@@ -750,10 +751,11 @@ export default function RouteTablesClient({
                 <select
                   value={targetType}
                   onChange={(e) => {
-                    const t = e.target.value as "igw" | "nat" | "local";
+                    const t = e.target.value as "igw" | "nat" | "local" | "vpce";
                     setTargetType(t);
                     if (t === "igw") setTargetId(internetGateways[0]?.InternetGatewayId || "");
                     else if (t === "nat") setTargetId(natGateways[0]?.NatGatewayId || "");
+                    else if (t === "vpce") setTargetId("");
                     else setTargetId("local");
                   }}
                   className="w-full px-3 py-1.5 border border-[#d5dbdb] rounded bg-white"
@@ -761,6 +763,7 @@ export default function RouteTablesClient({
                 >
                   <option value="igw">Internet Gateway</option>
                   <option value="nat">NAT Gateway</option>
+                  <option value="vpce">Gateway Load Balancer Endpoint / Network Firewall Endpoint</option>
                   <option value="local">Local</option>
                 </select>
               </div>
@@ -806,6 +809,26 @@ export default function RouteTablesClient({
                       ))}
                     </select>
                   )}
+                </div>
+              )}
+
+              {targetType === "vpce" && (
+                <div>
+                  <label className="block font-bold text-[#16191f] mb-1">
+                    Gateway Load Balancer Endpoint / Firewall Endpoint ID
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. vpce-00000000000000096"
+                    value={targetId}
+                    onChange={(e) => setTargetId(e.target.value)}
+                    className="w-full px-3 py-1.5 font-mono border border-[#d5dbdb] rounded bg-white text-[13px]"
+                    style={{ height: "32px", minHeight: "32px", maxHeight: "32px" }}
+                  />
+                  <p className="text-[11px] text-[#545b64] mt-1">
+                    Enter the VPC endpoint ID (vpce-...) provisioned by AWS Network Firewall in your subnet.
+                  </p>
                 </div>
               )}
 

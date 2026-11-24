@@ -31,4 +31,9 @@ export const vpcNav: VpcNavItem[] = [
   { label: "Customer gateways", href: "/vpc/customer-gateways", group: "Virtual Private Network (VPN)" },
   { label: "Site-to-Site VPN connections", href: "/vpc/vpn-connections", group: "Virtual Private Network (VPN)" },
   { label: "Client VPN endpoints", href: "/vpc/client-vpn-endpoints", group: "Virtual Private Network (VPN)" },
+
+  // Network Firewall
+  { label: "Firewalls", href: "/vpc/firewalls", group: "Network Firewall" },
+  { label: "Firewall policies", href: "/vpc/firewall-policies", group: "Network Firewall" },
+  { label: "Network Firewall rule groups", href: "/vpc/rule-groups", group: "Network Firewall" },
 ];

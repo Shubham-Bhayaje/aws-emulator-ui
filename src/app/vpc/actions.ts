@@ -929,6 +929,7 @@ export async function createRouteAction(data: {
   gatewayId?: string;
   natGatewayId?: string;
   transitGatewayId?: string;
+  vpcEndpointId?: string;
 }): Promise<{ success: boolean; error?: string }> {
   try {
     await ec2.send(
@@ -938,6 +939,7 @@ export async function createRouteAction(data: {
         GatewayId: data.gatewayId,
         NatGatewayId: data.natGatewayId,
         TransitGatewayId: data.transitGatewayId,
+        VpcEndpointId: data.vpcEndpointId,
       })
     );
     return { success: true };

@@ -52,6 +52,7 @@ export const SERVICE_PREFIXES: Record<string, string> = {
   resourceExplorer: "resource-explorer-2",
   directConnect: "directconnect",
   route53Resolver: "route53resolver",
+  networkFirewall: "network-firewall",
 };
 
 /**
@@ -123,6 +124,15 @@ function extractResourceArn(servicePrefix: string, commandName: string, input: a
         if (input.KeyName) {
           return `arn:aws:ec2:us-east-1:${accountId}:key-pair/${input.KeyName}`;
         }
+        break;
+
+      case "network-firewall":
+        if (input.FirewallArn) return input.FirewallArn;
+        if (input.FirewallPolicyArn) return input.FirewallPolicyArn;
+        if (input.RuleGroupArn) return input.RuleGroupArn;
+        if (input.FirewallName) return `arn:aws:network-firewall:us-east-1:${accountId}:firewall/${input.FirewallName}`;
+        if (input.FirewallPolicyName) return `arn:aws:network-firewall:us-east-1:${accountId}:firewall-policy/${input.FirewallPolicyName}`;
+        if (input.RuleGroupName) return `arn:aws:network-firewall:us-east-1:${accountId}:rulegroup/${input.RuleGroupName}`;
         break;
     }
   } catch {
