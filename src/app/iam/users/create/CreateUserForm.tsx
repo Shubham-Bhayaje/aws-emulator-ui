@@ -11,6 +11,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createUserWithDetails } from "../../actions";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 
 interface PolicyOption {
   name: string;
@@ -105,9 +106,7 @@ export function CreateUserForm({ policies, groups }: Props) {
     <>
       <form onSubmit={handleSubmit} className="space-y-6 max-w-[900px]">
         {error && (
-          <div className="bg-[#fdf3f1] border border-[#d13212] rounded p-4 text-[13px] text-[#d13212]">
-            {error}
-          </div>
+          <EmulatorOfflineBanner error={error} className="mb-4" />
         )}
 
         {/* Step 1: User details */}

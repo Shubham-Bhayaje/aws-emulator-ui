@@ -9,6 +9,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createGroupWithDetails } from "../../actions";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 
 interface Props {
   users: Array<{ userName: string; userId: string; createDate: string }>;
@@ -75,9 +76,7 @@ export function CreateGroupForm({ users, policies }: Props) {
   return (
     <form onSubmit={handleSubmit} className="space-y-6 max-w-[1000px]">
       {error && (
-        <div className="p-3 bg-[#fdf3f1] border border-[#d13212] rounded-sm text-[13px] text-[#d13212]">
-          {error}
-        </div>
+        <EmulatorOfflineBanner error={error} className="mb-4" />
       )}
 
       {/* Step 1: Group Name */}

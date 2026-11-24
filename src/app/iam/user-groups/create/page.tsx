@@ -8,17 +8,34 @@ import { iamNav } from "../../page";
 import { iam } from "@/lib/aws";
 import { ListUsersCommand, ListPoliciesCommand } from "@aws-sdk/client-iam";
 import { CreateGroupForm } from "./CreateGroupForm";
+import { getActiveIdentity } from "@/lib/identity";
+import { evaluatePermissions } from "@/lib/permissions";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateUserGroupPage() {
   let users: Array<{ userName: string; userId: string; createDate: string }> = [];
   let policies: Array<{ name: string; arn: string; description: string; isAWSManaged: boolean }> = [];
+  let pageError: string | null = null;
+
+  const identity = await getActiveIdentity();
+  const canCreateGroup = evaluatePermissions(identity, "iam:CreateGroup").allowed;
+
+  if (!canCreateGroup && identity.type !== "admin") {
+    pageError = `AccessDeniedException: User: ${identity.arn} is not authorized to perform: iam:CreateGroup on resource: * because no identity-based policy allows the iam:CreateGroup action`;
+  }
 
   try {
     const [usersRes, policiesRes] = await Promise.all([
-      iam.send(new ListUsersCommand({})),
-      iam.send(new ListPoliciesCommand({ Scope: "All", MaxItems: 100 })),
+      iam.send(new ListUsersCommand({})).catch((err: any) => {
+        if (!pageError) pageError = err?.message || String(err);
+        return { Users: [] };
+      }),
+      iam.send(new ListPoliciesCommand({ Scope: "All", MaxItems: 100 })).catch((err: any) => {
+        if (!pageError) pageError = err?.message || String(err);
+        return { Policies: [] };
+      }),
     ]);
 
     users = (usersRes.Users || []).map((u) => ({
@@ -33,8 +50,10 @@ export default async function CreateUserGroupPage() {
       description: p.Description || "IAM policy",
       isAWSManaged: (p.Arn || "").includes(":aws:policy"),
     }));
-  } catch (err) {
-    console.error("Error fetching users or policies for group creation:", err);
+  } catch (err: any) {
+    if (!pageError) {
+      pageError = err?.message || String(err);
+    }
   }
 
   return (
@@ -44,6 +63,10 @@ export default async function CreateUserGroupPage() {
         <p className="text-[13px] text-[#545b64] mb-6">
           Specify a group name, add users, and attach permissions policies.
         </p>
+
+        {pageError && (
+          <EmulatorOfflineBanner error={pageError} className="mb-6" />
+        )}
 
         <CreateGroupForm users={users} policies={policies} />
       </div>

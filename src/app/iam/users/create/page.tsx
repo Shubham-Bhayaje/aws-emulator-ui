@@ -9,16 +9,32 @@ import { iam } from "@/lib/aws";
 import { ListPoliciesCommand, ListGroupsCommand } from "@aws-sdk/client-iam";
 import { CreateUserForm } from "./CreateUserForm";
 import { iamNav } from "../../page";
+import { getActiveIdentity } from "@/lib/identity";
+import { evaluatePermissions } from "@/lib/permissions";
+import EmulatorOfflineBanner from "@/components/EmulatorOfflineBanner";
 
 export const dynamic = "force-dynamic";
 
 export default async function CreateUserPage() {
   let policies: { name: string; arn: string }[] = [];
   let groups: { name: string }[] = [];
+  let pageError: string | null = null;
+
+  const identity = await getActiveIdentity();
+  const canCreateUser = evaluatePermissions(identity, "iam:CreateUser").allowed;
+
+  if (!canCreateUser && identity.type !== "admin") {
+    pageError = `AccessDeniedException: User: ${identity.arn} is not authorized to perform: iam:CreateUser on resource: * because no identity-based policy allows the iam:CreateUser action`;
+  }
 
   try {
     const [policiesRes, groupsRes] = await Promise.all([
-      iam.send(new ListPoliciesCommand({ Scope: "All", MaxItems: 150 })),
+      iam.send(new ListPoliciesCommand({ Scope: "All", MaxItems: 150 })).catch((err: any) => {
+        if (!pageError) {
+          pageError = err?.message || String(err);
+        }
+        return { Policies: [] };
+      }),
       iam.send(new ListGroupsCommand({})).catch(() => ({ Groups: [] })),
     ]);
 
@@ -32,8 +48,10 @@ export default async function CreateUserPage() {
     groups = (groupsRes.Groups ?? []).map((g) => ({
       name: g.GroupName ?? "",
     })).filter((g) => g.name);
-  } catch (err) {
-    console.error("Error fetching policies or groups for user creation:", err);
+  } catch (err: any) {
+    if (!pageError) {
+      pageError = err?.message || String(err);
+    }
   }
 
   return (
@@ -43,6 +61,10 @@ export default async function CreateUserPage() {
         <p className="text-[13px] text-[#545b64] mb-6">
           Create an IAM user, configure console access, assign user groups, and attach permissions policies.
         </p>
+
+        {pageError && (
+          <EmulatorOfflineBanner error={pageError} className="mb-6" />
+        )}
 
         <CreateUserForm policies={policies} groups={groups} />
       </div>
