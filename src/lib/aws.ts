@@ -55,6 +55,7 @@ import { Route53ResolverClient } from "@aws-sdk/client-route53resolver";
 import { NodeHttpHandler } from "@smithy/node-http-handler";
 import https from "https";
 import { Readable } from "stream";
+import { withIAMEnforcement } from "./iam-interceptor";
 
 // The emulator runs here (self-signed HTTPS, cert trusted via NODE_EXTRA_CA_CERTS)
 const ENDPOINT = process.env.AWS_ENDPOINT_URL || process.env.EMULATOR_ENDPOINT || "https://127.0.0.1:9297";
@@ -82,229 +83,360 @@ const defaultHttpHandler = new NodeHttpHandler({
   requestTimeout: 5000,
 });
 
-// --- EC2 / VPC ---
-export const ec2 = new EC2Client({
+/**
+ * Factory helper for creating new AWS SDK clients with automatic IAM authorization enforcement.
+ * Any new AWS service added in the future should be instantiated using this function:
+ * e.g.: export const bedrock = createAwsClient(BedrockClient, "bedrock");
+ */
+export function createAwsClient<T extends { send: (...args: any[]) => any }>(
+  ClientClass: new (config: any) => T,
+  servicePrefix: string,
+  customConfig?: any
+): T {
+  const client = new ClientClass({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+    ...customConfig,
+  });
+  return withIAMEnforcement(client, servicePrefix);
+}
+
+// --- System IAM Client (Unintercepted, reserved exclusively for internal identity resolution) ---
+export const systemIam = new IAMClient({
   endpoint: ENDPOINT,
   region: DEFAULT_REGION,
   requestHandler: defaultHttpHandler,
 });
+
+// --- EC2 / VPC ---
+export const ec2 = withIAMEnforcement(
+  new EC2Client({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "ec2"
+);
 
 // --- ELB v2 (Elastic Load Balancing) ---
-export const elbv2 = new ElasticLoadBalancingV2Client({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: defaultHttpHandler,
-});
+export const elbv2 = withIAMEnforcement(
+  new ElasticLoadBalancingV2Client({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "elasticloadbalancing"
+);
 
 // --- Auto Scaling ---
-export const autoScaling = new AutoScalingClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: defaultHttpHandler,
-});
+export const autoScaling = withIAMEnforcement(
+  new AutoScalingClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "autoscaling"
+);
 
 // --- S3 ---
-export const s3 = new S3Client({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  forcePathStyle: true, // required: emulator doesn't support virtual-hosted buckets
-  requestHandler: defaultHttpHandler,
-});
+export const s3 = withIAMEnforcement(
+  new S3Client({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    forcePathStyle: true, // required: emulator doesn't support virtual-hosted buckets
+    requestHandler: defaultHttpHandler,
+  }),
+  "s3"
+);
 
 // --- SQS ---
-export const sqs = new SQSClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: defaultHttpHandler,
-});
+export const sqs = withIAMEnforcement(
+  new SQSClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "sqs"
+);
 
 // --- DynamoDB ---
-export const dynamodb = new DynamoDBClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: defaultHttpHandler,
-});
+export const dynamodb = withIAMEnforcement(
+  new DynamoDBClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "dynamodb"
+);
 
 // --- IAM ---
-export const iam = new IAMClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: defaultHttpHandler,
-});
+export const iam = withIAMEnforcement(
+  new IAMClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "iam"
+);
 
 // --- STS (Security Token Service – used to verify identity) ---
-export const sts = new STSClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: defaultHttpHandler,
-});
+export const sts = withIAMEnforcement(
+  new STSClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "sts"
+);
 
 // --- Lambda ---
-export const lambda = new LambdaClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: defaultHttpHandler,
-});
+export const lambda = withIAMEnforcement(
+  new LambdaClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: defaultHttpHandler,
+  }),
+  "lambda"
+);
 
 // --- Organizations ---
-export const organizations = new OrganizationsClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const organizations = withIAMEnforcement(
+  new OrganizationsClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "organizations"
+);
 
 // --- KMS (Key Management Service) ---
-export const kms = new KMSClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const kms = withIAMEnforcement(
+  new KMSClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "kms"
+);
 
 // --- RAM (Resource Access Manager) ---
-export const ram = new RAMClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const ram = withIAMEnforcement(
+  new RAMClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "ram"
+);
 
 // --- Service Quotas ---
-export const serviceQuotas = new ServiceQuotasClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const serviceQuotas = withIAMEnforcement(
+  new ServiceQuotasClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "servicequotas"
+);
 
 // --- Resource Groups Tagging API ---
-export const resourceGroupsTaggingApi = new ResourceGroupsTaggingAPIClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const resourceGroupsTaggingApi = withIAMEnforcement(
+  new ResourceGroupsTaggingAPIClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "tag"
+);
 
 // --- Resource Groups ---
-export const resourceGroups = new ResourceGroupsClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const resourceGroups = withIAMEnforcement(
+  new ResourceGroupsClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "resource-groups"
+);
 
 // --- AWS Account Management ---
-export const accountClient = new AccountClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const accountClient = withIAMEnforcement(
+  new AccountClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "account"
+);
 
 // --- ACM (AWS Certificate Manager) ---
-export const acm = new ACMClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const acm = withIAMEnforcement(
+  new ACMClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "acm"
+);
 
 // --- Route 53 (DNS) ---
-export const route53 = new Route53Client({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const route53 = withIAMEnforcement(
+  new Route53Client({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "route53"
+);
 
 // --- Secrets Manager ---
-export const secretsManager = new SecretsManagerClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const secretsManager = withIAMEnforcement(
+  new SecretsManagerClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "secretsmanager"
+);
 
 // --- SSM (Systems Manager / Parameter Store) ---
-export const ssm = new SSMClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const ssm = withIAMEnforcement(
+  new SSMClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "ssm"
+);
 
 // --- ACM-PCA (AWS Private Certificate Authority) ---
-export const acmPca = new ACMPCAClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const acmPca = withIAMEnforcement(
+  new ACMPCAClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "acm-pca"
+);
 
 // --- CloudHSM V2 ---
-export const cloudhsmv2 = new CloudHSMV2Client({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const cloudhsmv2 = withIAMEnforcement(
+  new CloudHSMV2Client({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "cloudhsm"
+);
 
 // --- Directory Service ---
-export const ds = new DirectoryServiceClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const ds = withIAMEnforcement(
+  new DirectoryServiceClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "ds"
+);
 
 // --- S3 Glacier ---
-export const glacier = new GlacierClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const glacier = withIAMEnforcement(
+  new GlacierClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "glacier"
+);
 
 // --- SNS ---
-export const sns = new SNSClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const sns = withIAMEnforcement(
+  new SNSClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "sns"
+);
 
 // --- Amazon Keyspaces (for Apache Cassandra) ---
-export const keyspaces = new KeyspacesClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const keyspaces = withIAMEnforcement(
+  new KeyspacesClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "cassandra"
+);
 
 // --- Amazon Timestream ---
-export const timestreamWrite = new TimestreamWriteClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const timestreamWrite = withIAMEnforcement(
+  new TimestreamWriteClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "timestream"
+);
 
-export const timestreamQuery = new TimestreamQueryClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-});
+export const timestreamQuery = withIAMEnforcement(
+  new TimestreamQueryClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+  }),
+  "timestream"
+);
 
 // --- Amazon Kinesis Data Streams ---
-export const kinesis = new KinesisClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler(),
-});
+export const kinesis = withIAMEnforcement(
+  new KinesisClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler(),
+  }),
+  "kinesis"
+);
 
 // --- Amazon CloudWatch Logs ---
-export const cloudwatchLogs = new CloudWatchLogsClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler(),
-});
+export const cloudwatchLogs = withIAMEnforcement(
+  new CloudWatchLogsClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler(),
+  }),
+  "logs"
+);
 
 // --- Amazon Elastic Container Registry (ECR) ---
-export const ecr = new ECRClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler(),
-});
+export const ecr = withIAMEnforcement(
+  new ECRClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler(),
+  }),
+  "ecr"
+);
 
 // --- Amazon Simple Email Service (SES v1 & v2) ---
-export const ses = new SESClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler(),
-});
+export const ses = withIAMEnforcement(
+  new SESClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler(),
+  }),
+  "ses"
+);
 
-export const sesv2 = new SESv2Client({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler(),
-});
+export const sesv2 = withIAMEnforcement(
+  new SESv2Client({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler(),
+  }),
+  "ses"
+);
 
 // --- AWS AppConfig & AppConfigData ---
-export const appconfig = new AppConfigClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler(),
-});
+export const appconfig = withIAMEnforcement(
+  new AppConfigClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler(),
+  }),
+  "appconfig"
+);
 
-export const appconfigData = new AppConfigDataClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler(),
-});
+export const appconfigData = withIAMEnforcement(
+  new AppConfigDataClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler(),
+  }),
+  "appconfig"
+);
 
 // Custom HTTPS agent to support subdomain endpoint prefixes in LocationClient (e.g. cp.maps.localhost, cp.tracking.localhost)
 const locationHttpsAgent = new https.Agent({
@@ -313,11 +445,14 @@ const locationHttpsAgent = new https.Agent({
 });
 
 // --- Amazon Location Service ---
-export const location = new LocationClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler({ httpsAgent: locationHttpsAgent }),
-});
+export const location = withIAMEnforcement(
+  new LocationClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler({ httpsAgent: locationHttpsAgent }),
+  }),
+  "geo"
+);
 
 // Custom HTTPS agent for AWS Cloud Map
 const cloudMapHttpsAgent = new https.Agent({
@@ -327,11 +462,14 @@ const cloudMapHttpsAgent = new https.Agent({
 });
 
 // --- AWS Cloud Map (Service Discovery) ---
-export const serviceDiscovery = new ServiceDiscoveryClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler({ httpsAgent: cloudMapHttpsAgent }),
-});
+export const serviceDiscovery = withIAMEnforcement(
+  new ServiceDiscoveryClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler({ httpsAgent: cloudMapHttpsAgent }),
+  }),
+  "servicediscovery"
+);
 
 // Middleware to strip 'data-' endpoint prefix for DiscoverInstances in local emulator
 serviceDiscovery.middlewareStack.add(
@@ -355,11 +493,14 @@ const resourceExplorerHttpsAgent = new https.Agent({
   servername: "localhost",
 });
 
-export const resourceExplorer = new ResourceExplorer2Client({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler({ httpsAgent: resourceExplorerHttpsAgent }),
-});
+export const resourceExplorer = withIAMEnforcement(
+  new ResourceExplorer2Client({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler({ httpsAgent: resourceExplorerHttpsAgent }),
+  }),
+  "resource-explorer-2"
+);
 
 // Middleware to normalize numeric or bigDecimal LastUpdatedAt / CreatedAt / LastReportedAt timestamps
 // to ISO-8601 strings so that Smithy's RFC-3339 deserializer parses them cleanly
@@ -405,18 +546,24 @@ resourceExplorer.middlewareStack.add(
 );
 
 // --- Direct Connect ---
-export const directConnect = new DirectConnectClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
-});
+export const directConnect = withIAMEnforcement(
+  new DirectConnectClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
+  }),
+  "directconnect"
+);
 
 // --- Route 53 Resolver ---
-export const route53Resolver = new Route53ResolverClient({
-  endpoint: ENDPOINT,
-  region: DEFAULT_REGION,
-  requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
-});
+export const route53Resolver = withIAMEnforcement(
+  new Route53ResolverClient({
+    endpoint: ENDPOINT,
+    region: DEFAULT_REGION,
+    requestHandler: new NodeHttpHandler({ httpsAgent: ec2HttpsAgent }),
+  }),
+  "route53resolver"
+);
 
 
 

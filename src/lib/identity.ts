@@ -8,7 +8,7 @@
 "use server";
 
 import { cookies } from "next/headers";
-import { iam } from "./aws";
+import { systemIam as iam } from "./aws";
 import {
   ListUsersCommand,
   ListRolesCommand,
