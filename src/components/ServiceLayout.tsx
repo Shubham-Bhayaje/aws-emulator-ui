@@ -38,16 +38,51 @@ export default function ServiceLayout({
       const stored: Array<{ name: string; href: string; visitedAt?: number }> = JSON.parse(
         localStorage.getItem("recentServices") || "[]"
       );
-      const rootSegment = "/" + (pathname.split("/")[1] || serviceName.toLowerCase().replace(/\s+/g, ""));
-      const isGlacier = rootSegment.includes("glacier") || serviceName.toLowerCase().includes("glacier");
-      const targetHref = isGlacier ? "/glacier" : rootSegment;
-      const targetName = isGlacier ? "Amazon S3 Glacier" : serviceName;
+
+      let targetHref = "/" + (pathname.split("/")[1] || serviceName.toLowerCase().replace(/\s+/g, ""));
+      let targetName = serviceName;
+
+      if (
+        pathname.startsWith("/vpc/firewalls") ||
+        pathname.startsWith("/vpc/firewall-policies") ||
+        pathname.startsWith("/vpc/rule-groups") ||
+        pathname.startsWith("/network-firewall") ||
+        pathname.startsWith("/networkfirewall")
+      ) {
+        targetHref = "/vpc/firewalls";
+        targetName = "AWS Network Firewall";
+      } else if (pathname.startsWith("/vpc/transit-gateway")) {
+        targetHref = "/vpc/transit-gateways";
+        targetName = "AWS Transit Gateway";
+      } else if (pathname.startsWith("/vpc/client-vpn")) {
+        targetHref = "/vpc/client-vpn-endpoints";
+        targetName = "AWS Client VPN";
+      } else if (
+        pathname.startsWith("/vpc/vpn-connection") ||
+        pathname.startsWith("/vpc/customer-gateway") ||
+        pathname.startsWith("/vpc/virtual-private-gateway")
+      ) {
+        targetHref = "/vpc/vpn-connections";
+        targetName = "AWS Site-to-Site VPN";
+      } else if (pathname.startsWith("/systems-manager/parameter-store")) {
+        targetHref = "/systems-manager/parameter-store";
+        targetName = "AWS Systems Manager Parameter Store";
+      } else if (pathname.startsWith("/route53/resolver")) {
+        targetHref = "/route53/resolver";
+        targetName = "AWS Route 53 Resolver";
+      } else if (pathname.startsWith("/cloudwatch/logs")) {
+        targetHref = "/cloudwatch/logs";
+        targetName = "Amazon CloudWatch Logs";
+      } else if (pathname.includes("glacier") || serviceName.toLowerCase().includes("glacier")) {
+        targetHref = "/glacier";
+        targetName = "Amazon S3 Glacier";
+      }
 
       const filtered = stored.filter((s) => {
         if (!s || !s.href) return false;
         const sHref = s.href.toLowerCase().trim();
         const sName = s.name.toLowerCase().trim();
-        if (isGlacier && (sHref.includes("glacier") || sName.includes("glacier"))) return false;
+        if (targetHref === "/glacier" && (sHref.includes("glacier") || sName.includes("glacier"))) return false;
         if (sHref === targetHref.toLowerCase().trim() || sName === targetName.toLowerCase().trim()) return false;
         return true;
       });

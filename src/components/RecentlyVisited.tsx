@@ -1,11 +1,12 @@
 /**
  * RecentlyVisited.tsx – Authentic AWS Console "Recently visited" widget.
  * Features:
- * - 2-column service launcher matching AWS Console Home
+ * - Dynamic display of ONLY services accessed by the user (no fixed/default pre-population)
  * - Real vector AWS service icons (zero emojis)
  * - Auto-tracking of recently accessed services in localStorage
  * - Interactive hover-to-remove button for individual services
  * - Functional "Clear history" action
+ * - Authentic AWS empty state when no services have been accessed yet
  * - Quick link to "All services (200+)" catalog
  * - Cloudscape enterprise styling.
  */
@@ -22,27 +23,6 @@ export type RecentService = {
   href: string;
   visitedAt?: number;
 };
-
-// Default service list matching AWS Console Home screenshot with exact active catalog paths
-const DEFAULT_SERVICES: RecentService[] = [
-  // Left column
-  { name: "IoT Core", href: "/iot-core" },
-  { name: "DynamoDB", href: "/dynamodb" },
-  { name: "Amazon Bedrock", href: "/bedrock" },
-  { name: "Security Hub", href: "/securityhub" },
-  { name: "Lambda", href: "/lambda" },
-  { name: "CloudFront", href: "/cloudfront" },
-  { name: "CloudFormation", href: "/cloudformation" },
-  { name: "Amazon Polly", href: "/polly" },
-  // Right column
-  { name: "RDS", href: "/rds" },
-  { name: "Device Farm", href: "/devicefarm" },
-  { name: "AWS Billing Conductor", href: "/billing-conductor" },
-  { name: "S3", href: "/s3" },
-  { name: "Route 53", href: "/route53" },
-  { name: "Secrets Manager", href: "/secretsmanager" },
-  { name: "Systems Manager", href: "/systems-manager" },
-];
 
 function getServiceIcon(name: string, href: string) {
   const service = findServiceByHref(href);
@@ -70,21 +50,32 @@ interface RecentlyVisitedProps {
 }
 
 export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
-  const [recents, setRecents] = useState<RecentService[]>(DEFAULT_SERVICES);
+  const [recents, setRecents] = useState<RecentService[]>([]);
+  const [isLoaded, setIsLoaded] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
 
   useEffect(() => {
     try {
-      const stored: RecentService[] = JSON.parse(localStorage.getItem("recentServices") || "[]");
+      const raw = localStorage.getItem("recentServices");
+      if (!raw) {
+        setRecents([]);
+        setIsLoaded(true);
+        return;
+      }
+
+      const stored: RecentService[] = JSON.parse(raw);
       const seen = new Set<string>();
       const deduped: RecentService[] = [];
 
-      for (const item of [...stored, ...DEFAULT_SERVICES]) {
-        if (!item || !item.href) continue;
+      for (const item of stored) {
+        if (!item || !item.href || !item.name) continue;
+
+        // Discard any legacy unvisited default items (only keep genuine visits with visitedAt timestamp)
+        if (!item.visitedAt) continue;
 
         let cleanHref = item.href.toLowerCase().trim().replace(/\/$/, "");
-        const isGlacier = cleanHref === "/glacier" || cleanHref.includes("glacier") || (item.name && item.name.toLowerCase().includes("glacier"));
+        const isGlacier = cleanHref === "/glacier" || cleanHref.includes("glacier") || item.name.toLowerCase().includes("glacier");
         if (isGlacier) {
           cleanHref = "/glacier";
         }
@@ -103,14 +94,18 @@ export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
 
       const finalRecents = deduped.slice(0, 16);
       setRecents(finalRecents);
-      // Clean up any stale duplicates in localStorage
+      // Clean up any stale unvisited items from localStorage
       localStorage.setItem("recentServices", JSON.stringify(finalRecents));
-    } catch { /* ignore */ }
+    } catch {
+      setRecents([]);
+    } finally {
+      setIsLoaded(true);
+    }
   }, []);
 
   function handleServiceClick(service: RecentService) {
     let cleanHref = service.href.toLowerCase().trim().replace(/\/$/, "");
-    const isGlacier = cleanHref === "/glacier" || cleanHref.includes("glacier") || (service.name && service.name.toLowerCase().includes("glacier"));
+    const isGlacier = cleanHref === "/glacier" || cleanHref.includes("glacier") || service.name.toLowerCase().includes("glacier");
     const targetHref = isGlacier ? "/glacier" : service.href;
     const targetName = isGlacier ? "Amazon S3 Glacier" : service.name;
 
@@ -144,14 +139,14 @@ export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
   }
 
   function handleClearRecents() {
-    setRecents(DEFAULT_SERVICES);
+    setRecents([]);
     try {
       localStorage.removeItem("recentServices");
     } catch { /* ignore */ }
     setShowMenu(false);
   }
 
-  // Split into 2 columns (approx 8 items per column)
+  // Split into 2 columns
   const leftCol = recents.slice(0, Math.ceil(recents.length / 2));
   const rightCol = recents.slice(Math.ceil(recents.length / 2));
 
@@ -207,12 +202,14 @@ export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
               >
                 Widget info
               </button>
-              <button
-                onClick={handleClearRecents}
-                className="w-full text-left px-3 py-1.5 hover:bg-[#f2f8fd] text-[#16191f]"
-              >
-                Reset to default list
-              </button>
+              {recents.length > 0 && (
+                <button
+                  onClick={handleClearRecents}
+                  className="w-full text-left px-3 py-1.5 hover:bg-[#f2f8fd] text-[#d13212]"
+                >
+                  Clear history
+                </button>
+              )}
               <Link
                 href="/services"
                 className="block w-full text-left px-3 py-1.5 hover:bg-[#f2f8fd] text-[#16191f]"
@@ -236,119 +233,138 @@ export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
         </div>
       </div>
 
-      {/* 2-Column Grid */}
-      <div className="p-4 flex-1">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
-          {/* Left Column */}
-          <div className="space-y-0.5">
-            {leftCol.map((service, idx) => {
-              const relTime = formatRelativeTime(service.visitedAt);
-              return (
-                <div
-                  key={`recent-l-${service.href}-${idx}`}
-                  className="group relative flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-[#f2f8fd] transition-colors"
-                >
-                  <Link
-                    href={service.href}
-                    onClick={() => handleServiceClick(service)}
-                    className="flex items-center gap-2.5 min-w-0 flex-1"
-                  >
-                    <span className="shrink-0 flex items-center justify-center w-5 h-5">
-                      {getServiceIcon(service.name, service.href)}
-                    </span>
-                    <span className="text-[13px] text-[#0073bb] group-hover:text-[#ec7211] group-hover:underline truncate font-medium">
-                      {service.name}
-                    </span>
-                  </Link>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {relTime && (
-                      <span className="text-[10px] text-[#879596] hidden group-hover:inline-block">
-                        {relTime}
-                      </span>
-                    )}
-                    <button
-                      onClick={(e) => handleRemoveItem(service.href, e)}
-                      className="opacity-0 group-hover:opacity-100 text-[#879596] hover:text-[#d13212] p-0.5"
-                      title="Remove from recents"
-                    >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Content Area */}
+      {isLoaded && recents.length === 0 ? (
+        <div className="p-8 flex-1 flex flex-col items-center justify-center text-center">
+          <div className="w-12 h-12 rounded-full bg-[#f2f3f3] flex items-center justify-center text-[#545b64] mb-3">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
           </div>
-
-          {/* Right Column */}
-          <div className="space-y-0.5">
-            {rightCol.map((service, idx) => {
-              const relTime = formatRelativeTime(service.visitedAt);
-              return (
-                <div
-                  key={`recent-r-${service.href}-${idx}`}
-                  className="group relative flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-[#f2f8fd] transition-colors"
-                >
-                  <Link
-                    href={service.href}
-                    onClick={() => handleServiceClick(service)}
-                    className="flex items-center gap-2.5 min-w-0 flex-1"
+          <div className="text-[14px] font-bold text-[#16191f] mb-1">
+            You don&apos;t have any recently visited services
+          </div>
+          <div className="text-[12px] text-[#545b64] max-w-[340px] mb-4 leading-normal">
+            Services you access across the AWS Management Console will automatically appear here for quick navigation.
+          </div>
+          <Link
+            href="/services"
+            className="inline-flex items-center justify-center text-[13px] font-bold px-4 rounded border border-[#545b64] text-[#16191f] hover:bg-[#f2f3f3] transition-colors"
+            style={{ height: "32px", minHeight: "32px", maxHeight: "32px" }}
+          >
+            View all services
+          </Link>
+        </div>
+      ) : (
+        /* 2-Column Grid */
+        <div className="p-4 flex-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
+            {/* Left Column */}
+            <div className="space-y-0.5">
+              {leftCol.map((service, idx) => {
+                const relTime = formatRelativeTime(service.visitedAt);
+                return (
+                  <div
+                    key={`recent-l-${service.href}-${idx}`}
+                    className="group relative flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-[#f2f8fd] transition-colors"
                   >
-                    <span className="shrink-0 flex items-center justify-center w-5 h-5">
-                      {getServiceIcon(service.name, service.href)}
-                    </span>
-                    <span className="text-[13px] text-[#0073bb] group-hover:text-[#ec7211] group-hover:underline truncate font-medium">
-                      {service.name}
-                    </span>
-                  </Link>
-
-                  <div className="flex items-center gap-2 shrink-0">
-                    {relTime && (
-                      <span className="text-[10px] text-[#879596] hidden group-hover:inline-block">
-                        {relTime}
-                      </span>
-                    )}
-                    <button
-                      onClick={(e) => handleRemoveItem(service.href, e)}
-                      className="opacity-0 group-hover:opacity-100 text-[#879596] hover:text-[#d13212] p-0.5"
-                      title="Remove from recents"
+                    <Link
+                      href={service.href}
+                      onClick={() => handleServiceClick(service)}
+                      className="flex items-center gap-2.5 min-w-0 flex-1"
                     >
-                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                        <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                      </svg>
-                    </button>
+                      <span className="shrink-0 flex items-center justify-center w-5 h-5">
+                        {getServiceIcon(service.name, service.href)}
+                      </span>
+                      <span className="text-[13px] text-[#0073bb] group-hover:text-[#ec7211] group-hover:underline truncate font-medium">
+                        {service.name}
+                      </span>
+                    </Link>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {relTime && (
+                        <span className="text-[10px] text-[#879596] hidden group-hover:inline-block">
+                          {relTime}
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => handleRemoveItem(service.href, e)}
+                        className="opacity-0 group-hover:opacity-100 text-[#879596] hover:text-[#d13212] p-0.5 cursor-pointer"
+                        title="Remove from recents"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-0.5">
+              {rightCol.map((service, idx) => {
+                const relTime = formatRelativeTime(service.visitedAt);
+                return (
+                  <div
+                    key={`recent-r-${service.href}-${idx}`}
+                    className="group relative flex items-center justify-between py-1.5 px-2 -mx-2 rounded hover:bg-[#f2f8fd] transition-colors"
+                  >
+                    <Link
+                      href={service.href}
+                      onClick={() => handleServiceClick(service)}
+                      className="flex items-center gap-2.5 min-w-0 flex-1"
+                    >
+                      <span className="shrink-0 flex items-center justify-center w-5 h-5">
+                        {getServiceIcon(service.name, service.href)}
+                      </span>
+                      <span className="text-[13px] text-[#0073bb] group-hover:text-[#ec7211] group-hover:underline truncate font-medium">
+                        {service.name}
+                      </span>
+                    </Link>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      {relTime && (
+                        <span className="text-[10px] text-[#879596] hidden group-hover:inline-block">
+                          {relTime}
+                        </span>
+                      )}
+                      <button
+                        onClick={(e) => handleRemoveItem(service.href, e)}
+                        className="opacity-0 group-hover:opacity-100 text-[#879596] hover:text-[#d13212] p-0.5 cursor-pointer"
+                        title="Remove from recents"
+                      >
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Footer Link */}
-      <div className="px-4 py-2.5 border-t border-[#eaeded] flex items-center justify-between text-[12px] bg-white">
+      <div className="px-4 py-2.5 border-t border-[#eaeded] flex items-center justify-between text-[12px] bg-white mt-auto">
         <Link
           href="/services"
           className="text-[#0073bb] hover:text-[#ec7211] hover:underline font-medium"
         >
           View all services (200+) &rarr;
         </Link>
-        <button
-          onClick={handleClearRecents}
-          className="text-[11px] text-[#879596] hover:text-[#16191f] cursor-pointer"
-        >
-          Clear history
-        </button>
-      </div>
-
-      {/* Resize handle icon */}
-      <div className="absolute right-1 bottom-1 text-[#aab7b8] pointer-events-none">
-        <svg width="8" height="8" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth="1.2">
-          <line x1="9" y1="3" x2="3" y2="9" />
-          <line x1="9" y1="6" x2="6" y2="9" />
-        </svg>
+        {recents.length > 0 && (
+          <button
+            onClick={handleClearRecents}
+            className="text-[11px] text-[#879596] hover:text-[#d13212] cursor-pointer hover:underline"
+          >
+            Clear history
+          </button>
+        )}
       </div>
 
       {/* Info Modal */}
@@ -364,13 +380,16 @@ export default function RecentlyVisited({ onRemove }: RecentlyVisitedProps) {
               </button>
             </div>
             <p className="text-[13px] text-[#545b64] leading-relaxed">
-              Maintains an automatic shortcut history of services you access across the console.
-              You can remove individual services or reset to the AWS default launcher.
+              The <strong>Recently visited</strong> widget automatically records the services you have accessed in this console session. No default services are pre-populated.
+            </p>
+            <p className="text-[13px] text-[#545b64] leading-relaxed">
+              You can remove an individual service by hovering over it and clicking the <strong>&times;</strong> icon, or clear your entire navigation history by clicking <strong>Clear history</strong>.
             </p>
             <div className="flex justify-end pt-2 border-t border-[#eaeded]">
               <button
                 onClick={() => setShowInfoModal(false)}
-                className="px-4 py-1.5 text-[13px] bg-[#0073bb] text-white rounded-sm font-medium hover:bg-[#005a9e]"
+                className="px-4 py-1.5 text-[13px] font-bold text-white bg-[#ec7211] hover:bg-[#eb5f07] rounded"
+                style={{ height: "32px", minHeight: "32px", maxHeight: "32px" }}
               >
                 Close
               </button>
